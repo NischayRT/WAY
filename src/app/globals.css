@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
+html.dark {
+  --background: #090d16;
+  --foreground: #f8fafc;
+  color-scheme: dark;
+}
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-ink: #0f172a;
+  --color-leaf: #f8fafc;
+  --color-surface: #ffffff;
+  --color-stone: #e2e8f0;
+  --color-turmeric: #f59e0b;
+  --color-cardamom: #10b981;
+  --color-brick: #3b82f6;
+  --color-brinjal: #8b5cf6;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-mono: var(--font-plex-mono), monospace;
+  --font-brand: var(--font-instrument-serif), Georgia, serif;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.font-numeric {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum";
+}
+
+/* --- VIBRANT NEON GLOW ACCENTS (Visible in Light & Dark) --- */
+.neon-amber {
+  filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.55));
+}
+.neon-emerald {
+  filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.55));
+}
+.neon-blue {
+  filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.55));
+}
+.neon-purple {
+  filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.55));
+}
+
+.dark .neon-box-amber {
+  box-shadow: 0 0 24px -2px rgba(245, 158, 11, 0.35), inset 0 0 12px rgba(245, 158, 11, 0.15);
+}
+.dark .neon-box-emerald {
+  box-shadow: 0 0 24px -2px rgba(16, 185, 129, 0.35), inset 0 0 12px rgba(16, 185, 129, 0.15);
+}
+.dark .neon-box-blue {
+  box-shadow: 0 0 24px -2px rgba(59, 130, 246, 0.35), inset 0 0 12px rgba(59, 130, 246, 0.15);
+}
+.dark .neon-box-purple {
+  box-shadow: 0 0 24px -2px rgba(168, 85, 247, 0.35), inset 0 0 12px rgba(168, 85, 247, 0.15);
 }

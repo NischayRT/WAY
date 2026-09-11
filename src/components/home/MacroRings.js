@@ -57,6 +57,7 @@ function MobileDottedGauge({ calorieConsumed, calorieTarget, proteinConsumed, pr
           cx={x}
           cy={y}
           r={hoveredMetric?.type === metricType ? dotRadius + 1 : dotRadius}
+          filter={isActive ? 'url(#dot-glow-mobile)' : undefined}
           onClick={() =>
             setHoveredMetric({
               type: metricType,
@@ -78,10 +79,10 @@ function MobileDottedGauge({ calorieConsumed, calorieTarget, proteinConsumed, pr
 
   return (
     <div className="relative flex flex-col items-center justify-center pt-2">
-      <svg width={270} height={225} viewBox="0 0 260 220" className="overflow-visible select-none neon-amber">
+      <svg width={270} height={225} viewBox="0 0 260 220" className="overflow-visible select-none">
         <defs>
-          <filter id="dot-glow-mobile" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="3.5" result="blur" />
+          <filter id="dot-glow-mobile" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="1.6" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -89,29 +90,25 @@ function MobileDottedGauge({ calorieConsumed, calorieTarget, proteinConsumed, pr
           </filter>
         </defs>
 
-        <g filter="url(#dot-glow-mobile)">
-          {renderTrack({
-            count: outerDotsCount,
-            radius: outerRadius,
-            activeCount: activeOuterDots,
-            activeColorClass: calColor.active,
-            dotRadius: 5.5,
-            direction: 'ltr',
-            metricType: 'calories',
-          })}
-        </g>
+        {renderTrack({
+          count: outerDotsCount,
+          radius: outerRadius,
+          activeCount: activeOuterDots,
+          activeColorClass: calColor.active,
+          dotRadius: 5.5,
+          direction: 'ltr',
+          metricType: 'calories',
+        })}
 
-        <g filter="url(#dot-glow-mobile)">
-          {renderTrack({
-            count: innerDotsCount,
-            radius: innerRadius,
-            activeCount: activeInnerDots,
-            activeColorClass: proteinColor.active,
-            dotRadius: 4.5,
-            direction: 'rtl',
-            metricType: 'protein',
-          })}
-        </g>
+        {renderTrack({
+          count: innerDotsCount,
+          radius: innerRadius,
+          activeCount: activeInnerDots,
+          activeColorClass: proteinColor.active,
+          dotRadius: 4.5,
+          direction: 'rtl',
+          metricType: 'protein',
+        })}
       </svg>
 
       <div className="absolute inset-0 flex flex-col items-center justify-center pt-6 pointer-events-none">
@@ -157,7 +154,7 @@ function MobileDottedGauge({ calorieConsumed, calorieTarget, proteinConsumed, pr
         )}
       </div>
 
-      <div className="mt-2 flex items-center justify-center text-[11px] font-medium text-slate-400">
+      <div className="flex items-center justify-center text-[11px] font-medium text-slate-400">
         <span className="flex items-center gap-1.5">
           <span className={`h-2 w-2 rounded-full ${calColor.active}`} />
           <span>Calories</span>

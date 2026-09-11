@@ -2,28 +2,39 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabaseClient';
 import ProfileForm from '@/components/forms/ProfileForm';
 import BodyStudio from '@/components/body/BodyStudio';
-import { User, Activity } from 'lucide-react';
+import { User, Activity, LogOut } from 'lucide-react';
+import { ui } from '@/lib/ui';
 
 export default function SettingsClient({ userId, initialProfile }) {
+  const supabase = createClient();
   const router = useRouter();
   const [activeSection, setActiveSection] = useState('profile');
   const [justSaved, setJustSaved] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const handleSaved = () => {
     setJustSaved(true);
     router.refresh();
   };
 
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-xl px-4 sm:px-6 py-6 space-y-5">
       {/* Settings Navigation Tabs */}
       <div className="grid grid-cols-2 rounded-xl bg-slate-200/80 dark:bg-slate-800 p-1 font-semibold text-xs text-slate-600 dark:text-slate-300">
         <button
           type="button"
           onClick={() => setActiveSection('profile')}
-          className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition ${
+          className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg transition ${
             activeSection === 'profile'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
               : 'hover:text-slate-900 dark:hover:text-white'
@@ -34,7 +45,7 @@ export default function SettingsClient({ userId, initialProfile }) {
         <button
           type="button"
           onClick={() => setActiveSection('body')}
-          className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition ${
+          className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg transition ${
             activeSection === 'body'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
               : 'hover:text-slate-900 dark:hover:text-white'
@@ -45,18 +56,40 @@ export default function SettingsClient({ userId, initialProfile }) {
       </div>
 
       {justSaved && (
-        <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
+        <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
           Profile updated successfully.
         </p>
       )}
 
-      {activeSection === 'profile' ? (
-        <ProfileForm userId={userId} initialProfile={initialProfile} onSaved={handleSaved} />
-      ) : (
-        <div className="space-y-4">
-          <BodyStudio profile={initialProfile} />
+      {/* Active Tab Content Container with proper padding and internal form spacing */}
+      <div className={`${ui.card} p-5 sm:p-7`}>
+        {activeSection === 'profile' ? (
+          <div className="space-y-4">
+            <ProfileForm userId={userId} initialProfile={initialProfile} onSaved={handleSaved} />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <BodyStudio profile={initialProfile} />
+          </div>
+        )}
+      </div>
+
+      {/* Log Out Section */}
+      <div className={`${ui.card} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 sm:p-6`}>
+        <div>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">Session</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Sign out of your WAY account on this device.</p>
         </div>
-      )}
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="inline-flex items-center gap-2 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 px-4 py-2.5 text-xs sm:text-sm font-semibold text-rose-700 dark:text-rose-300 shadow-2xs transition-all hover:bg-rose-100 dark:hover:bg-rose-900/50 active:scale-[0.98] disabled:opacity-50 cursor-pointer w-full sm:w-auto justify-center"
+        >
+          <LogOut size={15} />
+          <span>{loggingOut ? 'Signing out...' : 'Log out'}</span>
+        </button>
+      </div>
     </div>
   );
 }

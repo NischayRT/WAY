@@ -28,8 +28,8 @@ export const ui = {
   linkMuted: 'text-xs sm:text-sm text-slate-500 dark:text-slate-400 transition hover:text-slate-900 dark:hover:text-white',
   linkAccent: 'text-xs sm:text-sm font-semibold text-emerald-600 dark:text-emerald-400 transition hover:text-emerald-700 dark:hover:text-emerald-300',
 
-  heading: 'text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white',
-  subheading: 'flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white',
+  heading: 'font-heading text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white',
+  subheading: 'font-heading flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white',
   numeric: 'font-numeric',
 
   macroText: {

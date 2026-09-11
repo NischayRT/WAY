@@ -17,7 +17,6 @@ export default function BottomNav() {
 
   return (
     <>
-      {/* Mobile Navigation (<768px) */}
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md md:hidden">
         <div className="mx-auto flex max-w-md items-center justify-around px-3 py-2">
           {ITEMS.map(({ href, label, icon: Icon }) => {
@@ -40,10 +39,8 @@ export default function BottomNav() {
         </div>
       </nav>
 
-      {/* Desktop Hover-Expandable Sidebar (>=768px) */}
       <aside className="group hidden md:flex fixed top-0 left-0 bottom-0 z-50 flex-col justify-between border-r border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-950 p-3 shadow-lg shadow-slate-900/5 dark:shadow-black/50 transition-all duration-300 ease-in-out w-16 hover:w-[10.5rem] 2xl:hover:w-64 overflow-hidden">
         <div className="space-y-6">
-          {/* Brand Header with Instrument Serif Typography */}
           <div className="flex items-center gap-2.5 px-1 pt-1 select-none">
             <Link
               href="/home"
@@ -59,7 +56,6 @@ export default function BottomNav() {
             </div>
           </div>
 
-          {/* Navigation Links */}
           <nav className="space-y-1.5">
             {ITEMS.map(({ href, label, icon: Icon }) => {
               const isActive = pathname === href || pathname.startsWith(`${href}/`);

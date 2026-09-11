@@ -11,6 +11,23 @@ html.dark {
   --background: #090d16;
   --foreground: #f8fafc;
   color-scheme: dark;
+
+  /* These were missing — bg-leaf/text-ink/bg-surface/border-stone are used
+     bare (no dark: prefix) in a few places (app/layout.js's <body>, the
+     login page, weekStatus.js's empty-day cells), so without dark values
+     here those specific spots stay stuck in light mode regardless of the
+     .dark class being on <html>. */
+  --color-ink: #f1f5f9;
+  --color-leaf: #090d16;
+  --color-surface: #0f1420;
+  --color-stone: #253044;
+
+  /* Lightened one shade for dark-background contrast — saturated 500-shades
+     read as dim/muddy on a dark surface. */
+  --color-turmeric: #fbbf24;
+  --color-cardamom: #34d399;
+  --color-brick: #60a5fa;
+  --color-brinjal: #a78bfa;
 }
 @theme inline {
   --color-background: var(--background);
@@ -27,6 +44,7 @@ html.dark {
   --font-display: var(--font-fraunces), Georgia, serif;
   --font-mono: var(--font-plex-mono), monospace;
   --font-brand: var(--font-instrument-serif), Georgia, serif;
+  --font-heading: var(--font-pt-narrow), "Arial Narrow", sans-serif;
 }
 
 body {

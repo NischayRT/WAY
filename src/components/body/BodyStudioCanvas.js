@@ -6,7 +6,6 @@ import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import RealisticAvatar3D from './RealisticAvatar3D';
 import { RotateCw, Eye } from 'lucide-react';
-import { resolveArchetypeIndex, getArchetypeInfo } from '@/lib/physiqueArchetype';
 
 // Each avatar gets its own fixed-position wrapper containing its own
 // independent rotation group, so they spin in place on their own base
@@ -71,38 +70,6 @@ function StageModels({ currentData, targetData, autoRotate, wireframe }) {
   );
 }
 
-// Plain-DOM debug badge, rendered OUTSIDE the Canvas — guaranteed visible
-// regardless of what Three.js is doing, no devtools console needed. This
-// tells us definitively, on screen, exactly which of the 5 real archetypes
-// the classifier picked for each side, computed from the same props that
-// get passed into RealisticAvatar3D.
-function ArchetypeDebugBadge({ data, align }) {
-  const index = resolveArchetypeIndex({
-    bodyFatPct: data.bodyFatPct,
-    weightKg: data.weightKg,
-    heightCm: data.heightCm,
-    chestCm: data.chestCm,
-    waistCm: data.waistCm,
-    bicepCm: data.bicepCm,
-  });
-  const info = getArchetypeInfo(index);
-
-  return (
-    <div
-      style={{
-        fontSize: '10px',
-        fontFamily: 'monospace',
-        color: '#ef4444',
-        fontWeight: 'bold',
-        textAlign: align,
-        marginTop: '2px',
-      }}
-    >
-      DEBUG: index {index} → {info.meshKey} ({info.label})
-    </div>
-  );
-}
-
 export default function BodyStudioCanvas({ currentData, targetData }) {
   const [autoRotate, setAutoRotate] = useState(true);
   const [wireframe, setWireframe] = useState(false);
@@ -115,10 +82,10 @@ export default function BodyStudioCanvas({ currentData, targetData }) {
           onClick={() => setWireframe((w) => !w)}
           className={`p-2 rounded-xl border text-xs shadow-xs transition ${
             wireframe
-              ? 'border-sky-400 bg-sky-50 text-sky-700'
-              : 'border-slate-200 bg-white/90 backdrop-blur-xs text-slate-500 hover:text-slate-900'
+              ? 'border-sky-400 dark:border-sky-500 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300'
+              : 'border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
-          title="Toggle Wireframe"
+          title="Toggle wireframe"
         >
           <Eye size={14} />
         </button>
@@ -127,10 +94,10 @@ export default function BodyStudioCanvas({ currentData, targetData }) {
           onClick={() => setAutoRotate((r) => !r)}
           className={`p-2 rounded-xl border text-xs shadow-xs transition ${
             autoRotate
-              ? 'border-slate-800 bg-slate-900 text-white'
-              : 'border-slate-200 bg-white/90 backdrop-blur-xs text-slate-500 hover:text-slate-900'
+              ? 'border-slate-800 dark:border-slate-200 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
+              : 'border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
-          title="Toggle Rotation"
+          title="Toggle rotation"
         >
           <RotateCw size={14} />
         </button>
@@ -138,23 +105,21 @@ export default function BodyStudioCanvas({ currentData, targetData }) {
 
       <div className="w-full grid grid-cols-2 px-4 pt-2 z-10">
         <div className="flex flex-col text-left">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Current Baseline
+          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Now
           </span>
-          <span className="font-numeric text-xs font-bold text-slate-700 mt-0.5">
-            {currentData.weightKg} kg · {currentData.bodyFatPct}% Fat
+          <span className="font-numeric text-xs font-bold text-slate-700 dark:text-slate-200 mt-0.5">
+            {currentData.weightKg} kg · {currentData.bodyFatPct}% fat
           </span>
-          <ArchetypeDebugBadge data={currentData} align="left" />
         </div>
 
-        <div className="flex flex-col text-right pr-20">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
-            Target Goal
+        <div className="flex flex-col text-right">
+          <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            Goal
           </span>
-          <span className="font-numeric text-xs font-bold text-emerald-700 mt-0.5">
-            {targetData.weightKg} kg · {targetData.bodyFatPct}% Fat
+          <span className="font-numeric text-xs font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">
+            {targetData.weightKg} kg · {targetData.bodyFatPct}% fat
           </span>
-          <ArchetypeDebugBadge data={targetData} align="right" />
         </div>
       </div>
 
@@ -189,14 +154,14 @@ export default function BodyStudioCanvas({ currentData, targetData }) {
         </Canvas>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-2.5 pb-1 text-center font-numeric text-xs">
-        <div className="text-slate-500">
-          <span className="font-bold text-slate-800">{Math.round(currentData.waistCm / 2.54)}&quot;</span> Waist ·{' '}
-          <span className="font-bold text-slate-800">{Math.round(currentData.hipCm / 2.54)}&quot;</span> Hips
+      <div className="grid grid-cols-2 gap-4 border-t border-slate-100 dark:border-slate-800 pt-2.5 pb-1 text-center font-numeric text-xs">
+        <div className="text-slate-500 dark:text-slate-400">
+          <span className="font-bold text-slate-800 dark:text-slate-200">{Math.round(currentData.waistCm / 2.54)}&quot;</span> waist ·{' '}
+          <span className="font-bold text-slate-800 dark:text-slate-200">{Math.round(currentData.hipCm / 2.54)}&quot;</span> hips
         </div>
-        <div className="text-emerald-600">
-          <span className="font-bold text-emerald-700">{Math.round(targetData.waistCm / 2.54)}&quot;</span> Waist ·{' '}
-          <span className="font-bold text-emerald-700">{Math.round(targetData.hipCm / 2.54)}&quot;</span> Hips
+        <div className="text-emerald-600 dark:text-emerald-400">
+          <span className="font-bold text-emerald-700 dark:text-emerald-300">{Math.round(targetData.waistCm / 2.54)}&quot;</span> waist ·{' '}
+          <span className="font-bold text-emerald-700 dark:text-emerald-300">{Math.round(targetData.hipCm / 2.54)}&quot;</span> hips
         </div>
       </div>
     </div>

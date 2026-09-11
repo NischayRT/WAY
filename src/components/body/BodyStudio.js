@@ -39,24 +39,28 @@ export default function BodyStudio({ profile }) {
   const [activeTab, setActiveTab] = useState('dream');
 
   const defaultWaistIn = useMemo(() => {
+    if (profile?.waist_cm) return Math.round((Number(profile.waist_cm) / 2.54) * 2) / 2;
     const estWaistCm = (currentWeightKg / (heightCm / 100) ** 2) * 1.55 + heightCm * 0.28;
     return Math.round((estWaistCm / 2.54) * 2) / 2;
-  }, [currentWeightKg, heightCm]);
+  }, [profile?.waist_cm, currentWeightKg, heightCm]);
 
   const defaultHipIn = useMemo(() => {
+    if (profile?.hip_cm) return Math.round((Number(profile.hip_cm) / 2.54) * 2) / 2;
     const estHipCm = defaultWaistIn * 2.54 * (userSex === 'male' ? 1.07 : 1.18);
     return Math.round((estHipCm / 2.54) * 2) / 2;
-  }, [defaultWaistIn, userSex]);
+  }, [profile?.hip_cm, defaultWaistIn, userSex]);
 
   const defaultChestIn = useMemo(() => {
+    if (profile?.chest_cm) return Math.round((Number(profile.chest_cm) / 2.54) * 2) / 2;
     const estChestCm = heightCm * 0.54 + (currentWeightKg - 70) * 0.2;
     return Math.round((estChestCm / 2.54) * 2) / 2;
-  }, [heightCm, currentWeightKg]);
+  }, [profile?.chest_cm, heightCm, currentWeightKg]);
 
   const defaultBicepIn = useMemo(() => {
+    if (profile?.bicep_cm) return Math.round((Number(profile.bicep_cm) / 2.54) * 2) / 2;
     const estBicepCm = 28 + currentWeightKg / 10;
     return Math.round((estBicepCm / 2.54) * 2) / 2;
-  }, [currentWeightKg]);
+  }, [profile?.bicep_cm, currentWeightKg]);
 
   const [waistIn, setWaistIn] = useState(defaultWaistIn);
   const [hipIn, setHipIn] = useState(defaultHipIn);
@@ -198,7 +202,7 @@ export default function BodyStudio({ profile }) {
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-2 rounded-xl bg-slate-200/80 dark:bg-slate-800 p-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+      <div className="font-heading grid grid-cols-2 rounded-xl bg-slate-200/80 dark:bg-slate-800 p-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
         <button
           type="button"
           onClick={() => setActiveTab('current')}
@@ -208,7 +212,7 @@ export default function BodyStudio({ profile }) {
               : 'hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          1. Current Measurements
+          1. Measurements
         </button>
         <button
           type="button"
@@ -219,7 +223,7 @@ export default function BodyStudio({ profile }) {
               : 'hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          2. Target Transformation
+          2. Your Goal
         </button>
       </div>
 
@@ -228,11 +232,11 @@ export default function BodyStudio({ profile }) {
           <div className="space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Sliders size={16} /> Baseline Dimensions
+                <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Sliders size={16} /> Measurements
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Adjust measurements to match your personal body structure.
+                  Adjust these so the model actually looks like you.
                 </p>
               </div>
               <span className="text-xs font-numeric font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
@@ -316,20 +320,20 @@ export default function BodyStudio({ profile }) {
 
             <div className="rounded-xl border border-sky-200/70 dark:border-sky-800/60 bg-sky-50/40 dark:bg-sky-950/20 p-4 space-y-3">
               <div className="flex items-center justify-between text-xs font-bold text-sky-950 dark:text-sky-300">
-                <span className="flex items-center gap-1.5">
-                  <Activity size={14} /> Current Composition Analysis
+                <span className="font-heading flex items-center gap-1.5">
+                  <Activity size={14} /> Your Stats
                 </span>
                 <span className="font-numeric text-sky-800 dark:text-sky-400 text-sm font-extrabold">
-                  {currentStats.bodyFatPct}% Body Fat
+                  {currentStats.bodyFatPct}% body fat
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-3 font-numeric text-center text-xs">
                 <div className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-sky-100 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-sans">Lean Mass</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-sans">Lean mass</span>
                   <span className="font-bold text-slate-800 dark:text-white text-sm">{currentStats.leanMassKg} kg</span>
                 </div>
                 <div className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-sky-100 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-sans">BMR (Katch)</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 block font-sans">Resting burn</span>
                   <span className="font-bold text-slate-800 dark:text-white text-sm">{currentStats.bmr} kcal</span>
                 </div>
                 <div className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-sky-100 dark:border-slate-800 shadow-2xs">
@@ -342,7 +346,7 @@ export default function BodyStudio({ profile }) {
                 onClick={() => setActiveTab('dream')}
                 className="w-full mt-2 inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-600 dark:bg-sky-500 text-white font-semibold py-2.5 text-xs hover:bg-sky-700 shadow-xs transition cursor-pointer"
               >
-                Proceed to Target Goal <ArrowRight size={14} />
+                Set Your Goal <ArrowRight size={14} />
               </button>
             </div>
           </div>
@@ -350,11 +354,11 @@ export default function BodyStudio({ profile }) {
           <div className="space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Target size={16} className="text-emerald-500" /> Target Configuration & Timeline
+                <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Target size={16} className="text-emerald-500" /> Your Goal
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Adjust target weight to evaluate physiological feasibility.
+                  Move the slider and we'll check whether the timeline is realistic.
                 </p>
               </div>
               <span className="text-xs font-numeric font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800 px-2.5 py-1 rounded-lg">
@@ -365,7 +369,7 @@ export default function BodyStudio({ profile }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-700 dark:text-slate-300">Target Weight</span>
+                  <span className="text-slate-700 dark:text-slate-300">Goal Weight</span>
                   <span className="font-numeric text-emerald-700 dark:text-emerald-400 font-bold text-sm">
                     {targetWeight} kg{' '}
                     <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
@@ -387,7 +391,7 @@ export default function BodyStudio({ profile }) {
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-semibold">
                   <span className="text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                    <Calendar size={13} /> Target Deadline
+                    <Calendar size={13} /> By When
                   </span>
                   <span className="font-numeric text-slate-600 dark:text-slate-300 text-xs font-bold">
                     {feasibility.weeks} wks ({feasibility.days} days)
@@ -405,7 +409,7 @@ export default function BodyStudio({ profile }) {
 
             <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 p-4 space-y-3">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
-                Projected Sizing at {targetWeight} kg
+                What {targetWeight} kg Could Look Like
               </span>
 
               <div className="grid grid-cols-4 gap-2 text-center font-numeric">
@@ -446,21 +450,21 @@ export default function BodyStudio({ profile }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800 text-xs font-numeric">
-                <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-                  <span className="font-sans text-slate-400 dark:text-slate-500 text-[11px]">Fat Loss:</span>
+              <div className="grid grid-cols-1 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800 text-xs font-numeric">
+                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                  <span className="font-sans text-slate-400 dark:text-slate-500">Fat you'll lose</span>
                   <strong className="text-emerald-700 dark:text-emerald-400">
                     {Math.abs(dreamForecast.fatDelta)} kg
                   </strong>
                 </div>
-                <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-                  <span className="font-sans text-slate-400 dark:text-slate-500 text-[11px]">Water/Glycogen:</span>
+                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                  <span className="font-sans text-slate-400 dark:text-slate-500">Lean mass change</span>
                   <strong className="text-slate-800 dark:text-white">
                     {Math.abs(dreamForecast.muscleDelta)} kg
                   </strong>
                 </div>
-                <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-                  <span className="font-sans text-slate-400 dark:text-slate-500 text-[11px]">Target BF:</span>
+                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                  <span className="font-sans text-slate-400 dark:text-slate-500">Target body fat</span>
                   <strong className="text-emerald-700 dark:text-emerald-400">
                     {dreamForecast.targetBfPct}%
                   </strong>
@@ -472,15 +476,15 @@ export default function BodyStudio({ profile }) {
               <div className="space-y-3 pt-1">
                 <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-4 space-y-1">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
-                      <Sparkles size={15} className="text-emerald-500" /> Plan Achievable & Clinically Sound
+                    <span className="font-heading font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                      <Sparkles size={15} className="text-emerald-500" /> Safe Pace
                     </span>
                     <span className="font-numeric font-bold text-emerald-800 dark:text-emerald-400 text-sm">
                       {feasibility.weeklyRate} kg / wk
                     </span>
                   </div>
                   <p className="text-xs text-emerald-700 dark:text-emerald-400 font-numeric mt-1">
-                    Recommended Daily Target:{' '}
+                    Suggested target:{' '}
                     <strong>{feasibility.calculatedDailyCalories} kcal/day</strong> (with ~{Math.round(currentWeightKg * 2)}g protein)
                   </p>
                 </div>
@@ -492,14 +496,14 @@ export default function BodyStudio({ profile }) {
                   className={`${ui.btnPrimary} w-full py-3 cursor-pointer`}
                 >
                   {saving ? (
-                    'Applying Plan...'
+                    'Saving...'
                   ) : savedSuccess ? (
                     <>
-                      <CheckCircle2 size={16} /> Plan Activated!
+                      <CheckCircle2 size={16} /> Goal set!
                     </>
                   ) : (
                     <>
-                      <Sparkles size={15} /> Adopt Plan to Reach {targetWeight}kg by {targetDate}
+                      <Sparkles size={15} /> Confirm Goal
                     </>
                   )}
                 </button>
@@ -511,11 +515,11 @@ export default function BodyStudio({ profile }) {
                     <AlertTriangle size={18} />
                   </div>
                   <div className="space-y-1">
-                    <h4 className="text-sm font-bold text-rose-950 dark:text-white">
-                      Goal Beyond Safe Physiological Boundaries
+                    <h4 className="font-heading text-sm font-bold text-rose-950 dark:text-white">
+                      Too Fast to Recommend
                     </h4>
                     <p className="text-xs text-rose-800 dark:text-rose-300 leading-relaxed">
-                      This target requires an extreme deficit rate that falls outside this app&apos;s safe capabilities.
+                      This pace goes beyond what's safe to recommend.
                     </p>
                   </div>
                 </div>
@@ -535,7 +539,7 @@ export default function BodyStudio({ profile }) {
                     onClick={() => setTargetDate(feasibility.recommendedDateStr)}
                     className="underline font-bold text-rose-950 dark:text-white hover:text-rose-700 dark:hover:text-rose-400 cursor-pointer"
                   >
-                    Adjust to safe date ({feasibility.recommendedDateStr})
+                    Adjust to a safer date ({feasibility.recommendedDateStr})
                   </button>
                 </div>
               </div>

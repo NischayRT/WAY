@@ -87,11 +87,12 @@ export default function ProfileForm({ userId, onSaved, initialProfile }) {
     }
   };
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
-
+    const { data: { session } } = await supabase.auth.getSession();
+console.log('session user:', session?.user?.id, 'token present:', !!session?.access_token);
     const { error: upsertError } = await supabase.from('profiles').upsert({
       id: userId,
       full_name: form.fullName.trim() || null,
@@ -108,15 +109,12 @@ export default function ProfileForm({ userId, onSaved, initialProfile }) {
     });
 
     setSaving(false);
-
     if (upsertError) {
       setError(upsertError.message);
       return;
     }
-
     onSaved?.();
   };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <label className={ui.label}>
@@ -125,7 +123,7 @@ export default function ProfileForm({ userId, onSaved, initialProfile }) {
           type="text"
           value={form.fullName}
           onChange={handleChange('fullName')}
-          placeholder="Shown when you share a dish, e.g. Nischay"
+          placeholder="Shown when you share a dish, e.g. Markaaaaaaaaaaaaa"
           className={ui.input}
         />
       </label>

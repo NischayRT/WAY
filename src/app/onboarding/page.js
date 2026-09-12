@@ -2,6 +2,11 @@ import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import OnboardingClient from '@/components/onboarding/OnboardingClient';
 
+// Same reasoning as settings/page.js: never cache this page. It carries
+// a specific user's id down as a prop, and a stale render from a
+// different account would send a mismatched id on save.
+export const dynamic = 'force-dynamic';
+
 export default async function OnboardingPage() {
   const supabase = await createServerSupabaseClient();
   const {

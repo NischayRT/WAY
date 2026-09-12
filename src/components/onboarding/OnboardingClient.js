@@ -15,7 +15,15 @@ export default function OnboardingClient({ userId }) {
   const goHome = () => router.push('/home');
 
   const handleProfileSaved = (basics) => {
-    setProfileBasics(basics);
+    // Defensive: if ProfileForm's onSaved ever gets called without a
+    // payload (e.g. a version mismatch during deploy), fall back to sane
+    // defaults instead of leaving step 2 with nothing to render. The user
+    // can still adjust every slider on the next screen either way.
+    setProfileBasics({
+      heightCm: Number(basics?.heightCm) || 170,
+      weightKg: Number(basics?.weightKg) || 70,
+      sex: basics?.sex || 'male',
+    });
     setStep(1);
   };
 
@@ -51,12 +59,12 @@ export default function OnboardingClient({ userId }) {
 
       {step === 0 && <ProfileForm userId={userId} onSaved={handleProfileSaved} />}
 
-      {step === 1 && profileBasics && (
+      {step === 1 && (
         <BodyMeasurementsForm
           userId={userId}
-          heightCm={profileBasics.heightCm}
-          weightKg={profileBasics.weightKg}
-          sex={profileBasics.sex}
+          heightCm={profileBasics?.heightCm ?? 170}
+          weightKg={profileBasics?.weightKg ?? 70}
+          sex={profileBasics?.sex ?? 'male'}
           onSaved={goHome}
           onSkip={goHome}
         />

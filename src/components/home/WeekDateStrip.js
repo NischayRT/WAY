@@ -1,19 +1,14 @@
 'use client';
 
 import { useRef } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { ChevronDown, Calendar as CalendarIcon } from 'lucide-react';
 
-export default function WeekDateStrip({ days, selectedDate }) {
-  const router = useRouter();
+export default function WeekDateStrip({ days, selectedDate, onSelectDate }) {
   const dateInputRef = useRef(null);
 
   const handleCustomDateChange = (e) => {
     const picked = e.target.value;
-    if (picked) {
-      router.push(`/home?date=${picked}`);
-    }
+    if (picked) onSelectDate(picked);
   };
 
   const openCalendarPicker = () => {
@@ -39,11 +34,11 @@ export default function WeekDateStrip({ days, selectedDate }) {
 
       {days.map((day) => {
         const isSelected = day.date === selectedDate;
-        const href = day.isToday ? '/home' : `/home?date=${day.date}`;
         return (
-          <Link
+          <button
             key={day.date}
-            href={href}
+            type="button"
+            onClick={() => onSelectDate(day.date)}
             className={`flex flex-col items-center justify-center shrink-0 w-12 md:w-full py-2.5 px-1 rounded-xl text-center border transition-all active:scale-95 ${
               isSelected
                 ? 'border-slate-900 bg-slate-900 text-white shadow-sm dark:border-amber-400 dark:bg-amber-400/10 dark:text-amber-300 dark:shadow-[0_0_15px_rgba(245,158,11,0.25)]'
@@ -52,16 +47,12 @@ export default function WeekDateStrip({ days, selectedDate }) {
           >
             <span
               className={`text-[10px] uppercase font-bold tracking-wider ${
-                isSelected
-                  ? 'text-slate-300 dark:text-amber-300'
-                  : 'text-slate-400 dark:text-slate-400'
+                isSelected ? 'text-slate-300 dark:text-amber-300' : 'text-slate-400 dark:text-slate-400'
               }`}
             >
               {day.dayLabel}
             </span>
-            <span className="font-numeric text-sm font-bold mt-0.5">
-              {day.dateLabel}
-            </span>
+            <span className="font-numeric text-sm font-bold mt-0.5">{day.dateLabel}</span>
             {day.isToday && (
               <span
                 className={`h-1.5 w-1.5 rounded-full mt-1 ${
@@ -69,7 +60,7 @@ export default function WeekDateStrip({ days, selectedDate }) {
                 }`}
               />
             )}
-          </Link>
+          </button>
         );
       })}
 

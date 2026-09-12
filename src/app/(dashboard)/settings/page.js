@@ -1,91 +1,45 @@
-'use client';
-
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabaseClient';
-import ProfileForm from '@/components/forms/ProfileForm';
-import BodyStudio from '@/components/body/BodyStudio';
-import { User, Activity, LogOut } from 'lucide-react';
+import { redirect } from 'next/navigation';
+import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { ui } from '@/lib/ui';
+import AppHeader from '@/components/layout/AppHeader';
+import SettingsClient from '@/components/settings/SettingsClient';
 
-export default function SettingsClient({ userId, initialProfile }) {
-  const supabase = createClient();
-  const router = useRouter();
-  const [activeSection, setActiveSection] = useState('profile');
-  const [justSaved, setJustSaved] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
+// This page must never be served from a cached render. It carries a
+// specific user's auth.uid() and profile row down as props — if a stale
+// cached version from a *different* (e.g. deleted/recreated) account ever
+// got reused, the userId sent in a later save would no longer match the
+// current session's auth.uid(), and Postgres would correctly reject the
+// write as an RLS violation even though the policies themselves are fine.
+export const dynamic = 'force-dynamic';
 
-  const handleSaved = () => {
-    setJustSaved(true);
-    router.refresh();
-  };
+export default async function SettingsPage() {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const handleLogout = async () => {
-    setLoggingOut(true);
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
-  };
+  if (!user) redirect('/login');
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select(
+      'full_name, height_cm, weight_kg, age, sex, activity_level, goal, override_calories, override_protein_g, override_carbs_g, override_fat_g'
+    )
+    .eq('id', user.id)
+    .single();
+
+  if (!profile) redirect('/onboarding');
 
   return (
-    <div className="space-y-6 p-4">
-      {/* Settings Navigation Tabs */}
-      <div className="grid grid-cols-2 rounded-xl bg-slate-200/80 dark:bg-slate-800 p-1 font-semibold text-xs text-slate-600 dark:text-slate-300">
-        <button
-          type="button"
-          onClick={() => setActiveSection('profile')}
-          className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition ${
-            activeSection === 'profile'
-              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-              : 'hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <User size={14} /> Profile & Targets
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveSection('body')}
-          className={`flex items-center justify-center gap-1.5 py-2 rounded-lg transition ${
-            activeSection === 'body'
-              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-              : 'hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Activity size={14} /> Body Measurements
-        </button>
-      </div>
-
-      {justSaved && (
-        <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
-          Profile updated successfully.
+    <main className={ui.pageWrap}>
+      <div>
+        <AppHeader title="Settings" backHref="/home" backLabel="Back to today" />
+        <p className="mt-1 text-sm text-ink/60 dark:text-slate-400">
+          Update your details or change your goal — your daily targets recalculate
+          automatically.
         </p>
-      )}
-
-      {/* Active Tab Content */}
-      {activeSection === 'profile' ? (
-        <ProfileForm userId={userId} initialProfile={initialProfile} onSaved={handleSaved} />
-      ) : (
-        <div className="space-y-4">
-          <BodyStudio profile={initialProfile} />
-        </div>
-      )}
-
-      {/* Log Out Section */}
-      <div className={`${ui.card} flex items-center justify-between pt-4`}>
-        <div>
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">Session</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Sign out of your WAY account on this device.</p>
-        </div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={loggingOut}
-          className="inline-flex items-center gap-2 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 px-4 py-2 text-xs sm:text-sm font-semibold text-rose-700 dark:text-rose-300 shadow-2xs transition-all hover:bg-rose-100 dark:hover:bg-rose-900/50 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-        >
-          <LogOut size={15} />
-          <span>{loggingOut ? 'Signing out...' : 'Log out'}</span>
-        </button>
       </div>
-    </div>
+      <SettingsClient userId={user.id} initialProfile={profile} />
+    </main>
   );
 }

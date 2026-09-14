@@ -23,7 +23,7 @@ export default async function SettingsPage() {
   const { data: profile } = await supabase
     .from('profiles')
     .select(
-      'full_name, height_cm, weight_kg, age, sex, activity_level, goal, override_calories, override_protein_g, override_carbs_g, override_fat_g'
+      'full_name, height_cm, weight_kg, age, sex, activity_level, goal, override_calories, override_protein_g, override_carbs_g, override_fat_g, waist_cm, hip_cm, chest_cm, bicep_cm'
     )
     .eq('id', user.id)
     .single();

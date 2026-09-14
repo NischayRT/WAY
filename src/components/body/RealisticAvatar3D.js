@@ -27,14 +27,20 @@ export default function RealisticAvatar3D({
   // SELECT BY ARRAY POSITION, not by name matching — this is the proven fix.
   // Name-based matching against child.name was silently failing (likely a
   // SkinnedMesh naming quirk in GLTFLoader); positional indexing into the
-  // scene-traversal order reliably picks the correct, visually distinct mesh.
+  // scene-traversal order reliably picks a mesh.
+  //
+  // Uses archetype.meshIndex (NOT archetype.index) — empirical testing
+  // showed positions 0/1/2 don't actually read as three different body
+  // types, only positions 3 (obese) and 4 (skinny) are sculpturally
+  // distinct. meshIndex is the decoupled "which mesh to actually render"
+  // value; index is just the category id. See physiqueArchetype.js.
   const singleMesh = useMemo(() => {
     const meshes = [];
     scene.traverse((child) => {
       if (child.isMesh) meshes.push(child);
     });
 
-    const targetMesh = meshes[archetype.index] || meshes[0];
+    const targetMesh = meshes[archetype.meshIndex] || meshes[0];
     if (!targetMesh) return null;
 
     const geom = targetMesh.geometry.clone();

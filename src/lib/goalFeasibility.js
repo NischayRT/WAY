@@ -50,7 +50,8 @@ export function calculateTimelineAndFeasibility({
 
   // Clinical safety thresholds
   const minCalorieFloor = sex === 'male' ? 1450 : 1200;
-  const minEssentialBf = sex === 'male' ? 7.5 : 13.5;
+  // In lib/goalFeasibility.js -> calculateTimelineAndFeasibility
+const minEssentialBf = sex === 'male' ? 5.0 : 12.0;
 
   const failureReasons = [];
 

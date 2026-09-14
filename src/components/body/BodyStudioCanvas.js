@@ -103,27 +103,27 @@ export default function BodyStudioCanvas({ currentData, targetData }) {
         </button>
       </div>
 
-      <div className="w-full grid grid-cols-2 px-4 pt-2 z-10">
-        <div className="flex flex-col text-left">
+      <div className="w-full grid grid-cols-2 px-4 pt-2 z-10 gap-2">
+        <div className="flex flex-col text-left min-w-0">
           <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Now
           </span>
-          <span className="font-numeric text-xs font-bold text-slate-700 dark:text-slate-200 mt-0.5">
+          <span className="font-numeric text-xs font-bold text-slate-700 dark:text-slate-200 mt-0.5 truncate">
             {currentData.weightKg} kg · {currentData.bodyFatPct}% fat
           </span>
         </div>
 
-        <div className="flex flex-col text-right">
+        <div className="flex flex-col text-right min-w-0 pr-16 sm:pr-20">
           <span className="font-heading text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
             Goal
           </span>
-          <span className="font-numeric text-xs font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">
+          <span className="font-numeric text-xs font-bold text-emerald-700 dark:text-emerald-400 mt-0.5 truncate">
             {targetData.weightKg} kg · {targetData.bodyFatPct}% fat
           </span>
         </div>
       </div>
 
-      <div className="w-full h-88 sm:h-[420px] cursor-grab active:cursor-grabbing">
+      <div className="w-full h-[320px] sm:h-[420px] cursor-grab active:cursor-grabbing">
         <Canvas
           camera={{ position: [0, 0.1, 3.4], fov: 42 }}
           gl={{ alpha: true, antialias: true }}

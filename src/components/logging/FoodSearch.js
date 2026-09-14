@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { Search } from 'lucide-react';
 import { ui, authorTag } from '@/lib/ui';
+import { getCachedFoods } from '@/lib/cache/foodCache';
 
 export default function FoodSearch({ onAdd }) {
   const supabase = createClient();
@@ -14,21 +15,19 @@ export default function FoodSearch({ onAdd }) {
   const [quantityG, setQuantityG] = useState(100);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const loadFoods = async () => {
-      const { data, error: fetchError } = await supabase
-        .from('foods')
-        .select('id, name, region, calories_kcal, protein_g, carbs_g, fat_g, created_by, author_name')
-        .order('name');
-      if (fetchError) {
-        setError(fetchError.message);
-      } else {
-        setFoods(data ?? []);
-      }
+useEffect(() => {
+  let isMounted = true;
+  const loadFoods = async () => {
+    const data = await getCachedFoods(supabase);
+    if (isMounted) {
+      setFoods(data);
       setLoadingFoods(false);
-    };
-    loadFoods();
-  }, []);
+    }
+  };
+  loadFoods();
+  return () => { isMounted = false; };
+}, []);
+
 
   const filteredFoods =
     query.trim().length === 0

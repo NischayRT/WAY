@@ -197,7 +197,7 @@ export default function BodyStudio({ profile }) {
   return (
     <div className="space-y-5 max-w-2xl mx-auto pb-10 w-full px-1 sm:px-0">
       {/* 3D Visualizer Canvas Box */}
-      <div className={`${ui.card} relative overflow-hidden bg-gradient-to-b from-slate-50/50 dark:from-slate-900/60 to-white dark:to-slate-900 p-2 sm:pt-3 sm:pb-2`}>
+      <div className={`${ui.card} relative overflow-hidden bg-gradient-to-b from-slate-50/50 dark:from-slate-900/60 to-white !p-0 dark:to-slate-900 sm:pt-3 sm:pb-2`}>
         <BodyStudioCanvas
           currentData={{
             heightCm,

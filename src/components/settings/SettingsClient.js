@@ -28,13 +28,13 @@ export default function SettingsClient({ userId, initialProfile }) {
   };
 
   return (
-    <div className="mx-auto max-w-xl px-4 sm:px-6 py-6 space-y-5">
+    <div className="mx-auto max-w-xl py-6 space-y-5">
       {/* Settings Navigation Tabs */}
       <div className="grid grid-cols-2 rounded-xl bg-slate-200/80 dark:bg-slate-800 p-1 font-semibold text-xs text-slate-600 dark:text-slate-300">
         <button
           type="button"
           onClick={() => setActiveSection('profile')}
-          className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg transition ${
+          className={`flex items-center justify-center gap-1 py-2.5 rounded-lg transition ${
             activeSection === 'profile'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
               : 'hover:text-slate-900 dark:hover:text-white'
@@ -62,7 +62,7 @@ export default function SettingsClient({ userId, initialProfile }) {
       )}
 
       {/* Active Tab Content Container with proper padding and internal form spacing */}
-      <div className={`${ui.card} p-5 sm:p-7`}>
+      <div className={`${ui.card} p-2`}>
         {activeSection === 'profile' ? (
           <div className="space-y-4">
             <ProfileForm userId={userId} initialProfile={initialProfile} onSaved={handleSaved} />

@@ -22,7 +22,7 @@ export default async function LogFoodPage() {
         action={
           <Link
             href="/add-food"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all shadow-2xs whitespace-nowrap active:scale-[0.98]"
+            className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all shadow-2xs whitespace-nowrap active:scale-[0.98]"
           >
             <ChefHat size={15} className="text-amber-500 shrink-0" />
             <span>Add <span className="hidden sm:inline">custom</span> dish</span>

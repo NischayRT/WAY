@@ -3,11 +3,15 @@
 import { useState } from 'react';
 import { ui } from '@/lib/ui';
 
-export default function DateSelector({ selectedDate, today, onSelectDate }) {
+export default function DateSelector({ selectedDate, today, minDate, onSelectDate }) {
   const [open, setOpen] = useState(false);
 
   const handleChange = (e) => {
-    onSelectDate(e.target.value);
+    const val = e.target.value;
+    if (val && val >= minDate && val <= today) {
+      onSelectDate(val);
+      setOpen(false);
+    }
   };
 
   if (!open) {
@@ -20,7 +24,14 @@ export default function DateSelector({ selectedDate, today, onSelectDate }) {
 
   return (
     <div className="flex items-center gap-2">
-      <input type="date" value={selectedDate} max={today} onChange={handleChange} className={ui.input} />
+      <input
+        type="date"
+        value={selectedDate}
+        min={minDate}
+        max={today}
+        onChange={handleChange}
+        className={ui.input}
+      />
       <button type="button" onClick={() => setOpen(false)} className={ui.linkMuted}>
         Close
       </button>

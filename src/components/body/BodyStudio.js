@@ -26,7 +26,7 @@ import { ui } from '@/lib/ui';
 const BodyStudioCanvas = dynamic(() => import('./BodyStudioCanvas'), {
   ssr: false,
   loading: () => (
-    <div className="flex h-96 w-full items-center justify-center text-xs font-medium text-slate-400">
+    <div className="flex h-72 sm:h-96 w-full items-center justify-center text-xs font-medium text-slate-400">
       Loading 3D Visualizer...
     </div>
   ),
@@ -35,11 +35,9 @@ const BodyStudioCanvas = dynamic(() => import('./BodyStudioCanvas'), {
 export default function BodyStudio({ profile }) {
   const supabase = createClient();
   const router = useRouter();
-
   const heightCm = Number(profile?.height_cm) || 175.0;
   const currentWeightKg = Number(profile?.weight_kg) || 75.0;
   const userSex = profile?.sex || 'male';
-
   const [activeTab, setActiveTab] = useState('dream');
 
   const defaultWaistIn = useMemo(() => {
@@ -83,9 +81,6 @@ export default function BodyStudio({ profile }) {
   const chestCm = chestIn * 2.54;
   const bicepCm = bicepIn * 2.54;
 
-  // Smallest waist the slider may express without implying a body fat %
-  // below the essential-fat floor (5% male / 12% female). Recomputed live
-  // since it depends on height, weight, chest, and (for women) hip.
   const minWaistIn = useMemo(() => {
     const minCm = minWaistCmForBfFloor({
       heightCm,
@@ -94,14 +89,9 @@ export default function BodyStudio({ profile }) {
       hipCm,
       sex: userSex,
     });
-    // Round UP to the nearest 0.5" so the displayed minimum never sits on
-    // the wrong side of the floor due to rounding.
     return Math.max(26, Math.ceil((minCm / 2.54) * 2) / 2);
   }, [heightCm, currentWeightKg, chestCm, hipCm, userSex]);
 
-  // If a measurement change (weight, chest, hip) pushes the floor above the
-  // waist value currently held, snap the waist back up to the floor instead
-  // of silently letting the model imply an unsafe/implausible body fat %.
   useEffect(() => {
     setWaistIn((prev) => (prev < minWaistIn ? minWaistIn : prev));
   }, [minWaistIn]);
@@ -125,7 +115,6 @@ export default function BodyStudio({ profile }) {
   }, [profile?.dream_target_weight_kg, heightCm, currentWeightKg]);
 
   const [targetWeight, setTargetWeight] = useState(defaultTargetWeight);
-
   useEffect(() => {
     if (profile?.dream_target_weight_kg) {
       setTargetWeight(Number(profile.dream_target_weight_kg));
@@ -188,7 +177,6 @@ export default function BodyStudio({ profile }) {
   const handleSetGoal = async () => {
     if (!feasibility.isFeasible) return;
     setSaving(true);
-
     const { error } = await supabase
       .from('profiles')
       .update({
@@ -198,7 +186,6 @@ export default function BodyStudio({ profile }) {
         goal: targetWeight < currentWeightKg ? 'lose_weight' : 'gain_muscle',
       })
       .eq('id', profile.id);
-
     setSaving(false);
     if (!error) {
       setSavedSuccess(true);
@@ -208,9 +195,9 @@ export default function BodyStudio({ profile }) {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto pb-12">
-      {/* 3D Side-by-Side Dual Figure Stage */}
-      <div className={`${ui.card} relative overflow-hidden bg-gradient-to-b from-slate-50/50 dark:from-slate-900/60 to-white dark:to-slate-900 pt-3 pb-2`}>
+    <div className="space-y-5 max-w-2xl mx-auto pb-10 w-full px-1 sm:px-0">
+      {/* 3D Visualizer Canvas Box */}
+      <div className={`${ui.card} relative overflow-hidden bg-gradient-to-b from-slate-50/50 dark:from-slate-900/60 to-white dark:to-slate-900 p-2 sm:pt-3 sm:pb-2`}>
         <BodyStudioCanvas
           currentData={{
             heightCm,
@@ -233,12 +220,12 @@ export default function BodyStudio({ profile }) {
         />
       </div>
 
-      {/* Tabs */}
-      <div className="font-heading grid grid-cols-2 rounded-xl bg-slate-200/80 dark:bg-slate-800 p-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+      {/* Tab Switcher */}
+      <div className="grid grid-cols-2 rounded-xl bg-slate-200/80 dark:bg-slate-800 p-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
         <button
           type="button"
           onClick={() => setActiveTab('current')}
-          className={`py-2 rounded-lg transition ${
+          className={`py-2 text-center rounded-lg transition ${
             activeTab === 'current'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
               : 'hover:text-slate-900 dark:hover:text-white'
@@ -249,7 +236,7 @@ export default function BodyStudio({ profile }) {
         <button
           type="button"
           onClick={() => setActiveTab('dream')}
-          className={`py-2 rounded-lg transition ${
+          className={`py-2 text-center rounded-lg transition ${
             activeTab === 'dream'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
               : 'hover:text-slate-900 dark:hover:text-white'
@@ -261,22 +248,23 @@ export default function BodyStudio({ profile }) {
 
       <div className={ui.card}>
         {activeTab === 'current' ? (
-          <div className="space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="space-y-4 sm:space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
                   <Sliders size={16} /> Measurements
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Adjust these so the model actually looks like you.
+                  Adjust these so the model matches your proportions.
                 </p>
               </div>
-              <span className="self-start sm:self-auto shrink-0 text-xs font-numeric font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg whitespace-nowrap">
+              <span className="self-start sm:self-auto shrink-0 text-[11px] sm:text-xs font-numeric font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
                 {currentWeightKg} kg · {heightCm} cm
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
+            {/* Responsive Slider Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 pt-1">
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-semibold">
                   <span className="text-slate-700 dark:text-slate-300">Waist</span>
@@ -291,12 +279,8 @@ export default function BodyStudio({ profile }) {
                   step="0.5"
                   value={waistIn}
                   onChange={(e) => setWaistIn(Math.max(minWaistIn, Number(e.target.value)))}
-                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                  className="w-full h-2.5 sm:h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
                 />
-                <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                  Capped at {minWaistIn}&quot; — below this the model would imply a body fat %
-                  under the {userSex === 'female' ? '12%' : '5%'} essential-fat floor.
-                </p>
               </div>
 
               <div className="space-y-1.5">
@@ -313,7 +297,7 @@ export default function BodyStudio({ profile }) {
                   step="0.5"
                   value={hipIn}
                   onChange={(e) => setHipIn(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                  className="w-full h-2.5 sm:h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
                 />
               </div>
 
@@ -331,7 +315,7 @@ export default function BodyStudio({ profile }) {
                   step="0.5"
                   value={chestIn}
                   onChange={(e) => setChestIn(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                  className="w-full h-2.5 sm:h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
                 />
               </div>
 
@@ -349,81 +333,69 @@ export default function BodyStudio({ profile }) {
                   step="0.25"
                   value={bicepIn}
                   onChange={(e) => setBicepIn(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                  className="w-full h-2.5 sm:h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
                 />
               </div>
             </div>
 
-            <div className="rounded-xl border border-sky-200/70 dark:border-sky-800/60 bg-sky-50/40 dark:bg-sky-950/20 p-4 space-y-3">
+            {/* Metric Summary Badges */}
+            <div className="rounded-xl border border-sky-200/70 dark:border-sky-800/60 bg-sky-50/40 dark:bg-sky-950/20 p-3 sm:p-4 space-y-3">
               <div className="flex items-center justify-between text-xs font-bold text-sky-950 dark:text-sky-300">
                 <span className="font-heading flex items-center gap-1.5">
-                  <Activity size={14} /> Your Stats
+                  <Activity size={14} /> Estimated Body Fat
                 </span>
                 <span className="font-numeric text-sky-800 dark:text-sky-400 text-sm font-extrabold">
-                  {currentStats.bodyFatPct}% body fat
+                  {currentStats.bodyFatPct}%
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-1.5 sm:gap-3 font-numeric text-center text-xs">
-                <div className="bg-white dark:bg-slate-900 px-1.5 py-2.5 sm:p-2.5 rounded-xl border border-sky-100 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 block font-sans leading-tight">Lean mass</span>
-                  <span className="font-bold text-slate-800 dark:text-white text-xs sm:text-sm block mt-0.5">{currentStats.leanMassKg} kg</span>
+
+              <div className="grid grid-cols-3 gap-2 font-numeric text-center text-xs">
+                <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-sky-100 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[9px] text-slate-400 block font-sans">Lean Mass</span>
+                  <span className="font-bold text-slate-800 dark:text-white text-xs sm:text-sm mt-0.5 block">
+                    {currentStats.leanMassKg} kg
+                  </span>
                 </div>
-                <div className="bg-white dark:bg-slate-900 px-1.5 py-2.5 sm:p-2.5 rounded-xl border border-sky-100 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 block font-sans leading-tight">Resting burn</span>
-                  <span className="font-bold text-slate-800 dark:text-white text-xs sm:text-sm block mt-0.5">{currentStats.bmr} kcal</span>
+                <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-sky-100 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[9px] text-slate-400 block font-sans">BMR</span>
+                  <span className="font-bold text-slate-800 dark:text-white text-xs sm:text-sm mt-0.5 block">
+                    {currentStats.bmr} kcal
+                  </span>
                 </div>
-                <div className="bg-white dark:bg-slate-900 px-1.5 py-2.5 sm:p-2.5 rounded-xl border border-sky-100 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 block font-sans leading-tight">FFMI</span>
-                  <span className="font-bold text-slate-800 dark:text-white text-xs sm:text-sm block mt-0.5">{currentStats.ffmi}</span>
+                <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-sky-100 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[9px] text-slate-400 block font-sans">FFMI</span>
+                  <span className="font-bold text-slate-800 dark:text-white text-xs sm:text-sm mt-0.5 block">
+                    {currentStats.ffmi}
+                  </span>
                 </div>
               </div>
 
-              {/* Raw measurements driving the "Now" model, so the dashboard
-                  visibly matches what's rendered in the 3D stage above. */}
-              <div className="grid grid-cols-4 gap-1.5 sm:gap-3 font-numeric text-center text-xs pt-1 border-t border-sky-100/70 dark:border-slate-800">
-                <div className="px-1 py-2 rounded-lg">
-                  <span className="text-[9px] text-slate-400 dark:text-slate-500 block font-sans">Chest</span>
-                  <span className="font-bold text-slate-800 dark:text-white text-xs block mt-0.5">{chestIn}&quot;</span>
-                </div>
-                <div className="px-1 py-2 rounded-lg">
-                  <span className="text-[9px] text-slate-400 dark:text-slate-500 block font-sans">Waist</span>
-                  <span className="font-bold text-slate-800 dark:text-white text-xs block mt-0.5">{waistIn}&quot;</span>
-                </div>
-                <div className="px-1 py-2 rounded-lg">
-                  <span className="text-[9px] text-slate-400 dark:text-slate-500 block font-sans">Hips</span>
-                  <span className="font-bold text-slate-800 dark:text-white text-xs block mt-0.5">{hipIn}&quot;</span>
-                </div>
-                <div className="px-1 py-2 rounded-lg">
-                  <span className="text-[9px] text-slate-400 dark:text-slate-500 block font-sans">Arms</span>
-                  <span className="font-bold text-slate-800 dark:text-white text-xs block mt-0.5">{bicepIn}&quot;</span>
-                </div>
-              </div>
               <button
                 type="button"
                 onClick={() => setActiveTab('dream')}
-                className="w-full mt-2 inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-600 dark:bg-sky-500 text-white font-semibold py-2.5 text-xs hover:bg-sky-700 shadow-xs transition cursor-pointer"
+                className="w-full mt-2 inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-600 dark:bg-sky-500 text-white font-semibold py-2.5 text-xs hover:bg-sky-700 shadow-xs transition"
               >
                 Set Your Goal <ArrowRight size={14} />
               </button>
             </div>
           </div>
         ) : (
-          <div className="space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="space-y-4 sm:space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
                   <Target size={16} className="text-emerald-500" /> Your Goal
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Move the slider and we'll check whether the timeline is realistic.
+                  Set target weight and target completion date.
                 </p>
               </div>
-              <span className="self-start sm:self-auto shrink-0 text-xs font-numeric font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800 px-2.5 py-1 rounded-lg whitespace-nowrap">
+              <span className="self-start sm:self-auto shrink-0 text-[11px] sm:text-xs font-numeric font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800 px-2.5 py-1 rounded-lg">
                 ~0.85 kg / week pace
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-semibold">
                   <span className="text-slate-700 dark:text-slate-300">Goal Weight</span>
@@ -441,7 +413,7 @@ export default function BodyStudio({ profile }) {
                   step="0.5"
                   value={targetWeight}
                   onChange={(e) => setTargetWeight(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                  className="w-full h-2.5 sm:h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                 />
               </div>
 
@@ -464,74 +436,50 @@ export default function BodyStudio({ profile }) {
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 p-4 space-y-3">
+            <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 p-3.5 sm:p-4 space-y-3">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
-                What {targetWeight} kg Could Look Like
+                Projected Dimensions at {targetWeight} kg
               </span>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center font-numeric">
-                <div className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] text-slate-400 block font-sans uppercase font-bold">Waist</span>
-                  <span className="text-sm font-bold text-slate-900 dark:text-white block mt-0.5">
+                <div className="bg-white dark:bg-slate-900 p-2 sm:p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Waist</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white block mt-0.5">
                     {dreamForecast.dimensions.waistIn}&quot;
                   </span>
                   <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-semibold">
                     {(dreamForecast.dimensions.waistIn - waistIn).toFixed(1)}&quot;
                   </span>
                 </div>
-
-                <div className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] text-slate-400 block font-sans uppercase font-bold">Hips</span>
-                  <span className="text-sm font-bold text-slate-900 dark:text-white block mt-0.5">
+                <div className="bg-white dark:bg-slate-900 p-2 sm:p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Hips</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white block mt-0.5">
                     {dreamForecast.dimensions.hipIn}&quot;
                   </span>
                   <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-semibold">
                     {(dreamForecast.dimensions.hipIn - hipIn).toFixed(1)}&quot;
                   </span>
                 </div>
-
-                <div className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] text-slate-400 block font-sans uppercase font-bold">Chest</span>
-                  <span className="text-sm font-bold text-slate-900 dark:text-white block mt-0.5">
+                <div className="bg-white dark:bg-slate-900 p-2 sm:p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Chest</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white block mt-0.5">
                     {dreamForecast.dimensions.chestIn}&quot;
                   </span>
                   <span className="text-[10px] text-slate-400 block font-medium">Preserved</span>
                 </div>
-
-                <div className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] text-slate-400 block font-sans uppercase font-bold">V-Taper</span>
-                  <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 block mt-0.5">
+                <div className="bg-white dark:bg-slate-900 p-2 sm:p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">V-Taper</span>
+                  <span className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 block mt-0.5">
                     {dreamForecast.dimensions.vTaper}x
                   </span>
                   <span className="text-[10px] text-slate-400 block font-medium">Ratio</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800 text-xs font-numeric">
-                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                  <span className="font-sans text-slate-400 dark:text-slate-500">Fat you'll lose</span>
-                  <strong className="text-emerald-700 dark:text-emerald-400">
-                    {Math.abs(dreamForecast.fatDelta)} kg
-                  </strong>
-                </div>
-                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                  <span className="font-sans text-slate-400 dark:text-slate-500">Lean mass change</span>
-                  <strong className="text-slate-800 dark:text-white">
-                    {Math.abs(dreamForecast.muscleDelta)} kg
-                  </strong>
-                </div>
-                <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                  <span className="font-sans text-slate-400 dark:text-slate-500">Target body fat</span>
-                  <strong className="text-emerald-700 dark:text-emerald-400">
-                    {dreamForecast.targetBfPct}%
-                  </strong>
                 </div>
               </div>
             </div>
 
             {feasibility.isFeasible ? (
               <div className="space-y-3 pt-1">
-                <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-4 space-y-1">
+                <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-3.5 sm:p-4 space-y-1">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-heading font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
                       <Sparkles size={15} className="text-emerald-500" /> Safe Pace
@@ -545,7 +493,6 @@ export default function BodyStudio({ profile }) {
                     <strong>{feasibility.calculatedDailyCalories} kcal/day</strong> (with ~{Math.round(currentWeightKg * 2)}g protein)
                   </p>
                 </div>
-
                 <button
                   type="button"
                   disabled={saving}
@@ -573,32 +520,18 @@ export default function BodyStudio({ profile }) {
                   </div>
                   <div className="space-y-1">
                     <h4 className="font-heading text-sm font-bold text-rose-950 dark:text-white">
-                      Too Fast to Recommend
+                      Pace Exceeds Recommended Limit
                     </h4>
                     <p className="text-xs text-rose-800 dark:text-rose-300 leading-relaxed">
-                      This pace goes beyond what's safe to recommend.
+                      This timeline requires a rate beyond clinical safety recommendations.
                     </p>
                   </div>
                 </div>
-
                 <ul className="space-y-1 pl-4 list-disc text-xs text-rose-800/90 dark:text-rose-300/90 leading-normal font-numeric">
                   {feasibility.reasons.map((r, i) => (
                     <li key={i}>{r}</li>
                   ))}
                 </ul>
-
-                <div className="pt-2 border-t border-rose-200/70 dark:border-rose-800/60 text-xs text-rose-900 dark:text-rose-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <span className="flex items-center gap-1.5 font-medium">
-                    <UserCheck size={14} /> Please seek a physician or registered dietitian for guidance.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setTargetDate(feasibility.recommendedDateStr)}
-                    className="underline font-bold text-rose-950 dark:text-white hover:text-rose-700 dark:hover:text-rose-400 cursor-pointer"
-                  >
-                    Adjust to a safer date ({feasibility.recommendedDateStr})
-                  </button>
-                </div>
               </div>
             )}
           </div>

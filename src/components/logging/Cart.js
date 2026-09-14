@@ -31,24 +31,28 @@ export default function Cart({ userId, items, onUpdateQuantity, onRemove, onLogg
     if (items.length === 0) return;
     setSaving(true);
     setError(null);
+
     const rows = items.map((item) => ({
       user_id: userId,
       food_id: item.food.id,
       quantity_g: item.quantityG,
       meal_type: mealType,
     }));
+
     const { error: insertError } = await supabase.from('food_logs').insert(rows);
     setSaving(false);
+
     if (insertError) {
       setError(insertError.message);
       return;
     }
+
     onLogged();
     router.refresh();
   };
 
   return (
-    <div className={`${ui.card} space-y-3`}>
+    <div id="cart-section" className={`${ui.card} space-y-3 scroll-mt-20`}>
       <h2 className={ui.subheading}>
         <ShoppingBag size={15} className="text-emerald-500" /> Your meal
       </h2>

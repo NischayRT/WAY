@@ -10,9 +10,51 @@ import { RotateCw, Eye } from 'lucide-react';
 // Each avatar gets its own fixed-position wrapper containing its own
 // independent rotation group, so they spin in place on their own base
 // rather than orbiting a shared midpoint.
-function SingleAvatarStage({ data, color, roughness, wireframe, positionX, autoRotate, ringColor, ringOpacity }) {
-  const rotationRef = useRef();
+// components/body/BodyStudioCanvas.js
 
+function StageModels({ currentData, targetData, autoRotate, wireframe }) {
+  return (
+    <group position={[0, -0.95, 0]}>
+      {/* Current Model - Uses currentPhysiqueLogic.js */}
+      <SingleAvatarStage
+        data={currentData}
+        color="#94a3b8"
+        roughness={0.45}
+        wireframe={wireframe}
+        positionX={-0.85}
+        autoRotate={autoRotate}
+        ringColor="#cbd5e1"
+        ringOpacity={0.5}
+        isTarget={false}
+      />
+      {/* Target Model - Absolute & unchanged (uses targetPhysiqueLogic.js) */}
+      <SingleAvatarStage
+        data={targetData}
+        color="#10b981"
+        roughness={0.32}
+        wireframe={wireframe}
+        positionX={0.85}
+        autoRotate={autoRotate}
+        ringColor="#6ee7b7"
+        ringOpacity={0.65}
+        isTarget={true}
+      />
+    </group>
+  );
+}
+
+function SingleAvatarStage({
+  data,
+  color,
+  roughness,
+  wireframe,
+  positionX,
+  autoRotate,
+  ringColor,
+  ringOpacity,
+  isTarget,
+}) {
+  const rotationRef = useRef();
   useFrame((_, delta) => {
     if (autoRotate && rotationRef.current) {
       rotationRef.current.rotation.y += delta * 0.35;
@@ -33,6 +75,7 @@ function SingleAvatarStage({ data, color, roughness, wireframe, positionX, autoR
           color={color}
           roughness={roughness}
           wireframe={wireframe}
+          isTarget={isTarget}
         />
       </group>
       <mesh position={[0, -0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -42,34 +85,6 @@ function SingleAvatarStage({ data, color, roughness, wireframe, positionX, autoR
     </group>
   );
 }
-
-function StageModels({ currentData, targetData, autoRotate, wireframe }) {
-  return (
-    <group position={[0, -0.95, 0]}>
-      <SingleAvatarStage
-        data={currentData}
-        color="#94a3b8"
-        roughness={0.45}
-        wireframe={wireframe}
-        positionX={-0.85}
-        autoRotate={autoRotate}
-        ringColor="#cbd5e1"
-        ringOpacity={0.5}
-      />
-      <SingleAvatarStage
-        data={targetData}
-        color="#10b981"
-        roughness={0.32}
-        wireframe={wireframe}
-        positionX={0.85}
-        autoRotate={autoRotate}
-        ringColor="#6ee7b7"
-        ringOpacity={0.65}
-      />
-    </group>
-  );
-}
-
 export default function BodyStudioCanvas({ currentData, targetData }) {
   const [autoRotate, setAutoRotate] = useState(true);
   const [wireframe, setWireframe] = useState(false);

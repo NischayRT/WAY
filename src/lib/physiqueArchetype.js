@@ -1,38 +1,5 @@
 /**
  * lib/physiqueArchetype.js
- * ----------------------------------------------------------------
- * MAJOR REVISION based on direct empirical testing (not offline geometry
- * inspection, which turned out to give a different — and wrong — picture
- * of what the live runtime actually renders).
- *
- * The test: render the same handful of real body stats while manually
- * reassigning which raw index number each category returns, across three
- * variants, and record what mesh actually showed up at each index
- * position. Findings:
- *
- *   - meshIndex 3 is UNAMBIGUOUSLY the obese/heavyset sculpt (round belly,
- *     wide frame) — confirmed directly, not inferred.
- *   - meshIndex 4 is UNAMBIGUOUSLY the skinny/thin sculpt — same.
- *   - meshIndex 0, 1, and 2 do NOT read as three different body types.
- *     They all behave like the same "normal/athletic" build responding to
- *     input scaling (looks leaner at lower weight, more built at higher
- *     weight) — not three distinct sculpts.
- *
- * CONSEQUENCE: trying to make "Overweight/Soft belly," "Lean/Athletic,"
- * and "Muscular/Bodybuilder" each use a different one of {0,1,2} was
- * fighting an asset that doesn't actually have three different sculpts
- * there. Those three categories now all point at the SAME underlying mesh
- * (meshIndex 1) and are differentiated entirely through `visualBoost` (and
- * the existing measurement-based waist/chest scaling in
- * RealisticAvatar3D.js) — which is reliable, since that scaling is
- * demonstrably what was doing the real work in the test images anyway.
- * Obese and skinny keep their own distinct meshIndex, since those are the
- * two sculpturally real extremes this asset actually has.
- *
- * `index` below is the classifier's category id (unchanged from before —
- * resolveArchetypeIndex's threshold logic is untouched). `meshIndex` is
- * the SEPARATE, actual scene-position RealisticAvatar3D.js renders — the
- * two are no longer assumed to be the same number.
  */
 
 export const ARCHETYPES = [
@@ -55,14 +22,14 @@ export const ARCHETYPES = [
     meshIndex: 3,
     meshKey: "obese",
     label: "Heavyset / Obese",
-    visualBoost: { waist: 1.1, chest: 1.05, arm: 1.0 },
+    visualBoost: { waist: 1.25, chest: 1.05, arm: 1.0 },
   },
   {
     index: 3,
     meshIndex: 1,
     meshKey: "normal-muscular",
     label: "Muscular / Bodybuilder",
-    visualBoost: { waist: 0.92, chest: 1.22, arm: 1.2 },
+    visualBoost: { waist: 0.90, chest: 1.25, arm: 1.2 },
   },
   {
     index: 4,
@@ -79,10 +46,64 @@ function num(v, fallback) {
 }
 
 /**
- * Classification thresholds are unchanged from the previous revision —
- * only the archetype-to-mesh mapping above changed.
- * @param {{bodyFatPct?:number, weightKg:number, heightCm:number, chestCm?:number, waistCm?:number}} m
- * @returns {0|1|2|3|4}
+ * Dedicated classifier for the CURRENT model only.
+ * Logic:
+ * - Slim/Skinny if chest & waist are both small or BMI is very low (< 20.5)
+ * - Waist > Chest:
+ *     - If waist - chest >= 10 cm or severe waist size -> Obese
+ *     - Otherwise -> Soft belly / Overweight (or Slim if low BMI)
+ * - Chest > Waist:
+ *     - If chest / waist >= 1.25 (or chest - waist >= 18 cm) -> Muscular
+ *     - Otherwise -> Lean / Athletic
+ */
+export function resolveCurrentArchetypeIndex({
+  bodyFatPct,
+  weightKg,
+  heightCm,
+  chestCm,
+  waistCm,
+}) {
+  const hM = num(heightCm, 175) / 100;
+  const weight = num(weightKg, 75);
+  const bmi = weight / (hM * hM);
+  const chest = num(chestCm, 95);
+  const waist = num(waistCm, 85);
+  const bf = num(bodyFatPct, 18);
+
+  // 1. Check if frame is globally small/underweight
+  if (bmi < 20.0 || (chest < 86 && waist < 74)) {
+    return 4; // Slim / Skinny
+  }
+
+  // 2. Waist is greater than chest
+  if (waist >= chest) {
+    const diff = waist - chest;
+    // If waist significantly exceeds chest or body fat / BMI is high
+    if (diff >= 8 || bf >= 28 || bmi >= 31) {
+      return 2; // Obese / Heavyset
+    }
+    // If thin overall but waist slightly edges chest
+    if (bmi < 22) {
+      return 4; // Slim / Skinny
+    }
+    return 1; // Overweight / Soft belly
+  }
+
+  // 3. Chest is greater than waist
+  const ratio = chest / Math.max(1, waist);
+  const diff = chest - waist;
+
+  // Significant V-taper
+  if (ratio >= 1.22 || diff >= 16 || (ratio >= 1.16 && bf <= 15)) {
+    return 3; // Muscular / Bodybuilder
+  }
+
+  // Moderate athletic ratio
+  return 0; // Lean / Athletic
+}
+
+/**
+ * Target / Dream model classifier — untouched to preserve target logic.
  */
 export function resolveArchetypeIndex({ bodyFatPct, weightKg, heightCm, chestCm, waistCm }) {
   const heightM = num(heightCm, 176) / 100;
@@ -93,17 +114,13 @@ export function resolveArchetypeIndex({ bodyFatPct, weightKg, heightCm, chestCm,
   if (bf >= 25 || bmi >= 32) {
     return 2; // Heavyset / Obese
   }
-
   if (bf >= 18) {
     return 1; // Overweight / Soft belly (18-25%)
   }
-
   if (bf >= 13) {
     return 0; // Lean / Athletic (13-18%)
   }
 
-  // bf < 13: three real outcomes — Muscular (low fat + high muscle),
-  // Skinny (low fat + low muscle), or Lean (low fat + ordinary muscle).
   const vTaper = chestCm && waistCm ? num(chestCm, 0) / Math.max(1, num(waistCm, 1)) : null;
   const leanMassKg = weight * (1 - bf / 100);
   const ffmi = leanMassKg / (heightM * heightM);
@@ -117,7 +134,6 @@ export function resolveArchetypeIndex({ bodyFatPct, weightKg, heightCm, chestCm,
   return 0; // Lean / Athletic
 }
 
-/** Looks up full archetype metadata (label, meshIndex, visualBoost) for a category index. */
 export function getArchetypeInfo(index) {
   return ARCHETYPES[index] || ARCHETYPES[0];
 }

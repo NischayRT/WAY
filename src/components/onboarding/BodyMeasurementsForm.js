@@ -1,9 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useRef } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { analyzeCurrentPhysique } from '@/lib/bodyProportions';
 import { ui } from '@/lib/ui';
@@ -12,6 +11,8 @@ import { Sparkles } from 'lucide-react';
 const RealisticAvatar3D = dynamic(() => import('@/components/body/RealisticAvatar3D'), {
   ssr: false,
 });
+
+// components/onboarding/BodyMeasurementsForm.js
 
 function SpinningPreview({ heightCm, weightKg, chestCm, waistCm, hipCm, bicepCm, bodyFatPct }) {
   const rotationRef = useRef();
@@ -30,14 +31,14 @@ function SpinningPreview({ heightCm, weightKg, chestCm, waistCm, hipCm, bicepCm,
           hipCm={hipCm}
           bicepCm={bicepCm}
           bodyFatPct={bodyFatPct}
-          color="#10b981"
-          roughness={0.35}
+          color="#94a3b8"
+          roughness={0.45}
+          isTarget={false}
         />
       </group>
     </group>
   );
 }
-
 export default function BodyMeasurementsForm({ userId, heightCm, weightKg, sex = 'male', onSaved, onSkip }) {
   const supabase = createClient();
 
@@ -88,7 +89,6 @@ export default function BodyMeasurementsForm({ userId, heightCm, weightKg, sex =
   const handleSave = async () => {
     setSaving(true);
     setError(null);
-
     const { error: upsertError } = await supabase
       .from('profiles')
       .update({
@@ -100,12 +100,10 @@ export default function BodyMeasurementsForm({ userId, heightCm, weightKg, sex =
       .eq('id', userId);
 
     setSaving(false);
-
     if (upsertError) {
       setError(upsertError.message);
       return;
     }
-
     onSaved?.();
   };
 
@@ -114,8 +112,7 @@ export default function BodyMeasurementsForm({ userId, heightCm, weightKg, sex =
       <div>
         <h2 className={`${ui.heading}`}>Your body</h2>
         <p className="mt-1 text-sm text-ink/60 dark:text-slate-400">
-          A rough estimate is fine — drag until it looks about right. You can
-          fine-tune this later.
+          A rough estimate is fine — drag until it looks about right. You can fine-tune this later.
         </p>
       </div>
 
@@ -167,19 +164,10 @@ export default function BodyMeasurementsForm({ userId, heightCm, weightKg, sex =
       {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
 
       <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={onSkip}
-          className={`${ui.btnSecondary} flex-1`}
-        >
+        <button type="button" onClick={onSkip} className={`${ui.btnSecondary} flex-1`}>
           Skip for now
         </button>
-        <button
-          type="button"
-          disabled={saving}
-          onClick={handleSave}
-          className={`${ui.btnPrimary} flex-1`}
-        >
+        <button type="button" disabled={saving} onClick={handleSave} className={`${ui.btnPrimary} flex-1`}>
           {saving ? 'Saving...' : (
             <>
               <Sparkles size={15} /> Looks right

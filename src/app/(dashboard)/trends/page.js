@@ -6,36 +6,26 @@ import { todayLocalDate, addDays } from '@/lib/dateUtils';
 import { ui } from '@/lib/ui';
 import AppHeader from '@/components/layout/AppHeader';
 import MacroBarChart from '@/components/trends/MacroBarChart';
+import { getAuthenticatedUserAndProfile } from '@/lib/userData';
 
 export default async function TrendsPage() {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { user, profile, supabase } = await getAuthenticatedUserAndProfile();
   if (!user) redirect('/login');
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select(
-      'height_cm, weight_kg, age, sex, activity_level, goal, override_calories, override_protein_g, override_carbs_g, override_fat_g'
-    )
-    .eq('id', user.id)
-    .single();
-
   if (!profile) redirect('/onboarding');
 
   const targets = resolveDailyTargets(profile);
-
   const today = todayLocalDate();
   const weekStart = addDays(today, -6);
 
+  // Fetch only the columns needed for trend calculation
   const { data: weekLogs } = await supabase
     .from('food_logs')
     .select('quantity_g, logged_at, foods (calories_kcal, protein_g, carbs_g, fat_g)')
     .eq('user_id', user.id)
     .gte('logged_at', weekStart)
     .lte('logged_at', today);
+
+ 
 
   const dailyTotalsByDate = computeDailyTotalsByDate(weekLogs ?? []);
 

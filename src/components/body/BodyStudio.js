@@ -16,10 +16,10 @@ import {
   AlertTriangle,
   Calendar,
   Sparkles,
-  UserCheck,
   Target,
   Activity,
   ArrowRight,
+  Save,
 } from 'lucide-react';
 import { ui } from '@/lib/ui';
 
@@ -38,8 +38,9 @@ export default function BodyStudio({ profile }) {
   const heightCm = Number(profile?.height_cm) || 175.0;
   const currentWeightKg = Number(profile?.weight_kg) || 75.0;
   const userSex = profile?.sex || 'male';
-  const [activeTab, setActiveTab] = useState('dream');
+  const [activeTab, setActiveTab] = useState('current');
 
+  // Default values matching onboarding calculations
   const defaultWaistIn = useMemo(() => {
     if (profile?.waist_cm) return Math.round((Number(profile.waist_cm) / 2.54) * 2) / 2;
     const estWaistCm = (currentWeightKg / (heightCm / 100) ** 2) * 1.55 + heightCm * 0.28;
@@ -108,6 +109,7 @@ export default function BodyStudio({ profile }) {
     });
   }, [heightCm, currentWeightKg, userSex, waistCm, hipCm, chestCm, bicepCm]);
 
+  // Target values (strictly preserved for Target Model)
   const defaultTargetWeight = useMemo(() => {
     if (profile?.dream_target_weight_kg) return Number(profile.dream_target_weight_kg);
     const idealWeight = Math.round(22.2 * (heightCm / 100) ** 2 * 10) / 10;
@@ -171,12 +173,44 @@ export default function BodyStudio({ profile }) {
     });
   }, [currentWeightKg, targetWeight, targetDate, currentStats.bmr, userSex, dreamForecast.targetBfPct]);
 
-  const [saving, setSaving] = useState(false);
-  const [savedSuccess, setSavedSuccess] = useState(false);
+  // Current measurements save state
+  const [savingCurrent, setSavingCurrent] = useState(false);
+  const [currentSuccess, setCurrentSuccess] = useState(false);
+  const [currentError, setCurrentError] = useState(null);
+
+  // Target goal save state
+  const [savingGoal, setSavingGoal] = useState(false);
+  const [goalSuccess, setGoalSuccess] = useState(false);
+
+  // Save Current Model Measurements (matching Onboarding save logic)
+  const handleSaveCurrentMeasurements = async () => {
+    setSavingCurrent(true);
+    setCurrentError(null);
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        waist_cm: Math.round(waistCm * 10) / 10,
+        hip_cm: Math.round(hipCm * 10) / 10,
+        chest_cm: Math.round(chestCm * 10) / 10,
+        bicep_cm: Math.round(bicepCm * 10) / 10,
+      })
+      .eq('id', profile.id);
+
+    setSavingCurrent(false);
+    if (error) {
+      setCurrentError(error.message);
+      return;
+    }
+
+    setCurrentSuccess(true);
+    router.refresh();
+    setTimeout(() => setCurrentSuccess(false), 3000);
+  };
 
   const handleSetGoal = async () => {
     if (!feasibility.isFeasible) return;
-    setSaving(true);
+    setSavingGoal(true);
     const { error } = await supabase
       .from('profiles')
       .update({
@@ -186,18 +220,25 @@ export default function BodyStudio({ profile }) {
         goal: targetWeight < currentWeightKg ? 'lose_weight' : 'gain_muscle',
       })
       .eq('id', profile.id);
-    setSaving(false);
+    setSavingGoal(false);
     if (!error) {
-      setSavedSuccess(true);
+      setGoalSuccess(true);
       router.refresh();
-      setTimeout(() => setSavedSuccess(false), 3000);
+      setTimeout(() => setGoalSuccess(false), 3000);
     }
   };
+
+  const currentSliders = [
+    { key: 'waist', label: 'Waist', value: waistIn, set: setWaistIn, min: minWaistIn, max: 46, step: 0.5, cm: waistCm },
+    { key: 'hip', label: 'Hips', value: hipIn, set: setHipIn, min: 30, max: 50, step: 0.5, cm: hipCm },
+    { key: 'chest', label: 'Chest', value: chestIn, set: setChestIn, min: 32, max: 52, step: 0.5, cm: chestCm },
+    { key: 'bicep', label: 'Arms (Biceps)', value: bicepIn, set: setBicepIn, min: 10, max: 20, step: 0.25, cm: bicepCm },
+  ];
 
   return (
     <div className="space-y-5 max-w-2xl mx-auto pb-10 w-full px-1 sm:px-0">
       {/* 3D Visualizer Canvas Box */}
-      <div className={`${ui.card} relative overflow-hidden bg-gradient-to-b from-slate-50/50 dark:from-slate-900/60 to-white !p-0 dark:to-slate-900 sm:pt-3 sm:pb-2`}>
+      <div className={`${ui.card} relative overflow-hidden bg-gradient-to-b from-slate-50/50 dark:from-slate-900/60 to-white dark:to-slate-900 p-2 sm:pt-3 sm:pb-2`}>
         <BodyStudioCanvas
           currentData={{
             heightCm,
@@ -252,10 +293,10 @@ export default function BodyStudio({ profile }) {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Sliders size={16} /> Measurements
+                  <Sliders size={16} /> Current Measurements
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Adjust these so the model matches your proportions.
+                  Adjust sliders to calibrate your current 3D model.
                 </p>
               </div>
               <span className="self-start sm:self-auto shrink-0 text-[11px] sm:text-xs font-numeric font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
@@ -263,106 +304,54 @@ export default function BodyStudio({ profile }) {
               </span>
             </div>
 
-            {/* Responsive Slider Grid */}
+            {/* Responsive Onboarding-Style Measurement Sliders */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 pt-1">
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-700 dark:text-slate-300">Waist</span>
-                  <span className="font-numeric font-bold text-sky-600 dark:text-sky-400">
-                    {waistIn}&quot; ({Math.round(waistCm)} cm)
-                  </span>
+              {currentSliders.map((s) => (
+                <div key={s.key} className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-semibold">
+                    <span className="text-slate-700 dark:text-slate-300">{s.label}</span>
+                    <span className="font-numeric font-bold text-emerald-600 dark:text-emerald-400">
+                      {s.value}&quot; ({Math.round(s.cm)} cm)
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={s.min}
+                    max={s.max}
+                    step={s.step}
+                    value={s.value}
+                    onChange={(e) => s.set(Number(e.target.value))}
+                    className="w-full h-2.5 sm:h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                  />
                 </div>
-                <input
-                  type="range"
-                  min={minWaistIn}
-                  max="46"
-                  step="0.5"
-                  value={waistIn}
-                  onChange={(e) => setWaistIn(Math.max(minWaistIn, Number(e.target.value)))}
-                  className="w-full h-2.5 sm:h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-700 dark:text-slate-300">Hips</span>
-                  <span className="font-numeric font-bold text-sky-600 dark:text-sky-400">
-                    {hipIn}&quot; ({Math.round(hipCm)} cm)
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="30"
-                  max="50"
-                  step="0.5"
-                  value={hipIn}
-                  onChange={(e) => setHipIn(Number(e.target.value))}
-                  className="w-full h-2.5 sm:h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-700 dark:text-slate-300">Chest</span>
-                  <span className="font-numeric font-bold text-sky-600 dark:text-sky-400">
-                    {chestIn}&quot; ({Math.round(chestCm)} cm)
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="32"
-                  max="52"
-                  step="0.5"
-                  value={chestIn}
-                  onChange={(e) => setChestIn(Number(e.target.value))}
-                  className="w-full h-2.5 sm:h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-700 dark:text-slate-300">Arms (Biceps)</span>
-                  <span className="font-numeric font-bold text-sky-600 dark:text-sky-400">
-                    {bicepIn}&quot; ({Math.round(bicepCm)} cm)
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="10"
-                  max="20"
-                  step="0.25"
-                  value={bicepIn}
-                  onChange={(e) => setBicepIn(Number(e.target.value))}
-                  className="w-full h-2.5 sm:h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
-                />
-              </div>
+              ))}
             </div>
 
             {/* Metric Summary Badges */}
-            <div className="rounded-xl border border-sky-200/70 dark:border-sky-800/60 bg-sky-50/40 dark:bg-sky-950/20 p-3 sm:p-4 space-y-3">
-              <div className="flex items-center justify-between text-xs font-bold text-sky-950 dark:text-sky-300">
+            <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 p-3 sm:p-4 space-y-3">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white">
                 <span className="font-heading flex items-center gap-1.5">
-                  <Activity size={14} /> Estimated Body Fat
+                  <Activity size={14} className="text-emerald-500" /> Current Body Composition
                 </span>
-                <span className="font-numeric text-sky-800 dark:text-sky-400 text-sm font-extrabold">
-                  {currentStats.bodyFatPct}%
+                <span className="font-numeric text-emerald-600 dark:text-emerald-400 text-sm font-extrabold">
+                  {currentStats.bodyFatPct}% body fat
                 </span>
               </div>
 
               <div className="grid grid-cols-3 gap-2 font-numeric text-center text-xs">
-                <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-sky-100 dark:border-slate-800 shadow-2xs">
+                <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/70 dark:border-slate-800 shadow-2xs">
                   <span className="text-[9px] text-slate-400 block font-sans">Lean Mass</span>
                   <span className="font-bold text-slate-800 dark:text-white text-xs sm:text-sm mt-0.5 block">
                     {currentStats.leanMassKg} kg
                   </span>
                 </div>
-                <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-sky-100 dark:border-slate-800 shadow-2xs">
+                <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/70 dark:border-slate-800 shadow-2xs">
                   <span className="text-[9px] text-slate-400 block font-sans">BMR</span>
                   <span className="font-bold text-slate-800 dark:text-white text-xs sm:text-sm mt-0.5 block">
                     {currentStats.bmr} kcal
                   </span>
                 </div>
-                <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-sky-100 dark:border-slate-800 shadow-2xs">
+                <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/70 dark:border-slate-800 shadow-2xs">
                   <span className="text-[9px] text-slate-400 block font-sans">FFMI</span>
                   <span className="font-bold text-slate-800 dark:text-white text-xs sm:text-sm mt-0.5 block">
                     {currentStats.ffmi}
@@ -370,13 +359,39 @@ export default function BodyStudio({ profile }) {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('dream')}
-                className="w-full mt-2 inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-600 dark:bg-sky-500 text-white font-semibold py-2.5 text-xs hover:bg-sky-700 shadow-xs transition"
-              >
-                Set Your Goal <ArrowRight size={14} />
-              </button>
+              {currentError && (
+                <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{currentError}</p>
+              )}
+
+              {/* Save Current Measurements Button */}
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={savingCurrent}
+                  onClick={handleSaveCurrentMeasurements}
+                  className={`${ui.btnPrimary} flex-1 py-2.5 cursor-pointer`}
+                >
+                  {savingCurrent ? (
+                    'Saving...'
+                  ) : currentSuccess ? (
+                    <>
+                      <CheckCircle2 size={15} /> Measurements Saved!
+                    </>
+                  ) : (
+                    <>
+                      <Save size={15} /> Save Measurements
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('dream')}
+                  className={`${ui.btnSecondary} sm:w-auto py-2.5 cursor-pointer justify-center`}
+                >
+                  Configure Goal <ArrowRight size={14} />
+                </button>
+              </div>
             </div>
           </div>
         ) : (
@@ -495,13 +510,13 @@ export default function BodyStudio({ profile }) {
                 </div>
                 <button
                   type="button"
-                  disabled={saving}
+                  disabled={savingGoal}
                   onClick={handleSetGoal}
                   className={`${ui.btnPrimary} w-full py-3 cursor-pointer`}
                 >
-                  {saving ? (
+                  {savingGoal ? (
                     'Saving...'
-                  ) : savedSuccess ? (
+                  ) : goalSuccess ? (
                     <>
                       <CheckCircle2 size={16} /> Goal set!
                     </>

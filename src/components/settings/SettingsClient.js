@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabaseClient';
 import ProfileForm from '@/components/forms/ProfileForm';
@@ -8,12 +8,49 @@ import BodyStudio from '@/components/body/BodyStudio';
 import { User, Activity, LogOut } from 'lucide-react';
 import { ui } from '@/lib/ui';
 
+// Warms up the 3D chunk (BodyStudioCanvas -> RealisticAvatar3D -> Three.js
+// + the GLTF model) in the background, BEFORE the user clicks the tab.
+// Calling this only starts real work the first time — subsequent calls are
+// no-ops since the dynamic import is already cached by the module system.
+function prefetchBodyStudio() {
+  import('@/components/body/BodyStudioCanvas').catch(() => {});
+}
+
 export default function SettingsClient({ userId, initialProfile }) {
   const supabase = createClient();
   const router = useRouter();
   const [activeSection, setActiveSection] = useState('profile');
+  // BodyStudio contains a WebGL canvas — genuinely expensive to construct
+  // (GPU context, geometry cloning, OrbitControls setup). Previously this
+  // whole section was gated behind a ternary, so React fully unmounted and
+  // rebuilt it from scratch on every single tab switch. Now it mounts once
+  // (only once the user actually visits the tab, not eagerly on page load)
+  // and stays mounted — switching tabs afterward just toggles CSS
+  // visibility, which is instant.
+  const [hasVisitedBody, setHasVisitedBody] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // Low-priority background warm-up, mainly for mobile/touch where there's
+  // no hover to signal intent ahead of a tap. Runs once, after the page has
+  // had a moment to settle, so it never competes with the initial Profile
+  // tab render for bandwidth/CPU.
+  useEffect(() => {
+    const idle =
+      typeof window !== 'undefined' && window.requestIdleCallback
+        ? window.requestIdleCallback
+        : (fn) => setTimeout(fn, 1500);
+    const cancelIdle =
+      typeof window !== 'undefined' && window.cancelIdleCallback ? window.cancelIdleCallback : clearTimeout;
+
+    const id = idle(prefetchBodyStudio);
+    return () => cancelIdle(id);
+  }, []);
+
+  const handleTabClick = (section) => {
+    setActiveSection(section);
+    if (section === 'body') setHasVisitedBody(true);
+  };
 
   const handleSaved = () => {
     setJustSaved(true);
@@ -33,7 +70,7 @@ export default function SettingsClient({ userId, initialProfile }) {
       <div className="grid grid-cols-2 rounded-xl bg-slate-200/80 dark:bg-slate-800 p-1 font-semibold text-xs text-slate-600 dark:text-slate-300">
         <button
           type="button"
-          onClick={() => setActiveSection('profile')}
+          onClick={() => handleTabClick('profile')}
           className={`flex items-center justify-center gap-1 py-2.5 rounded-lg transition ${
             activeSection === 'profile'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
@@ -44,7 +81,10 @@ export default function SettingsClient({ userId, initialProfile }) {
         </button>
         <button
           type="button"
-          onClick={() => setActiveSection('body')}
+          onClick={() => handleTabClick('body')}
+          onMouseEnter={prefetchBodyStudio}
+          onFocus={prefetchBodyStudio}
+          onTouchStart={prefetchBodyStudio}
           className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg transition ${
             activeSection === 'body'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
@@ -63,12 +103,12 @@ export default function SettingsClient({ userId, initialProfile }) {
 
       {/* Active Tab Content Container with proper padding and internal form spacing */}
       <div className={`${ui.card} p-2`}>
-        {activeSection === 'profile' ? (
-          <div className="space-y-4">
-            <ProfileForm userId={userId} initialProfile={initialProfile} onSaved={handleSaved} />
-          </div>
-        ) : (
-          <div className="space-y-4">
+        <div className={activeSection === 'profile' ? 'space-y-4' : 'hidden'}>
+          <ProfileForm userId={userId} initialProfile={initialProfile} onSaved={handleSaved} />
+        </div>
+
+        {hasVisitedBody && (
+          <div className={activeSection === 'body' ? 'space-y-4' : 'hidden'}>
             <BodyStudio profile={initialProfile} />
           </div>
         )}

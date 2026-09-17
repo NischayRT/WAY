@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabaseClient';
 import { Scale, Check, X } from 'lucide-react';
 import { ui } from '@/lib/ui';
+import { getCurrentUserId } from '@/lib/currentUser';
 
 export default function QuickWeightLogModal({
-  userId,
   currentWeight,
   targetDate,
   today,
@@ -38,6 +38,17 @@ export default function QuickWeightLogModal({
     setSaving(true);
     setError(null);
 
+    // Resolved from the session rather than taken as a prop — a prop that no
+    // longer gets passed evaluates to undefined, Supabase drops the key, and
+    // Postgres sees NULL. That is what broke the insert.
+    let userId;
+    try {
+      userId = await getCurrentUserId(supabase);
+    } catch (authError) {
+      setSaving(false);
+      setError(authError.message);
+      return;
+    }
     // 1. Log or update the weight entry specifically for targetDate
     const { error: weightLogError } = await supabase.from('weight_logs').upsert(
       {

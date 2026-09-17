@@ -1,6 +1,6 @@
 export const ui = {
   pageWrap: 'mx-auto max-w-md md:max-w-4xl lg:max-w-5xl px-4 sm:px-6 md:px-8 py-6 pb-28 md:pb-12 space-y-6',
-  pageWrapWide: 'mx-auto max-w-md md:max-w-5xl lg:max-w-6xl px-4 sm:px-6 md:px-8 py-6 pb-28 md:pb-12 space-y-6',
+  pageWrapWide: 'mx-auto max-w-md md:max-w-5xl lg:max-w-6xl px-4 sm:px-6 py-6 pb-28 md:pb-12 space-y-6',
 
   // Modern Cards with high-visibility borders in dark mode
   card: 'rounded-2xl border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-900/90 p-3 shadow-xs shadow-slate-200/50 dark:shadow-slate-950/60 hover:border-slate-300 dark:hover:border-slate-500 transition-all',

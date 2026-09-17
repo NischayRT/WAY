@@ -104,7 +104,7 @@ export default function SettingsClient({ userId, initialProfile }) {
       {/* Active Tab Content Container with proper padding and internal form spacing */}
       <div className={`${ui.card} p-2`}>
         <div className={activeSection === 'profile' ? 'space-y-4' : 'hidden'}>
-          <ProfileForm userId={userId} initialProfile={initialProfile} onSaved={handleSaved} />
+          <ProfileForm initialProfile={initialProfile} onSaved={handleSaved} />
         </div>
 
         {hasVisitedBody && (

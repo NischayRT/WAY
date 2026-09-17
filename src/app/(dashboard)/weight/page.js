@@ -4,6 +4,15 @@ import { ui } from '@/lib/ui';
 import AppHeader from '@/components/layout/AppHeader';
 import WeighInForm from '@/components/weight/WeighInForm';
 import WeightTrendChart from '@/components/weight/WeightTrendChart';
+import WeightStats from '@/components/weight/WeightStats';
+import WeightHistoryList from '@/components/weight/WeightHistoryList';
+
+export const dynamic = 'force-dynamic';
+
+// Enough history for a 30-day regression plus context. Ordered newest-first in
+// the query so the limit keeps the MOST RECENT logs, then reversed for the
+// chart, which needs ascending order.
+const HISTORY_LIMIT = 90;
 
 export default async function WeightPage() {
   const supabase = await createServerSupabaseClient();
@@ -13,22 +22,29 @@ export default async function WeightPage() {
 
   if (!user) redirect('/login');
 
-  // Fetch the 30 most RECENT weigh-ins. Ordering ascending with .limit(30)
-  // returned the 30 oldest entries instead, so the chart froze on the
-  // first month of history once a user had more than 30 logs.
-  const { data: recentEntries } = await supabase
-    .from('weight_logs')
-    .select('logged_at, weight_kg')
-    .eq('user_id', user.id)
-    .order('logged_at', { ascending: false })
-    .limit(30);
+  const [{ data: profile }, { data: recentDesc }] = await Promise.all([
+    supabase.from('profiles').select('height_cm, goal').eq('id', user.id).single(),
+    supabase
+      .from('weight_logs')
+      .select('logged_at, weight_kg')
+      .eq('user_id', user.id)
+      .order('logged_at', { ascending: false })
+      .limit(HISTORY_LIMIT),
+  ]);
 
-  // The chart and history list want chronological order.
-  const entries = [...(recentEntries ?? [])].reverse();
+  const entries = [...(recentDesc ?? [])].reverse();
 
   return (
     <main className={ui.pageWrapWide}>
       <AppHeader title="Weight" backHref="/home" backLabel="Back to today" />
+
+      {entries.length > 0 && (
+        <WeightStats
+          entries={entries}
+          heightCm={profile?.height_cm ?? null}
+          goal={profile?.goal ?? 'maintain'}
+        />
+      )}
 
       <div className={ui.card}>
         <WeightTrendChart entries={entries} />
@@ -40,15 +56,7 @@ export default async function WeightPage() {
 
       {entries.length > 0 && (
         <div className={ui.card}>
-          <h2 className={ui.subheading}>History</h2>
-          <ul className="mt-2 divide-y divide-stone">
-            {[...entries].reverse().map((e) => (
-              <li key={e.logged_at} className="flex justify-between py-2 text-sm">
-                <span className="text-ink/60 dark:text-slate-400">{e.logged_at}</span>
-                <span className="font-numeric font-medium">{e.weight_kg} kg</span>
-              </li>
-            ))}
-          </ul>
+          <WeightHistoryList entries={entries} />
         </div>
       )}
     </main>

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { getDailyTargets } from '@/lib/bmrTdee';
 import { ui } from '@/lib/ui';
+import { getCurrentUserId } from '@/lib/currentUser';
 
 const GOALS = [
   { value: 'lose_weight', label: 'Lose weight' },
@@ -21,7 +22,7 @@ const ACTIVITY_LEVELS = [
   { value: 'very_active', label: 'Very active' },
 ];
 
-export default function ProfileForm({ userId, onSaved, initialProfile }) {
+export default function ProfileForm({ onSaved, initialProfile }) {
   const supabase = createClient();
   const [form, setForm] = useState({
     fullName: initialProfile?.full_name ?? '',
@@ -91,6 +92,17 @@ const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    // Resolved from the session rather than taken as a prop — a prop that no
+    // longer gets passed evaluates to undefined, Supabase drops the key, and
+    // Postgres sees NULL. That is what broke the insert.
+    let userId;
+    try {
+      userId = await getCurrentUserId(supabase);
+    } catch (authError) {
+      setSaving(false);
+      setError(authError.message);
+      return;
+    }
     const { data: { session } } = await supabase.auth.getSession();
 console.log('session user:', session?.user?.id, 'token present:', !!session?.access_token);
     const { error: upsertError } = await supabase.from('profiles').upsert({

@@ -1,19 +1,18 @@
 'use client';
-
+import { getCurrentUserId } from '@/lib/currentUser';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabaseClient';
 import { MEAL_CATEGORIES } from '@/lib/mealCategories';
 import { ShoppingBag } from 'lucide-react';
 import { ui } from '@/lib/ui';
-
-export default function Cart({ userId, items, onUpdateQuantity, onRemove, onLogged }) {
+export default function Cart({ items, loggedAt, onUpdateQuantity, onRemove, onLogged }) {  
   const supabase = createClient();
   const router = useRouter();
   const [mealType, setMealType] = useState('lunch');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-
+​
   const totals = items.reduce(
     (acc, item) => {
       const ratio = item.quantityG / 100;
@@ -26,31 +25,45 @@ export default function Cart({ userId, items, onUpdateQuantity, onRemove, onLogg
     },
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
-
+​
   const handleLog = async () => {
     if (items.length === 0) return;
     setSaving(true);
     setError(null);
-
+​
+    // Resolved from the session inside the handler. It cannot live in the
+    // component body: that body is not async, and it would also run on every
+    // render rather than once per submit.
+    let userId;
+    try {
+      userId = await getCurrentUserId(supabase);
+    } catch (authError) {
+      setSaving(false);
+      setError(authError.message);
+      return;
+    }
+​
     const rows = items.map((item) => ({
       user_id: userId,
       food_id: item.food.id,
       quantity_g: item.quantityG,
       meal_type: mealType,
+      // Sent only when the parent supplies a date; otherwise the column default applies.
+      ...(loggedAt ? { logged_at: loggedAt } : {}),
     }));
-
+​
     const { error: insertError } = await supabase.from('food_logs').insert(rows);
     setSaving(false);
-
+​
     if (insertError) {
       setError(insertError.message);
       return;
     }
-
+​
     onLogged();
     router.refresh();
   };
-
+​
   return (
     <div id="cart-section" className={`${ui.card} space-y-3 scroll-mt-20`}>
       <h2 className={ui.subheading}>

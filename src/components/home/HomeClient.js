@@ -92,8 +92,8 @@ export default function HomeClient({
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-[90px_1fr]">
-        <WeekDateStrip
+<div className="grid grid-cols-1 gap-4 md:grid-cols-[50px_1fr]">
+          <WeekDateStrip
           days={days}
           selectedDate={selectedDate}
           onSelectDate={handleSelectDate}
@@ -161,7 +161,12 @@ export default function HomeClient({
 
           {/* Macro Gauges calibrated to that date's nearest-weight targets */}
           <div className={ui.card}>
-            <MacroRings consumed={breakdown.overallTotals} targets={currentTargets} />
+            <MacroRings
+  consumed={breakdown.overallTotals}
+  targets={currentTargets}
+  days={days}
+  weekBreakdowns={weekBreakdowns}
+/>
           </div>
 
           <RepeatMealBanner selectedDate={selectedDate} />
@@ -188,7 +193,6 @@ export default function HomeClient({
       </div>
 
       <QuickWeightLogModal
-        userId={userId}
         currentWeight={currentTargets.effectiveWeight}
         targetDate={selectedDate}
         today={today}

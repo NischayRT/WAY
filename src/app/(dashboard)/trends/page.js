@@ -9,19 +9,21 @@ import TrendsClient from '@/components/trends/TrendsClient';
 
 export const dynamic = 'force-dynamic';
 
+// Widest window the client can slice. One query covers 7/14/30 day views, so
+// switching range costs no round trip.
+const WINDOW_DAYS = 30;
+
 export default async function TrendsPage() {
   const supabase = await createServerSupabaseClient();
   const today = todayLocalDate();
-  const weekStart = addDays(today, -6);
+  const windowStart = addDays(today, -(WINDOW_DAYS - 1));
 
-  // Authenticate user first
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  // Concurrently fetch profile targets and the 7-day food logs in a single round-trip
-  const [{ data: profile }, { data: weekLogs }] = await Promise.all([
+  const [{ data: profile }, { data: logs }] = await Promise.all([
     supabase
       .from('profiles')
       .select(
@@ -33,21 +35,24 @@ export default async function TrendsPage() {
       .from('food_logs')
       .select('quantity_g, logged_at, foods (calories_kcal, protein_g, carbs_g, fat_g)')
       .eq('user_id', user.id)
-      .gte('logged_at', weekStart)
+      .gte('logged_at', windowStart)
       .lte('logged_at', today),
   ]);
 
   if (!profile) redirect('/onboarding');
 
   const targets = resolveDailyTargets(profile);
-  const dailyTotalsByDate = computeDailyTotalsByDate(weekLogs ?? []);
+  const dailyTotalsByDate = computeDailyTotalsByDate(logs ?? []);
 
-  // Compute 7-day aggregates directly on the server
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const date = addDays(weekStart, i);
+  const days = Array.from({ length: WINDOW_DAYS }, (_, i) => {
+    const date = addDays(windowStart, i);
     const totals = dailyTotalsByDate.get(date) ?? { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    const d = new Date(`${date}T00:00:00`);
+
     return {
-      dayLabel: new Date(`${date}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short' }),
+      date,
+      dayLabel: d.toLocaleDateString('en-IN', { weekday: 'short' }),
+      dateLabel: d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
       calories: Math.round(totals.calories),
       protein: Math.round(totals.protein),
       carbs: Math.round(totals.carbs),

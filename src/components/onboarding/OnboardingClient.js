@@ -57,11 +57,10 @@ export default function OnboardingClient({ userId }) {
         ))}
       </div>
 
-      {step === 0 && <ProfileForm userId={userId} onSaved={handleProfileSaved} />}
+      {step === 0 && <ProfileForm onSaved={handleProfileSaved} />}
 
       {step === 1 && (
         <BodyMeasurementsForm
-          userId={userId}
           heightCm={profileBasics?.heightCm ?? 170}
           weightKg={profileBasics?.weightKg ?? 70}
           sex={profileBasics?.sex ?? 'male'}

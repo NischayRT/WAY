@@ -46,7 +46,7 @@ export default function WeekDateStrip({ days, selectedDate, onSelectDate, today,
             type="button"
             disabled={isDisabled}
             onClick={() => onSelectDate(day.date)}
-            className={`flex flex-col items-center justify-center shrink-0 w-12 md:w-full py-2.5 px-1 rounded-xl text-center border transition-all ${
+            className={`flex flex-col items-center justify-center shrink-0 w-[50px] md:w-full py-2.5 px-1 rounded-xl text-center border transition-all ${
               isDisabled
                 ? 'opacity-30 cursor-not-allowed border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 text-slate-400'
                 : isSelected
@@ -77,7 +77,7 @@ export default function WeekDateStrip({ days, selectedDate, onSelectDate, today,
         type="button"
         onClick={openCalendarPicker}
         title="Open calendar to choose date"
-        className="flex flex-col items-center justify-center shrink-0 w-12 md:w-full py-2 px-1 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-500 dark:hover:border-slate-500 transition-all shadow-2xs group active:scale-95 cursor-pointer"
+        className="flex flex-col items-center justify-center shrink-0 w-[50px] md:w-full py-2 px-1 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-500 dark:hover:border-slate-500 transition-all shadow-2xs group active:scale-95 cursor-pointer"
       >
         <CalendarIcon size={13} className="text-slate-400 group-hover:text-slate-800 dark:group-hover:text-white transition" />
         <ChevronDown size={14} className="mt-0.5 text-slate-400 group-hover:text-slate-800 dark:group-hover:text-white transition" />

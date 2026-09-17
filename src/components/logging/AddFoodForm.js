@@ -7,6 +7,7 @@ import { computeDishNutrition } from '@/lib/recipeNutrition';
 import { ui } from '@/lib/ui';
 import IngredientSearch from './IngredientSearch';
 import ClosestMatchPicker from './ClosestMatchPicker';
+import { getCurrentUserId } from '@/lib/currentUser';
 
 const COOKING_METHODS = [
   'curry', 'dry_curry', 'deep_fried', 'shallow_fried', 'baked', 'grilled',
@@ -18,7 +19,7 @@ const DISH_CLASSES = [
 ];
 const label = (s) => s.replace(/_/g, ' ');
 
-export default function AddFoodForm({ userId, authorName }) {
+export default function AddFoodForm({ authorName }) {
   const supabase = createClient();
   const router = useRouter();
   const [name, setName] = useState('');
@@ -77,6 +78,17 @@ export default function AddFoodForm({ userId, authorName }) {
       return;
     }
 
+    // Resolved from the session rather than taken as a prop — a prop that no
+    // longer gets passed evaluates to undefined, Supabase drops the key, and
+    // Postgres sees NULL. That is what broke the insert.
+    let userId;
+    try {
+      userId = await getCurrentUserId(supabase);
+    } catch (authError) {
+      setSaving(false);
+      setError(authError.message);
+      return;
+    }
     setSaving(true);
     const { data: insertedFood, error: insertError } = await supabase
       .from('foods')
@@ -211,7 +223,7 @@ export default function AddFoodForm({ userId, authorName }) {
           </ul>
         )}
 
-        <IngredientSearch userId={userId} onAdd={(line) => setLines((prev) => [...prev, line])} />
+        <IngredientSearch onAdd={(line) => setLines((prev) => [...prev, line])} />
 
         {lines.length > 0 && (
           <p className="font-numeric text-xs text-slate-400 dark:text-slate-500">

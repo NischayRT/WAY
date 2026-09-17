@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabaseClient';
 import { MEAL_CATEGORIES } from '@/lib/mealCategories';
 import { Trash2, Check, Edit2, X, Calendar, Clock } from 'lucide-react';
@@ -60,10 +61,10 @@ export default function DailyLog({ categories }) {
 
   if (!categories || categories.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 p-8 text-center">
+      <Link className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/40 p-8 text-center" href="/log-food">
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No foods logged for this date.</p>
-        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Click &quot;+ Log food&quot; above to track your meals.</p>
-      </div>
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Click to track your meals.</p>
+      </Link>
     );
   }
 

@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { ChefHat } from 'lucide-react';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { todayLocalDate, addDays, clampDate } from '@/lib/dateUtils';
-import { ui } from '@/lib/ui';
 import AppHeader from '@/components/layout/AppHeader';
 import LogFoodBuilder from '@/components/logging/LogFoodBuilder';
 
@@ -23,7 +22,10 @@ export default async function LogFoodPage({ searchParams }) {
   const initialDate = clampDate(params?.date, minDate, today);
 
   return (
-    <main className={ui.pageWrapWide}>
+    // Deliberately NOT ui.pageWrapWide here. That wrapper is sized for
+    // single-column reading; this page needs room for the food list AND a
+    // ~340px cart column side by side, so it gets a wider max-width.
+    <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 pb-28 space-y-6">
       <AppHeader
         title="Log food"
         backHref="/home"

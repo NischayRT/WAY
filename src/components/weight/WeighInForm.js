@@ -4,12 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabaseClient';
 import { ui } from '@/lib/ui';
+import { getCurrentUserId } from '@/lib/currentUser';
 
 function todayLocalDate() {
   return new Date().toISOString().split('T')[0];
 }
 
-export default function WeighInForm({ userId }) {
+export default function WeighInForm() {
   const supabase = createClient();
   const router = useRouter();
   const [weightKg, setWeightKg] = useState('');
@@ -22,6 +23,17 @@ export default function WeighInForm({ userId }) {
     setSaving(true);
     setError(null);
 
+    // Resolved from the session rather than taken as a prop — a prop that no
+    // longer gets passed evaluates to undefined, Supabase drops the key, and
+    // Postgres sees NULL. That is what broke the insert.
+    let userId;
+    try {
+      userId = await getCurrentUserId(supabase);
+    } catch (authError) {
+      setSaving(false);
+      setError(authError.message);
+      return;
+    }
     const { error: upsertError } = await supabase.from('weight_logs').upsert(
       { user_id: userId, weight_kg: Number(weightKg), logged_at: loggedAt },
       { onConflict: 'user_id,logged_at' }

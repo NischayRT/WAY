@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShoppingBag, AlertCircle } from 'lucide-react';
@@ -9,11 +8,19 @@ import RecommendedFoods from './RecommendedFoods';
 import Cart from './Cart';
 import { ui } from '@/lib/ui';
 
-export default function LogFoodBuilder({ userId }) {
+export default function LogFoodBuilder({ today, minDate, initialDate }) {
   const router = useRouter();
   const [cart, setCart] = useState([]);
   const [showExitModal, setShowExitModal] = useState(false);
   const [pendingRoute, setPendingRoute] = useState(null);
+
+  // The day this meal gets logged against. Seeded from the date the user
+  // was viewing on the home screen (passed through ?date=), falling back
+  // to today. Previously these props were passed by page.js but never
+  // accepted here, so logs always landed on today regardless.
+  const [loggedAt, setLoggedAt] = useState(initialDate || today);
+
+  const isBackdated = loggedAt && today && loggedAt !== today;
 
   const addToCart = (food, quantityG) => {
     setCart((prev) => [...prev, { food, quantityG }]);
@@ -75,26 +82,44 @@ export default function LogFoodBuilder({ userId }) {
   };
 
   return (
-    <div className="relative grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-      <div className="space-y-6">
+    <div className="relative flex flex-col md:flex-row gap-6 md:items-start">
+      <div className="min-w-0 flex-1 space-y-6">
         <FoodSearch onAdd={addToCart} />
         <DishBuilder onAdd={addToCart} />
         <RecommendedFoods onAdd={addToCart} />
       </div>
 
-      <div className="lg:sticky lg:top-6 lg:self-start">
+      <div className="w-full md:w-[290px] lg:w-[340px] md:shrink-0 md:sticky md:top-6 space-y-3">
+        {isBackdated && (
+          <div className="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            Logging to <span className="font-numeric font-semibold">{loggedAt}</span>, not today.
+          </div>
+        )}
+
         <Cart
-          userId={userId}
           items={cart}
+          loggedAt={loggedAt}
           onUpdateQuantity={updateQuantity}
           onRemove={removeItem}
           onLogged={() => setCart([])}
         />
+
+        <label className={`${ui.label} px-1`}>
+          Log to date
+          <input
+            type="date"
+            value={loggedAt || ''}
+            min={minDate}
+            max={today}
+            onChange={(e) => setLoggedAt(e.target.value)}
+            className={ui.input}
+          />
+        </label>
       </div>
 
       {/* Floating Mobile Cart Icon & Badge */}
       {cart.length > 0 && (
-        <div className="fixed bottom-20 right-5 z-40 lg:hidden">
+        <div className="fixed bottom-20 right-5 z-40 md:hidden">
           <button
             type="button"
             onClick={scrollToCart}

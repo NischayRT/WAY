@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabaseClient';
 import { analyzeCurrentPhysique } from '@/lib/bodyProportions';
 import { ui } from '@/lib/ui';
 import { Sparkles } from 'lucide-react';
+import { getCurrentUserId } from '@/lib/currentUser';
 
 const RealisticAvatar3D = dynamic(() => import('@/components/body/RealisticAvatar3D'), {
   ssr: false,
@@ -39,7 +40,7 @@ function SpinningPreview({ heightCm, weightKg, chestCm, waistCm, hipCm, bicepCm,
     </group>
   );
 }
-export default function BodyMeasurementsForm({ userId, heightCm, weightKg, sex = 'male', onSaved, onSkip }) {
+export default function BodyMeasurementsForm({ heightCm, weightKg, sex = 'male', onSaved, onSkip }) {
   const supabase = createClient();
 
   const defaultWaistIn = useMemo(() => {
@@ -89,6 +90,17 @@ export default function BodyMeasurementsForm({ userId, heightCm, weightKg, sex =
   const handleSave = async () => {
     setSaving(true);
     setError(null);
+    // Resolved from the session rather than taken as a prop — a prop that no
+    // longer gets passed evaluates to undefined, Supabase drops the key, and
+    // Postgres sees NULL. That is what broke the insert.
+    let userId;
+    try {
+      userId = await getCurrentUserId(supabase);
+    } catch (authError) {
+      setSaving(false);
+      setError(authError.message);
+      return;
+    }
     const { error: upsertError } = await supabase
       .from('profiles')
       .update({

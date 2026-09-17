@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { ui } from '@/lib/ui';
+import { getCurrentUserId } from '@/lib/currentUser';
 
 const CATEGORIES = [
   'grain', 'lentil', 'vegetable', 'dairy', 'oil_fat', 'meat', 'spice', 'sweetener', 'other',
 ];
 
-export default function IngredientSearch({ userId, onAdd }) {
+export default function IngredientSearch({ onAdd }) {
   const supabase = createClient();
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +63,15 @@ export default function IngredientSearch({ userId, onAdd }) {
     }
     setSavingNew(true);
     setNewError(null);
+    let userId;
+    try {
+      userId = await getCurrentUserId(supabase);
+    } catch (authError) {
+      setSavingNew(false);
+      setNewError(authError.message);
+      return;
+    }
+
     const { data, error } = await supabase
       .from('ingredients')
       .insert({

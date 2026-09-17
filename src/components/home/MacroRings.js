@@ -453,7 +453,7 @@ export default function MacroRings({ consumed, targets }) {
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-white">
                 Macronutrient Targets
               </span>
-              <span className="text-[11px] font-numeric text-slate-400">Daily Balance</span>
+              
             </div>
             <div className="flex flex-col gap-2.5">
               {planets.map((p) => {
@@ -478,9 +478,7 @@ export default function MacroRings({ consumed, targets }) {
                         </div>
                         <div>
                           <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">{p.name}</h4>
-                          <p className="text-[11px] font-numeric text-slate-400 dark:text-slate-400">
-                            Target: <span className="font-semibold text-slate-600 dark:text-slate-300">{p.target}{p.unit}</span>
-                          </p>
+                          
                         </div>
                       </div>
                       <div className="text-right font-numeric">

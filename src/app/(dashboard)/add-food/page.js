@@ -27,7 +27,7 @@ export default async function AddFoodPage() {
           delete it.
         </p>
       </div>
-      <AddFoodForm userId={user.id} authorName={profile?.full_name} />
+      <AddFoodForm authorName={profile?.full_name} />
     </main>
   );
 }

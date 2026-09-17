@@ -4,12 +4,11 @@ import { ui } from '@/lib/ui';
 import AppHeader from '@/components/layout/AppHeader';
 import SettingsClient from '@/components/settings/SettingsClient';
 
-// This page must never be served from a cached render. It carries a
-// specific user's auth.uid() and profile row down as props — if a stale
-// cached version from a *different* (e.g. deleted/recreated) account ever
-// got reused, the userId sent in a later save would no longer match the
-// current session's auth.uid(), and Postgres would correctly reject the
-// write as an RLS violation even though the policies themselves are fine.
+// This page must never be served from a cached render: it carries a
+// specific user's profile row down as props, and a stale render from a
+// different account would show the wrong details. Writes themselves no
+// longer depend on this — forms resolve the user id from the live session
+// at save time rather than trusting a prop.
 export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
@@ -39,7 +38,7 @@ export default async function SettingsPage() {
           automatically.
         </p>
       </div>
-      <SettingsClient userId={user.id} initialProfile={profile} />
+      <SettingsClient initialProfile={profile} />
     </main>
   );
 }

@@ -32,7 +32,7 @@ export default async function OnboardingPage() {
           We use this to calculate your daily calorie and macro targets.
         </p>
       </div>
-      <OnboardingClient userId={user.id} />
+      <OnboardingClient />
     </main>
   );
 }

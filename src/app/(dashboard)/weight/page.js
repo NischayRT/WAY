@@ -13,26 +13,32 @@ export default async function WeightPage() {
 
   if (!user) redirect('/login');
 
-  const { data: entries } = await supabase
+  // Fetch the 30 most RECENT weigh-ins. Ordering ascending with .limit(30)
+  // returned the 30 oldest entries instead, so the chart froze on the
+  // first month of history once a user had more than 30 logs.
+  const { data: recentEntries } = await supabase
     .from('weight_logs')
     .select('logged_at, weight_kg')
     .eq('user_id', user.id)
-    .order('logged_at', { ascending: true })
+    .order('logged_at', { ascending: false })
     .limit(30);
+
+  // The chart and history list want chronological order.
+  const entries = [...(recentEntries ?? [])].reverse();
 
   return (
     <main className={ui.pageWrapWide}>
       <AppHeader title="Weight" backHref="/home" backLabel="Back to today" />
 
       <div className={ui.card}>
-        <WeightTrendChart entries={entries ?? []} />
+        <WeightTrendChart entries={entries} />
       </div>
 
       <div className={ui.card}>
-        <WeighInForm userId={user.id} />
+        <WeighInForm />
       </div>
 
-      {entries && entries.length > 0 && (
+      {entries.length > 0 && (
         <div className={ui.card}>
           <h2 className={ui.subheading}>History</h2>
           <ul className="mt-2 divide-y divide-stone">

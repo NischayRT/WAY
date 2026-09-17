@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { resolveDailyTargets } from '@/lib/bmrTdee';
 import { computeMealBreakdown } from '@/lib/mealBreakdown';
 import { recommendFoods } from '@/lib/recommend';
+import { todayLocalDate } from '@/lib/dateUtils';
 
 export async function GET() {
   const supabase = await createServerSupabaseClient();
@@ -28,7 +29,9 @@ export async function GET() {
 
   const targets = resolveDailyTargets(profile);
 
-  const today = new Date().toISOString().split('T')[0];
+  // Was a UTC date, which pointed at yesterday for any request before
+  // 05:30 IST — recommendations were computed against the wrong day's logs.
+  const today = todayLocalDate();
   const { data: todaysLogs } = await supabase
     .from('food_logs')
     .select('food_id, quantity_g, meal_type, foods (name, calories_kcal, protein_g, carbs_g, fat_g)')

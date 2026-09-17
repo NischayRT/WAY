@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
-import { getDailyTargets } from '@/lib/bmrTdee';
+import { resolveDailyTargets } from '@/lib/bmrTdee';
 
 // GET /api/targets — returns the logged-in user's daily calorie/macro targets
+//
+// This used to call getDailyTargets() and ignore the override_* columns, so
+// a user with custom targets saw their computed numbers here while every
+// other screen (which uses resolveDailyTargets) showed the overrides.
 export async function GET() {
   const supabase = await createServerSupabaseClient();
 
@@ -16,7 +20,9 @@ export async function GET() {
 
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('height_cm, weight_kg, age, sex, activity_level, goal')
+    .select(
+      'height_cm, weight_kg, age, sex, activity_level, goal, override_calories, override_protein_g, override_carbs_g, override_fat_g'
+    )
     .eq('id', user.id)
     .single();
 
@@ -24,14 +30,5 @@ export async function GET() {
     return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
   }
 
-  const targets = getDailyTargets({
-    heightCm: profile.height_cm,
-    weightKg: profile.weight_kg,
-    age: profile.age,
-    sex: profile.sex,
-    activityLevel: profile.activity_level,
-    goal: profile.goal,
-  });
-
-  return NextResponse.json(targets);
+  return NextResponse.json(resolveDailyTargets(profile));
 }

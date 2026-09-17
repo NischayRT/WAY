@@ -2,16 +2,25 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ChefHat } from 'lucide-react';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
+import { todayLocalDate, addDays, clampDate } from '@/lib/dateUtils';
 import { ui } from '@/lib/ui';
 import AppHeader from '@/components/layout/AppHeader';
 import LogFoodBuilder from '@/components/logging/LogFoodBuilder';
 
-export default async function LogFoodPage() {
+export default async function LogFoodPage({ searchParams }) {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
+
+  // The home screen can be parked on an earlier day. Carry that date over
+  // via ?date= so the cart logs to the day the user was actually looking
+  // at instead of silently defaulting to today.
+  const params = await searchParams;
+  const today = todayLocalDate();
+  const minDate = addDays(today, -90);
+  const initialDate = clampDate(params?.date, minDate, today);
 
   return (
     <main className={ui.pageWrapWide}>
@@ -29,7 +38,7 @@ export default async function LogFoodPage() {
           </Link>
         }
       />
-      <LogFoodBuilder userId={user.id} />
+      <LogFoodBuilder today={today} minDate={minDate} initialDate={initialDate} />
     </main>
   );
 }

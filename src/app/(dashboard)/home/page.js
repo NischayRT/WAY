@@ -126,7 +126,6 @@ export default async function HomePage({ searchParams }) {
   return (
     <main className={ui.pageWrapWide}>
       <HomeClient
-        userId={user.id}
         profile={profile}
         weightLogs={weightLogs}
         currentWeightKg={initialTargets.effectiveWeight}

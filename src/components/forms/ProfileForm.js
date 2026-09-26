@@ -135,7 +135,7 @@ console.log('session user:', session?.user?.id, 'token present:', !!session?.acc
           type="text"
           value={form.fullName}
           onChange={handleChange('fullName')}
-          placeholder="Shown when you share a dish, e.g. Markaaaaaaaaaaaaa"
+          placeholder="Shown when you share a dish, e.g. Mark"
           className={ui.input}
         />
       </label>

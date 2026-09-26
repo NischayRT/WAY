@@ -51,7 +51,7 @@ async function loadFoods(supabase) {
   const { data, error } = await supabase
     .from('foods')
     .select('id, name, region, calories_kcal, protein_g, carbs_g, fat_g, created_by, author_name')
-    .order('name');
+    .order('id', { ascending: false });
   if (error) throw error;
   return data ?? [];
 }

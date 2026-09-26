@@ -6,6 +6,7 @@ import FoodSearch from './FoodSearch';
 import DishBuilder from './DishBuilder';
 import RecommendedFoods from './RecommendedFoods';
 import Cart from './Cart';
+import MyDishesPanel from './MyDishesPanel';
 import { ui } from '@/lib/ui';
 
 export default function LogFoodBuilder({ today, minDate, initialDate }) {
@@ -115,6 +116,8 @@ export default function LogFoodBuilder({ today, minDate, initialDate }) {
             className={ui.input}
           />
         </label>
+        <MyDishesPanel onAdd={addToCart} />
+
       </div>
 
       {/* Floating Mobile Cart Icon & Badge */}

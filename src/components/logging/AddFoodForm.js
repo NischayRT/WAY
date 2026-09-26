@@ -8,6 +8,7 @@ import { ui } from '@/lib/ui';
 import IngredientSearch from './IngredientSearch';
 import ClosestMatchPicker from './ClosestMatchPicker';
 import { getCurrentUserId } from '@/lib/currentUser';
+import { invalidateFoodCache } from '@/lib/cache/foodCache';
 
 const COOKING_METHODS = [
   'curry', 'dry_curry', 'deep_fried', 'shallow_fried', 'baked', 'grilled',
@@ -130,6 +131,11 @@ export default function AddFoodForm({ authorName }) {
       setError(recipeError.message);
       return;
     }
+    // This new dish is now a real row in `foods` — without this, FoodSearch's
+    // cached list would keep excluding it until something else happened to
+    // clear the cache (previously: nothing did, until the 5-min TTL or a
+    // hard reload).
+    invalidateFoodCache();
     router.push('/log-food');
   };
 

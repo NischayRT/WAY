@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { Search } from 'lucide-react';
 import { ui, authorTag } from '@/lib/ui';
-import { getCachedFoods } from '@/lib/cache/foodCache';
+import { getCachedFoods, peekCachedFoods } from '@/lib/cache/foodCache';
 
 export default function FoodSearch({ onAdd }) {
   const supabase = createClient();
-  const [foods, setFoods] = useState([]);
-  const [loadingFoods, setLoadingFoods] = useState(true);
+  const [foods, setFoods] = useState(() => peekCachedFoods() ?? []);
+  const [loadingFoods, setLoadingFoods] = useState(() => peekCachedFoods() === null);
   const [query, setQuery] = useState('');
   const [selectedFood, setSelectedFood] = useState(null);
   const [quantityG, setQuantityG] = useState(100);
@@ -18,10 +18,13 @@ export default function FoodSearch({ onAdd }) {
 useEffect(() => {
   let isMounted = true;
   const loadFoods = async () => {
-    const data = await getCachedFoods(supabase);
-    if (isMounted) {
-      setFoods(data);
-      setLoadingFoods(false);
+    try {
+      const data = await getCachedFoods(supabase);
+      if (isMounted) setFoods(data);
+    } catch (err) {
+      if (isMounted) setError(err.message || 'Could not load foods.');
+    } finally {
+      if (isMounted) setLoadingFoods(false);
     }
   };
   loadFoods();
@@ -52,6 +55,10 @@ useEffect(() => {
 
   if (loadingFoods) {
     return <p className="text-sm text-slate-500 dark:text-slate-400">Loading foods...</p>;
+  }
+
+  if (error && foods.length === 0) {
+    return <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>;
   }
 
   return (

@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { ChefHat, Search } from 'lucide-react';
 import { ui, authorTag } from '@/lib/ui';
+import { getCachedIngredients, peekCachedIngredients } from '@/lib/cache/foodCache';
 
 export default function DishBuilder({ onAdd }) {
   const supabase = createClient();
-  const [allIngredients, setAllIngredients] = useState([]);
+  const [allIngredients, setAllIngredients] = useState(() => peekCachedIngredients() ?? []);
   const [query, setQuery] = useState('');
   const [haveList, setHaveList] = useState([]);
   const [matches, setMatches] = useState(null);
@@ -15,11 +16,20 @@ export default function DishBuilder({ onAdd }) {
   const [quantities, setQuantities] = useState({});
 
   useEffect(() => {
+    let isMounted = true;
     const load = async () => {
-      const { data } = await supabase.from('ingredients').select('id, name').order('name');
-      setAllIngredients(data ?? []);
+      try {
+        const data = await getCachedIngredients(supabase);
+        // This component only needs id/name, but reads from the same
+        // cache entry IngredientSearch populates (full rows) so the two
+        // never fire two separate fetches for the same table.
+        if (isMounted) setAllIngredients(data.map(({ id, name }) => ({ id, name })));
+      } catch {
+        // Non-fatal here — the "what can I cook" search just stays empty.
+      }
     };
     load();
+    return () => { isMounted = false; };
   }, []);
 
   const filtered =

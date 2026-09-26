@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { ui } from '@/lib/ui';
 import { getCurrentUserId } from '@/lib/currentUser';
+import { getCachedIngredients, invalidateIngredientCache, peekCachedIngredients } from '@/lib/cache/foodCache';
 
 const CATEGORIES = [
   'grain', 'lentil', 'vegetable', 'dairy', 'oil_fat', 'meat', 'spice', 'sweetener', 'other',
@@ -11,8 +12,8 @@ const CATEGORIES = [
 
 export default function IngredientSearch({ onAdd }) {
   const supabase = createClient();
-  const [ingredients, setIngredients] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [ingredients, setIngredients] = useState(() => peekCachedIngredients() ?? []);
+  const [loading, setLoading] = useState(() => peekCachedIngredients() === null);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
   const [quantityG, setQuantityG] = useState(50);
@@ -29,15 +30,19 @@ export default function IngredientSearch({ onAdd }) {
   const [newError, setNewError] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
     const load = async () => {
-      const { data } = await supabase
-        .from('ingredients')
-        .select('id, name, category, calories_kcal, protein_g, carbs_g, fat_g, fiber_g')
-        .order('name');
-      setIngredients(data ?? []);
-      setLoading(false);
+      try {
+        const data = await getCachedIngredients(supabase);
+        if (isMounted) setIngredients(data);
+      } catch (err) {
+        if (isMounted) setNewError(err.message || 'Could not load ingredients.');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     };
     load();
+    return () => { isMounted = false; };
   }, []);
 
   const filtered =
@@ -93,6 +98,10 @@ export default function IngredientSearch({ onAdd }) {
       setNewError(error.message);
       return;
     }
+    // Cache is now stale (missing this row) — clear it so the next mount
+    // of this or DishBuilder re-fetches the real list; this instance
+    // updates its own local state immediately without waiting on that.
+    invalidateIngredientCache();
     setIngredients((prev) => [...prev, data]);
     setSelected(data);
     setShowNewForm(false);

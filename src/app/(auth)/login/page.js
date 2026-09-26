@@ -162,8 +162,11 @@ export default function LoginPage() {
         {codeSent ? (
           <form onSubmit={handleVerifyCode} className="w-full space-y-2.5">
             <p className="text-xs text-white/70 leading-relaxed px-1">
-              We sent a 8-digit code to <span className="font-medium text-white">{email.trim()}</span>.
+              We sent a 6-digit code to <span className="font-medium text-white">{email.trim()}</span>.
               Enter it below to sign in.
+            </p>
+            <p className="text-[11px] text-white/50 leading-relaxed px-1">
+              Don&apos;t see it? Check your spam or promotions folder — it can take a minute to arrive.
             </p>
 
             <div className="relative">

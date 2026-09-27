@@ -278,6 +278,14 @@ export default function BottomNav() {
         <div ref={menuRef} className="relative w-full">
           {dropdownOpen && (
             <div className="absolute bottom-full left-0 mb-2.5 w-48 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-1.5 shadow-xl backdrop-blur-md z-50">
+              <Link
+                href="/settings"
+                onClick={() => setDropdownOpen(false)}
+                className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-[0.98] cursor-pointer"
+              >
+                <Settings size={14} />
+                <span>Settings</span>
+              </Link>
               <button
                 type="button"
                 onClick={handleLogout}

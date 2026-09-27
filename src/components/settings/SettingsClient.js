@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabaseClient';
 import ProfileForm from '@/components/forms/ProfileForm';
 import BodyStudio from '@/components/body/BodyStudio';
-import { User, Activity, LogOut } from 'lucide-react';
+import { User, Activity, LogOut, Trash2 } from 'lucide-react';
 import { ui } from '@/lib/ui';
 
 // Warms up the 3D chunk (BodyStudioCanvas -> RealisticAvatar3D -> Three.js
@@ -30,6 +30,9 @@ export default function SettingsClient({ userId, initialProfile }) {
   const [hasVisitedBody, setHasVisitedBody] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   // Low-priority background warm-up, mainly for mobile/touch where there's
   // no hover to signal intent ahead of a tap. Runs once, after the page has
@@ -59,6 +62,44 @@ export default function SettingsClient({ userId, initialProfile }) {
 
   const handleLogout = async () => {
     setLoggingOut(true);
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  };
+
+  // Data wipe, not a real account deletion — the login itself stays valid
+  // by design (see the note above this component's usage). Deliberately
+  // does NOT touch foods/ingredients/dish_ingredients this user created:
+  // those are shared community content other users may already reference,
+  // so hard-deleting them here risks a foreign-key failure or worse. Order
+  // matters below — food_logs and weight_logs first (nothing else
+  // references them), profiles last, since foods/ingredients this user
+  // created may still carry a created_by pointing at it.
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+
+    const { error: logsError } = await supabase.from('food_logs').delete().eq('user_id', userId);
+    if (logsError) {
+      setDeleting(false);
+      setDeleteError(`Could not remove food logs: ${logsError.message}`);
+      return;
+    }
+
+    const { error: weightError } = await supabase.from('weight_logs').delete().eq('user_id', userId);
+    if (weightError) {
+      setDeleting(false);
+      setDeleteError(`Could not remove weight logs: ${weightError.message}`);
+      return;
+    }
+
+    const { error: profileError } = await supabase.from('profiles').delete().eq('id', userId);
+    if (profileError) {
+      setDeleting(false);
+      setDeleteError(`Could not remove your profile: ${profileError.message}`);
+      return;
+    }
+
     await supabase.auth.signOut();
     router.push('/login');
     router.refresh();
@@ -129,6 +170,65 @@ export default function SettingsClient({ userId, initialProfile }) {
           <LogOut size={15} />
           <span>{loggingOut ? 'Signing out...' : 'Log out'}</span>
         </button>
+      </div>
+
+      {/* Danger Zone */}
+      <div className={`${ui.card} border-rose-200 dark:border-rose-900/50 p-5 sm:p-6 space-y-4`}>
+        <div>
+          <h3 className="text-sm font-bold text-rose-700 dark:text-rose-400">Danger Zone</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Permanently erase your profile, food logs, and weight logs. This cannot be undone.
+          </p>
+        </div>
+
+        {!confirmingDelete ? (
+          <button
+            type="button"
+            onClick={() => setConfirmingDelete(true)}
+            className="inline-flex items-center gap-2 rounded-xl border border-rose-300 dark:border-rose-800 bg-white dark:bg-slate-900 px-4 py-2.5 text-xs sm:text-sm font-semibold text-rose-700 dark:text-rose-300 shadow-2xs transition-all hover:bg-rose-50 dark:hover:bg-rose-950/40 active:scale-[0.98] cursor-pointer w-full sm:w-auto justify-center"
+          >
+            <Trash2 size={15} />
+            <span>Delete account</span>
+          </button>
+        ) : (
+          <div className="rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50/60 dark:bg-rose-950/30 p-4 space-y-3">
+            <p className="text-sm font-semibold text-rose-800 dark:text-rose-300">
+              Are you sure? This deletes your profile, every food log, and every weight log —
+              permanently.
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              You can still sign back in afterward with the same account, but you&apos;ll start over
+              from onboarding.
+            </p>
+
+            {deleteError && (
+              <p className="text-xs font-medium text-rose-600 dark:text-rose-400">{deleteError}</p>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-2xs transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+              >
+                <Trash2 size={14} />
+                <span>{deleting ? 'Deleting...' : 'Yes, delete my account'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  setDeleteError(null);
+                }}
+                disabled={deleting}
+                className="inline-flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition disabled:opacity-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

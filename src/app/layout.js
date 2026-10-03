@@ -85,7 +85,15 @@ export default function RootLayout({ children }) {
       className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable} ${instrumentSerif.variable} ${ptSansNarrow.variable} h-full antialiased`}
     >
       <head>
-        {SITE_VERIFICATION && <meta name="google-site-verification" content={SITE_VERIFICATION} />}
+        {/* Ternary with null, not `&&`. When the env var is empty, `'' && <meta/>`
+            evaluates to the empty string '', which React passes down as a text
+            child of <head>. Text isn't valid there, so hydration fails and React
+            re-renders the whole document on the client, dropping the stylesheet
+            links Next put in <head> (the "plain unstyled page" symptom). null
+            renders nothing, whether or not the variable is set. */}
+        {SITE_VERIFICATION ? (
+          <meta name="google-site-verification" content={SITE_VERIFICATION} />
+        ) : null}
       </head>
       <body className="min-h-full flex flex-col bg-leaf text-ink">{children}</body>
     </html>

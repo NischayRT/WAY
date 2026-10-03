@@ -236,7 +236,8 @@ export default function HomeClient({
       md+: single wrapping row. */}
   <div className="grid grid-cols-2 gap-1.5 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800 min-w-0 md:flex md:flex-wrap md:items-center md:gap-2.5">
     {targetWeight && (
-      <div className="flex min-w-0 items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2 py-1.5 md:px-3 rounded-xl border border-slate-200/80 dark:border-slate-700">
+      
+      <div className="flex justify-center min-w-0 items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2 py-1.5 md:px-3 rounded-xl border border-slate-200/80 dark:border-slate-700">
         <Target size={14} className="text-emerald-500 shrink-0" />
         <div className="min-w-0 truncate text-xs font-medium">
           <span className="text-slate-500 dark:text-slate-400">Target: </span>

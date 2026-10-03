@@ -37,7 +37,7 @@ export default function RepeatMealBanner({ selectedDate }) {
   };
 
   return (
-    <div className="flex flex-col border rounded-2xl transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] bg-white border-slate-200/90/90 shadow-xs h-full min-h-[110px] overflow-hidden">
+    <div className="flex flex-col border rounded-2xl transition-shadow hover:shadow-lg border border-slate-200/90 dark:border-[#14305a] dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] bg-white border-slate-200/90/90 shadow-xs h-full min-h-[110px] overflow-hidden">
       <div className="flex items-center gap-2 px-3 pt-3">
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">
           <RotateCcw size={14} />

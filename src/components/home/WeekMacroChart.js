@@ -99,7 +99,7 @@ export default function WeekMacroChart({ days = [], weekBreakdowns = {}, targetC
   const anyLogs = loggedCount > 0;
 
   return (
-    <div className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-3.5">
+    <div className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200/80 dark:border-slate-800 dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] bg-white p-3">
       {/* --- Header ------------------------------------------------------- */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">

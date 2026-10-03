@@ -30,8 +30,10 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
+  // food_logs.id may be a uuid (string) or a bigint (number): accept both.
+  // (The old string-only filter dropped numeric ids, so nothing was ever synced.)
   const ids = Array.isArray(body.logIds)
-    ? body.logIds.filter((id) => typeof id === 'string').slice(0, 100)
+    ? body.logIds.filter((id) => typeof id === 'string' || typeof id === 'number').slice(0, 100)
     : [];
 
   switch (body.action) {

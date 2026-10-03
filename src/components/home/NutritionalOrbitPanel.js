@@ -26,7 +26,7 @@ export default function NutritionalOrbitPanel({consumed={},targets={}}){
   {k:'fat',n:'Fat',v:consumed.fat||0,t:targets.fatG||0,bg:'bg-violet-500',glow:'rgba(139,92,246,.5)',base:4.18},
  ];
  return (
-  <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-3 sm:px-3 sm:py-4 shadow-xs flex flex-col h-full min-h-[280px] sm:min-h-[320px]">
+  <div className="border rounded-2xl transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] bg-white border-slate-200/90 px-2 py-3 sm:px-3 sm:py-4 shadow-xs flex flex-col h-full min-h-[280px] sm:min-h-[320px]">
    <div className="flex items-center justify-between px-1 mb-1">
     <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-900 dark:text-white"><Flame size={12} className="text-amber-500"/> Nutritional Orbit</span>
     <div className="flex items-center gap-1.5">

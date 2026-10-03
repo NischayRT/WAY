@@ -43,7 +43,7 @@ function Stat({ icon: Icon, label, value, unit, sub, tone = 'text-slate-900 dark
 
   return (
     <div
-      className={`rounded-2xl border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-900/90 p-3 shadow-xs transition-all duration-500 ease-out hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-slate-500 hover:shadow-md ${
+      className={`rounded-2xl border rounded-2xl transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] bg-white border-slate-200/90 p-3 shadow-xs transition-all duration-500 ease-out hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-slate-500 hover:shadow-md ${
         shown ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
       }`}
     >

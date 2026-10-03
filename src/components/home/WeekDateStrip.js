@@ -48,7 +48,7 @@ function ProfileMenu({ firstName }) {
         <span className="truncate">Hi, {firstName}</span>
         <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
-      <div className={`absolute right-0 top-full z-30 mt-2 w-44 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-1.5 shadow-xl backdrop-blur-md transition max-md:left-0 max-md:right-auto ${open ? 'block' : 'hidden'}`} role="menu">
+      <div className={`absolute right-0 top-full z-30 mt-2 w-44 border rounded-2xl transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] bg-white border-slate-200/90 p-1.5 shadow-xl backdrop-blur-md transition max-md:left-0 max-md:right-auto ${open ? 'block' : 'hidden'}`} role="menu">
         <Link href="/settings" onClick={() => setOpen(false)} role="menuitem" className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900"><Settings size={14} /></span>
           Settings
@@ -108,7 +108,7 @@ export default function WeekDateStrip({
     }
   };
 
-  const themeBtnClass = 'flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition active:scale-95';
+  const themeBtnClass = 'flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 dark:border-[#14305a] bg-white dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 transition-shadow hover:shadow-lg active:scale-95';
 
   return (
     <div className="flex w-full flex-col gap-2 md:flex-row md:items-center lg:gap-3">

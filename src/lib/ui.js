@@ -3,7 +3,7 @@ export const ui = {
   pageWrapWide: 'w-full max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 pb-28 md:pb-8 space-y-4 sm:space-y-5',
 
   // Modern Cards with high-visibility borders in dark mode
-  card: 'rounded-2xl border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-900/90 p-3 shadow-xs shadow-slate-200/50 dark:shadow-slate-950/60 hover:border-slate-300 dark:hover:border-slate-500 transition-all',
+  card: 'rounded-2xl border rounded-2xl transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] bg-white border-slate-200/90 p-3 shadow-xs shadow-slate-200/50 dark:shadow-slate-950/60 hover:border-slate-300 dark:hover:border-slate-500 transition-all',
   cardMuted: 'rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/50 p-4',
   cardElevated: 'rounded-2xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-lg shadow-slate-900/5 dark:shadow-black/50',
 
@@ -23,7 +23,7 @@ export const ui = {
   btnPrimary:
     'inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 dark:bg-white px-4 py-2 text-xs sm:text-sm font-semibold text-white dark:text-slate-950 shadow-sm shadow-slate-900/10 dark:shadow-white/10 transition-all hover:bg-slate-800 dark:hover:bg-slate-200 active:scale-[0.98] disabled:opacity-50',
   btnSecondary:
-    'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 shadow-2xs transition-all hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-white active:scale-[0.98] disabled:opacity-50',
+    'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-[#14305a] bg-white dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] px-4 py-2 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 shadow-2xs transition-shadow hover:shadow-lg hover:bg-slate-50 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-white active:scale-[0.98] disabled:opacity-50',
   btnSmall:
     'inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-200 shadow-2xs transition-all hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-500 hover:text-slate-900 dark:hover:text-white active:scale-[0.97] disabled:opacity-50',
 

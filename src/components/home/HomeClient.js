@@ -188,7 +188,7 @@ export default function HomeClient({
             </div>
           </div>
 {/* Quick Weight & Target Banner for the selected date */}
-<div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 md:gap-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-3 sm:p-4 shadow-xs">
+<div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 md:gap-4 border rounded-2xl transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] bg-white border-slate-200/90 p-3 sm:p-4 shadow-xs">
   {/* Weight Status */}
   <div className="flex items-center gap-3 min-w-0">
     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">

@@ -211,6 +211,15 @@ export async function syncFoodLogs(supabase, userId, logIds) {
 
   const usable = (logs ?? []).filter((l) => l.foods);
 
+  // Say why nothing is sent instead of reporting a quiet "0 synced".
+  if (usable.length === 0) {
+    return {
+      ok: false,
+      synced: 0,
+      error: `No meals to send (received ${logIds.length} ids, found ${(logs ?? []).length} matching logs, ${usable.length} with food details).`,
+    };
+  }
+
   try {
     await deletePoints(
       ctx.token,

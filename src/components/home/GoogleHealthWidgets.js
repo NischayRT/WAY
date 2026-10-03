@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Footprints, Navigation, Flame, Target, MapPin, ChevronRight, RefreshCw } from 'lucide-react';
 
-// Four dashboard metric cards (Steps, Distance, Burn, Remaining Goal).
+// Four dashboard metric cards (Steps, Distance, Burn, Consumed).
 // Dark mode: deep-navy glass cards with a coloured icon disc, big number and a
 // gradient progress bar. Light mode: white cards with the same accents.
 // The chevron (top-right) links to the Activity page.
@@ -53,13 +53,16 @@ function MetricCard({
   const t = THEMES[theme];
   return (
     <div
-      className={`group relative flex h-full min-h-[210px] flex-col rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] ${t.glow}`}
+      className={`group relative flex h-full min-h-[190px] flex-col rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-[#071530] dark:to-[#050e22] ${t.glow}`}
     >
-      <div className="flex items-start justify-between">
-        <div className={`flex h-12 w-12 items-center justify-center rounded-full border ${t.disc}`}>
-          <Icon size={22} />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border ${t.disc}`}>
+            <Icon size={20} />
+          </div>
+          <p className="truncate text-base font-semibold text-slate-900 dark:text-white">{title}</p>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1.5">
           {loading && <RefreshCw size={12} className="animate-spin text-slate-400" />}
           <Link
             href={href}
@@ -72,8 +75,7 @@ function MetricCard({
         </div>
       </div>
 
-      <p className="mt-3 text-base font-semibold text-slate-900 dark:text-white">{title}</p>
-      <p className="font-numeric mt-0.5 text-2xl font-bold leading-none tracking-tight text-slate-900 dark:text-white">
+      <p className="font-numeric mt-4 text-4xl font-bold leading-none tracking-tight text-slate-900 dark:text-white">
         {value}
       </p>
       <p className="font-numeric mt-1.5 min-h-[1.25rem] text-sm text-slate-500 dark:text-sky-200/60">{sub}</p>
@@ -115,12 +117,12 @@ export function StepsWidget({ steps = 0, targetSteps = null, loading = false }) 
       theme="sky"
       Icon={Footprints}
       FooterIcon={Target}
-      title="Steps"
+      title="Step Count"
       value={Number(steps).toLocaleString('en-IN')}
       sub={hasGoal ? `/ ${Number(targetSteps).toLocaleString('en-IN')}` : 'steps today'}
       pct={pctOf(steps, targetSteps)}
       showBar={hasGoal}
-      footerLabel="Daily Target"
+      footerLabel="Steps Target"
       footerValue={hasGoal ? Number(targetSteps).toLocaleString('en-IN') : null}
       footerExtra={hasGoal ? null : <SetGoalLink />}
       loading={loading}
@@ -135,12 +137,12 @@ export function DistanceWidget({ distanceKm = 0, targetKm = null, loading = fals
       theme="emerald"
       Icon={Navigation}
       FooterIcon={MapPin}
-      title="Distance"
+      title="Distance Count"
       value={(Number(distanceKm) || 0).toFixed(1)}
       sub={hasGoal ? `/ ${Number(targetKm).toFixed(1)} km` : 'km today'}
       pct={pctOf(distanceKm, targetKm)}
       showBar={hasGoal}
-      footerLabel="Daily Target"
+      footerLabel="Distance Target"
       footerValue={hasGoal ? `${Number(targetKm).toFixed(1)} km` : null}
       footerExtra={hasGoal ? null : <SetGoalLink />}
       loading={loading}
@@ -156,7 +158,7 @@ export function CaloriesBurnedWidget({ caloriesBurned = 0, targetBurn = null, lo
       theme="violet"
       Icon={Flame}
       FooterIcon={Flame}
-      title="Burn"
+      title="Calories Burned"
       value={burn.toLocaleString('en-IN')}
       sub={hasGoal ? `/ ${Number(targetBurn).toLocaleString('en-IN')} kcal` : 'kcal today'}
       pct={pctOf(burn, targetBurn)}
@@ -178,12 +180,12 @@ export function RemainingGoalWidget({ consumedCalories = 0, targetCalories = 0 }
       theme="pink"
       Icon={Target}
       FooterIcon={Target}
-      title="Remaining Goal"
-      value={left.toLocaleString('en-IN')}
+      title="Consumed"
+      value={eaten.toLocaleString('en-IN')}
       sub="kcal"
       pct={target > 0 ? Math.min(Math.round((eaten / target) * 100), 100) : 0}
       showBar
-      footerLabel={left === 0 ? 'Goal reached' : 'To reach your goal'}
+      footerLabel={left === 0 ? 'Goal reached' : 'Remaining'}
       footerValue={`${left.toLocaleString('en-IN')} kcal`}
     />
   );

@@ -277,7 +277,7 @@ export default function BottomNav() {
         {/* Bottom Profile Area with Name & Logout Dropdown */}
         <div ref={menuRef} className="relative w-full">
           {dropdownOpen && (
-            <div className="absolute bottom-full left-0 mb-2.5 w-48 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-1.5 shadow-xl backdrop-blur-md z-50">
+            <div className="absolute bottom-full left-0 mb-2.5 w-48 border rounded-2xl transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] bg-white border-slate-200/90 p-1.5 shadow-xl backdrop-blur-md z-50">
               <Link
                 href="/settings"
                 onClick={() => setDropdownOpen(false)}

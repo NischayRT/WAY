@@ -9,7 +9,7 @@ export default function DateSelector({ selectedDate, today, minDate, onSelectDat
   const handleOpen = () => { setOpen(true); requestAnimationFrame(() => { try { inputRef.current?.showPicker?.(); } catch {} }); };
   if (!open) {
     return (
-      <button type="button" onClick={handleOpen} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shrink-0" title="Jump to date">
+      <button type="button" onClick={handleOpen} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-[#14305a] bg-white dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 transition-shadow hover:shadow-lg shrink-0" title="Jump to date">
         <CalendarDays size={14} className="text-slate-400" />
         <span className="hidden sm:inline">Jump to</span><span className="sm:hidden">Date</span>
       </button>

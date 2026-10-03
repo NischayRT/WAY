@@ -18,6 +18,7 @@ export default function RealisticAvatar3D({
   roughness = 0.4,
   wireframe = false,
   isTarget = false, // false = Current model (uses new logic), true = Target model (unchanged)
+  clippingPlanes = null, // optional stable array of THREE.Plane (used by the home progress preview)
 }) {
   const { scene } = useGLTF('/models/stylized_male_base_mesh_free.glb');
 
@@ -66,6 +67,7 @@ export default function RealisticAvatar3D({
       metalness: 0.08,
       wireframe,
       side: THREE.DoubleSide,
+      clippingPlanes: clippingPlanes || null,
     });
 
     const mesh = new THREE.Mesh(geom, material);
@@ -103,7 +105,7 @@ export default function RealisticAvatar3D({
 
     mesh.position.set(0, 1.0, 0);
     return mesh;
-  }, [scene, physiqueConfig, color, roughness, wireframe, heightCm, waistCm, chestCm, isTarget]);
+  }, [scene, physiqueConfig, color, roughness, wireframe, heightCm, waistCm, chestCm, isTarget, clippingPlanes]);
 
   if (!singleMesh) return null;
 

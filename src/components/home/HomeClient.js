@@ -3,7 +3,8 @@
 import { useMemo, useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Scale, CheckCircle2, Target, Calendar, RefreshCw, Activity } from 'lucide-react';
+import { Scale, CheckCircle2, Target, Calendar, RefreshCw, Activity, ChevronDown } from 'lucide-react';
+import WeightBodyPreview, { prefetchWeightBody } from '@/components/home/WeightBodyPreview';
 import { ui } from '@/lib/ui';
 import { resolveDateTargets } from '@/lib/weightTimeline';
 import WeekDateStrip from '@/components/home/WeekDateStrip';
@@ -39,6 +40,7 @@ export default function HomeClient({
   const [healthData, setHealthData] = useState({ steps: 0, distanceKm: 0, caloriesBurned: 0 });
   const [healthConnected, setHealthConnected] = useState(null);
   const [healthLoading, setHealthLoading] = useState(false);
+  const [weightPreviewOpen, setWeightPreviewOpen] = useState(false);
   const [weightSyncing, setWeightSyncing] = useState(false);
   const [weightSyncMsg, setWeightSyncMsg] = useState(null);
 
@@ -188,7 +190,8 @@ export default function HomeClient({
             </div>
           </div>
 {/* Quick Weight & Target Banner for the selected date */}
-<div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 md:gap-4 border rounded-2xl transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] bg-white border-slate-200/90 p-3 sm:p-4 shadow-xs">
+<div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-xs overflow-hidden">
+<div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 md:gap-4 p-3 sm:p-4">
   {/* Weight Status */}
   <div className="flex items-center gap-3 min-w-0">
     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">
@@ -213,6 +216,19 @@ export default function HomeClient({
         {!isDateWeighedIn && <span className="text-[10px] ml-1 opacity-75">(nearest)</span>}
       </p>
     </div>
+    <button
+      type="button"
+      onClick={() => setWeightPreviewOpen((o) => !o)}
+      onMouseEnter={prefetchWeightBody}
+      onFocus={prefetchWeightBody}
+      onTouchStart={prefetchWeightBody}
+      aria-expanded={weightPreviewOpen}
+      aria-label={weightPreviewOpen ? 'Hide body preview' : 'Show body preview'}
+      title={weightPreviewOpen ? 'Hide body preview' : 'Show body preview'}
+      className="ml-auto shrink-0 rounded-full border border-slate-200 p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+    >
+      <ChevronDown size={16} className={`transition-transform duration-300 ${weightPreviewOpen ? 'rotate-180' : ''}`} />
+    </button>
   </div>
 
   {/* Target Weight & Action Buttons
@@ -275,6 +291,14 @@ export default function HomeClient({
       </p>
     )}
   </div>
+</div>
+
+<WeightBodyPreview
+  open={weightPreviewOpen}
+  profile={profile}
+  weightKg={currentTargets.effectiveWeight}
+  weightLogs={weightLogs}
+/>
 </div>
 
           {/* Orbit + Meal Targets + Weekly Chart */}

@@ -56,9 +56,9 @@ math rather than a generic avatar.
 - Each avatar rotates independently on its own base, so you can compare both
   bodies from any angle without them awkwardly orbiting each other.
 
-### Trends & history
+### Nutrition & history
 - A 7-day macro trend view (calories, protein, carbs, fat) with daily averages.
-- A weight log with a trend chart, so progress is visible over weeks, not just
+- A weight log with a trend chart, so activity is visible over weeks, not just
   today.
 
 ### Sign-in
@@ -89,7 +89,7 @@ app/
   home/                   - today's tracking view
   settings/page.js        - profile & body-measurement settings
   weight/page.js          - weight log + trend chart
-  trends/page.js          - 7-day macro trend charts
+  nutrition/page.js          - 7-day macro trend charts
   body-studio/page.js     - the Physique Studio 3D comparison
   api/targets/route.js    - GET current user's daily targets as JSON
 
@@ -104,7 +104,7 @@ components/
     BodyMeshCanvas.js        - flat SVG silhouette version (no 3D dependency)
   settings/SettingsClient.js - profile & body-measurement tabs
   layout/AppHeader.js         - shared page header (referenced, not included here)
-  weight/, trends/, onboarding/ - form + chart components for those pages
+  weight/, nutrition/, onboarding/ - form + chart components for those pages
 
 lib/
   bmrTdee.js               - BMR -> TDEE -> goal-adjusted macro targets

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabaseClient';
 import { Scale, Check, X } from 'lucide-react';
 import { ui } from '@/lib/ui';
 import { getCurrentUserId } from '@/lib/currentUser';
+import { syncToGoogleHealth } from '@/lib/googleHealthSyncClient';
 
 export default function QuickWeightLogModal({
   currentWeight,
@@ -65,6 +66,8 @@ export default function QuickWeightLogModal({
       return;
     }
 
+    syncToGoogleHealth({ action: 'weight_upsert', date: targetDate });
+
     // 2. If the logged date is today, also synchronize the live profile weight
     if (targetDate === today) {
       const { error: profileError } = await supabase
@@ -100,7 +103,7 @@ export default function QuickWeightLogModal({
               </h3>
               <p className="text-[11px] text-slate-400">
                 {isToday
-                  ? 'Updates trends & recalibrates diet targets'
+                  ? 'Updates nutrition & recalibrates diet targets'
                   : 'Updates trend logs & target basis for this date'}
               </p>
             </div>

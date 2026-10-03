@@ -36,13 +36,13 @@ const MACROS = [
 ];
 ​
 /**
- * Trends view. The server sends the widest window (30 days) in one query and
+ * Nutrition view. The server sends the widest window (30 days) in one query and
  * this component slices it, so switching range costs no round trip.
  *
  * @param days    ascending [{ date, dayLabel, dateLabel, calories, protein, carbs, fat }]
  * @param targets resolved daily targets
  */
-export default function TrendsClient({ days, targets }) {
+export default function NutritionClient({ days, targets }) {
   const [range, setRange] = useState(7);
 ​
   const windowDays = useMemo(() => days.slice(-range), [days, range]);

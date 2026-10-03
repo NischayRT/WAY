@@ -124,7 +124,7 @@ export default function WeekMacroChart({ days = [], weekBreakdowns = {}, targetC
         </div>
 
         <Link
-          href="/trends"
+          href="/nutrition"
           className="group inline-flex shrink-0 items-center gap-0.5 text-[11px] font-medium text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-white"
         >
           See all
@@ -228,30 +228,30 @@ export default function WeekMacroChart({ days = [], weekBreakdowns = {}, targetC
               })}
             </div>
 
-            {/* Tooltip. Anchored to the hovered column via flex order so it
-                never escapes the panel on the first/last day. */}
+            {/* Tooltip centered in the chart area regardless of which bar is hovered. */}
             {active && (
-              <div className="pointer-events-none absolute inset-x-0 -top-1 z-20 flex justify-center">
-                <div className="rounded-lg border border-slate-200/80 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 px-2 py-1 shadow-lg backdrop-blur-sm">
-                  <div className="flex items-baseline gap-1">
-                    <span className="font-numeric text-xs font-bold text-slate-900 dark:text-white leading-none">
+              <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+                <div className="rounded-xl border border-slate-200/80 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 px-3 py-2 shadow-xl backdrop-blur-sm text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-none">{active.dayLabel}</p>
+                  <div className="mt-1 flex items-baseline justify-center gap-1">
+                    <span className="font-numeric text-sm font-black text-slate-900 dark:text-white leading-none">
                       {active.loggedKcal.toLocaleString('en-IN')}
                     </span>
-                    <span className="font-numeric text-[9px] text-slate-400">kcal</span>
+                    <span className="font-numeric text-[9px] font-semibold text-slate-400">kcal</span>
                   </div>
                   {active.hasLogs ? (
-                    <div className="mt-1 flex items-center gap-2">
+                    <div className="mt-1.5 flex items-center justify-center gap-2.5">
                       {active.parts.map((p) => (
                         <span key={p.key} className="flex items-center gap-1">
                           <span className={`h-1.5 w-1.5 rounded-full ${p.dot}`} />
-                          <span className="font-numeric text-[9px] font-semibold text-slate-600 dark:text-slate-300">
+                          <span className="font-numeric text-[10px] font-semibold text-slate-600 dark:text-slate-300">
                             {p.grams}g
                           </span>
                         </span>
                       ))}
                     </div>
                   ) : (
-                    <span className="mt-0.5 block text-[9px] text-slate-400">No log</span>
+                    <span className="mt-1 block text-[10px] font-medium text-slate-400">No log</span>
                   )}
                 </div>
               </div>

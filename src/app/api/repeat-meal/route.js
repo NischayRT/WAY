@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { addDays } from '@/lib/dateUtils';
+import { syncFoodLogs } from '@/lib/googleHealthSync';
 
 export async function POST(request) {
   const supabase = await createServerSupabaseClient();
@@ -37,9 +38,19 @@ export async function POST(request) {
     logged_at: targetDate,
   }));
 
-  const { error: insertErr } = await supabase.from('food_logs').insert(newRows);
+  const { data: inserted, error: insertErr } = await supabase
+    .from('food_logs')
+    .insert(newRows)
+    .select('id');
   if (insertErr) {
     return NextResponse.json({ error: insertErr.message }, { status: 500 });
+  }
+
+  // Mirror into Google Health; a failure there must not fail the repeat.
+  try {
+    if (inserted?.length) await syncFoodLogs(supabase, user.id, inserted.map((r) => r.id));
+  } catch {
+    // ignore
   }
 
   return NextResponse.json({ success: true, count: newRows.length });

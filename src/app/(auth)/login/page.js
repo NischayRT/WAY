@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabaseClient';
-import { Soup, UtensilsCrossed, Coffee, Wheat, Flame, Leaf, CookingPot, Cookie, Mail, KeyRound, Loader2 } from 'lucide-react';
+import { TERMS_VERSION } from '@/lib/legal';
+import { Soup, UtensilsCrossed, Coffee, Wheat, Flame, Leaf, CookingPot, Cookie, Mail, KeyRound, Loader2, Check } from 'lucide-react';
 
 const LANE_ICONS = [Soup, Wheat, Coffee, Flame, Leaf, UtensilsCrossed, CookingPot, Cookie];
 
@@ -50,8 +52,35 @@ export default function LoginPage() {
   const [verifying, setVerifying] = useState(false);
   const [sendError, setSendError] = useState(null);
   const [verifyError, setVerifyError] = useState(null);
+  const [accepted, setAccepted] = useState(false);
+  const [termsError, setTermsError] = useState(false);
+
+  // Remember acceptance of the current Terms version on this device so
+  // returning users are not asked to tick it every time.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('way-terms-accepted') === TERMS_VERSION) setAccepted(true);
+    } catch {}
+  }, []);
+
+  const handleAcceptChange = (checked) => {
+    setAccepted(checked);
+    if (checked) setTermsError(false);
+    try {
+      if (checked) localStorage.setItem('way-terms-accepted', TERMS_VERSION);
+      else localStorage.removeItem('way-terms-accepted');
+    } catch {}
+  };
+
+  // Gate for every sign-in path.
+  const requireAccepted = () => {
+    if (accepted) return true;
+    setTermsError(true);
+    return false;
+  };
 
   const handleGoogleLogin = async () => {
+    if (!requireAccepted()) return;
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -70,6 +99,7 @@ export default function LoginPage() {
   const handleSendCode = async (e) => {
     e.preventDefault();
     if (!email.trim() || sendingCode) return;
+    if (!requireAccepted()) return;
     setSendingCode(true);
     setSendError(null);
     const { error } = await supabase.auth.signInWithOtp({ email: email.trim() });
@@ -145,6 +175,41 @@ export default function LoginPage() {
             Track meals, the Indian way.
           </p>
         </div>
+
+        <label
+          className={`flex w-full cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 text-left backdrop-blur-2xl transition-colors ${
+            termsError ? 'border-rose-300/70 bg-rose-500/10' : 'border-white/20 bg-white/10 hover:bg-white/15'
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={accepted}
+            onChange={(e) => handleAcceptChange(e.target.checked)}
+            className="peer sr-only"
+          />
+          <span
+            aria-hidden="true"
+            className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border border-white/50 bg-white/10 text-transparent transition peer-checked:border-white peer-checked:bg-white peer-checked:text-slate-900 peer-focus-visible:ring-2 peer-focus-visible:ring-white/70"
+          >
+            <Check size={13} strokeWidth={3} />
+          </span>
+          <span className="text-xs leading-relaxed text-white/80">
+            I agree to the{' '}
+            <Link href="/terms" target="_blank" className="font-semibold text-white underline underline-offset-2">
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" target="_blank" className="font-semibold text-white underline underline-offset-2">
+              Privacy Policy
+            </Link>
+            .
+          </span>
+        </label>
+        {termsError && (
+          <p role="alert" className="-mt-5 w-full px-1 text-left text-xs font-medium text-rose-300">
+            Please accept the Terms of Service and Privacy Policy to continue.
+          </p>
+        )}
 
         <button
           onClick={handleGoogleLogin}
@@ -264,6 +329,12 @@ export default function LoginPage() {
             </button>
           </form>
         )}
+
+        <p className="text-[11px] text-white/50">
+          <Link href="/privacy" className="underline underline-offset-2 hover:text-white">Privacy Policy</Link>
+          <span className="mx-2">&middot;</span>
+          <Link href="/terms" className="underline underline-offset-2 hover:text-white">Terms of Service</Link>
+        </p>
       </div>
 
       <style jsx>{`

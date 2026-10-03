@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { createClient } from '@/lib/supabaseClient';
@@ -124,6 +124,7 @@ export default function BodyStudio({ profile }) {
   }, [profile?.dream_target_weight_kg]);
 
   const [targetDate, setTargetDate] = useState(() => {
+    if (profile?.dream_target_date) return String(profile.dream_target_date).slice(0, 10);
     const absDiff = Math.abs(currentWeightKg - defaultTargetWeight);
     const weeksNeeded = Math.max(1, Math.round(absDiff / 0.85));
     const d = new Date();
@@ -131,7 +132,14 @@ export default function BodyStudio({ profile }) {
     return d.toISOString().split('T')[0];
   });
 
+  // When a goal date was saved, keep it on first load instead of replacing it
+  // with the auto-suggested one. Moving the slider afterwards re-suggests.
+  const savedDateKey = useRef(
+    profile?.dream_target_date ? `${defaultTargetWeight}|${currentWeightKg}` : null
+  );
   useEffect(() => {
+    if (savedDateKey.current === `${targetWeight}|${currentWeightKg}`) return;
+    savedDateKey.current = null;
     const absDiff = Math.abs(currentWeightKg - targetWeight);
     const weeksNeeded = Math.max(1, Math.round(absDiff / 0.85));
     const d = new Date();
@@ -215,6 +223,7 @@ export default function BodyStudio({ profile }) {
       .from('profiles')
       .update({
         dream_target_weight_kg: targetWeight,
+        dream_target_date: targetDate,
         override_calories: feasibility.calculatedDailyCalories,
         override_protein_g: Math.round(currentWeightKg * 2.0),
         goal: targetWeight < currentWeightKg ? 'lose_weight' : 'gain_muscle',

@@ -5,7 +5,7 @@ import { computeDailyTotalsByDate } from '@/lib/weekStatus';
 import { todayLocalDate, addDays } from '@/lib/dateUtils';
 import { ui } from '@/lib/ui';
 import AppHeader from '@/components/layout/AppHeader';
-import TrendsClient from '@/components/trends/TrendsClient';
+import NutritionClient from '@/components/nutrition/NutritionClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // switching range costs no round trip.
 const WINDOW_DAYS = 30;
 
-export default async function TrendsPage() {
+export default async function NutritionPage() {
   const supabase = await createServerSupabaseClient();
   const today = todayLocalDate();
   const windowStart = addDays(today, -(WINDOW_DAYS - 1));
@@ -62,8 +62,8 @@ export default async function TrendsPage() {
 
   return (
     <main className={ui.pageWrapWide}>
-      <AppHeader title="Trends" backHref="/home" backLabel="Back to today" />
-      <TrendsClient days={days} targets={targets} />
+      <AppHeader title="Nutrition" backHref="/home" backLabel="Back to today" />
+      <NutritionClient days={days} targets={targets} />
     </main>
   );
 }

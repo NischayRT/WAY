@@ -12,51 +12,60 @@ export default function RepeatMealBanner({ selectedDate }) {
   const handleRepeat = async (mealType = null) => {
     setLoading(true);
     setStatus(null);
-    const res = await fetch('/api/repeat-meal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetDate: selectedDate, mealType }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (res.ok) {
-      setStatus(`Copied ${data.count} item${data.count > 1 ? 's' : ''} from yesterday!`);
-      router.refresh();
-      setTimeout(() => setStatus(null), 3500);
-    } else {
-      setStatus(data.error || 'Failed to copy');
+    try {
+      const res = await fetch('/api/repeat-meal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetDate: selectedDate, mealType }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const n = Number(data.count) || 0;
+        setStatus(`Copied ${n} item${n === 1 ? '' : 's'} from yesterday!`);
+        router.refresh();
+        setTimeout(() => setStatus(null), 3500);
+      } else {
+        setStatus(data.error || 'Failed');
+        setTimeout(() => setStatus(null), 3000);
+      }
+    } catch {
+      setStatus('Network error');
       setTimeout(() => setStatus(null), 3000);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-2xl border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-900/90 p-4 shadow-xs">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">
-          <RotateCcw size={16} />
+    <div className="flex flex-col rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-xs h-full min-h-[110px] overflow-hidden">
+      <div className="flex items-center gap-2 px-3 pt-3">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">
+          <RotateCcw size={14} />
         </div>
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1">
-            Quick Repeat <Sparkles size={12} className="text-amber-500" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1 truncate">
+            Quick Repeat <Sparkles size={11} className="text-amber-500 shrink-0" />
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Copy what you ate yesterday into today&apos;s log
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-none">
+            Repeat yesterday&apos;s meals
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mt-3 sm:mt-0 w-full sm:w-auto">
-        {status ? (
-          <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-xl">
+      {status ? (
+        <div className="px-3 pb-3 pt-2">
+          <span className="block text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 px-2 py-1.5 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg w-full text-center truncate">
             {status}
           </span>
-        ) : (
-          <>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5 px-2 pb-2 pt-2.5">
+          <div className="grid grid-cols-3 gap-1.5">
             <button
               type="button"
               disabled={loading}
               onClick={() => handleRepeat('breakfast')}
-              className="flex-1 sm:flex-none text-xs font-medium text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+              className="text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition text-center disabled:opacity-50"
             >
               Breakfast
             </button>
@@ -64,21 +73,29 @@ export default function RepeatMealBanner({ selectedDate }) {
               type="button"
               disabled={loading}
               onClick={() => handleRepeat('lunch')}
-              className="flex-1 sm:flex-none text-xs font-medium text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+              className="text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition text-center disabled:opacity-50"
             >
               Lunch
             </button>
             <button
               type="button"
               disabled={loading}
-              onClick={() => handleRepeat(null)}
-              className="flex-1 sm:flex-none text-xs font-semibold text-white dark:text-slate-950 px-3.5 py-1.5 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 transition shadow-xs"
+              onClick={() => handleRepeat('dinner')}
+              className="text-[11px] font-medium text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition text-center disabled:opacity-50"
             >
-              All Day
+              Dinner
             </button>
-          </>
-        )}
-      </div>
+          </div>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => handleRepeat(null)}
+            className="w-full text-[11px] font-semibold text-white dark:text-slate-950 py-1.5 rounded-lg bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 transition shadow-xs text-center disabled:opacity-50"
+          >
+            All Day
+          </button>
+        </div>
+      )}
     </div>
   );
 }

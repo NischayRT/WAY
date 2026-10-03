@@ -1,18 +1,19 @@
 'use client';
 import { getCurrentUserId } from '@/lib/currentUser';
+import { syncToGoogleHealth } from '@/lib/googleHealthSyncClient';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabaseClient';
 import { MEAL_CATEGORIES } from '@/lib/mealCategories';
 import { ShoppingBag } from 'lucide-react';
 import { ui } from '@/lib/ui';
-export default function Cart({ items, loggedAt, onUpdateQuantity, onRemove, onLogged }) {  
+export default function Cart({ items, loggedAt, initialMeal, onUpdateQuantity, onRemove, onLogged }) {  
   const supabase = createClient();
   const router = useRouter();
-  const [mealType, setMealType] = useState('lunch');
+  const [mealType, setMealType] = useState(initialMeal || 'lunch');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-​
+
   const totals = items.reduce(
     (acc, item) => {
       const ratio = item.quantityG / 100;
@@ -25,12 +26,12 @@ export default function Cart({ items, loggedAt, onUpdateQuantity, onRemove, onLo
     },
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
-​
+
   const handleLog = async () => {
     if (items.length === 0) return;
     setSaving(true);
     setError(null);
-​
+
     // Resolved from the session inside the handler. It cannot live in the
     // component body: that body is not async, and it would also run on every
     // render rather than once per submit.
@@ -42,7 +43,7 @@ export default function Cart({ items, loggedAt, onUpdateQuantity, onRemove, onLo
       setError(authError.message);
       return;
     }
-​
+
     const rows = items.map((item) => ({
       user_id: userId,
       food_id: item.food.id,
@@ -51,19 +52,27 @@ export default function Cart({ items, loggedAt, onUpdateQuantity, onRemove, onLo
       // Sent only when the parent supplies a date; otherwise the column default applies.
       ...(loggedAt ? { logged_at: loggedAt } : {}),
     }));
-​
-    const { error: insertError } = await supabase.from('food_logs').insert(rows);
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('food_logs')
+      .insert(rows)
+      .select('id');
     setSaving(false);
-​
+
     if (insertError) {
       setError(insertError.message);
       return;
     }
-​
+
+    // Mirror into Google Health (no-op if not connected).
+    if (inserted?.length) {
+      syncToGoogleHealth({ action: 'food_upsert', logIds: inserted.map((r) => r.id) });
+    }
+
     onLogged();
     router.refresh();
   };
-​
+
   return (
     <div id="cart-section" className={`${ui.card} space-y-3 scroll-mt-20`}>
       <h2 className={ui.subheading}>

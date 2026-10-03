@@ -19,26 +19,42 @@ export default async function SettingsPage() {
 
   if (!user) redirect('/login');
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select(
-      'full_name, height_cm, weight_kg, age, sex, activity_level, goal, override_calories, override_protein_g, override_carbs_g, override_fat_g, waist_cm, hip_cm, chest_cm, bicep_cm'
-    )
-    .eq('id', user.id)
-    .single();
+  const [{ data: profile }, { data: googleHealthConnection }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select(
+        'id, full_name, height_cm, weight_kg, age, sex, activity_level, goal, override_calories, override_protein_g, override_carbs_g, override_fat_g, waist_cm, hip_cm, chest_cm, bicep_cm, dream_target_weight_kg, dream_target_date, step_goal, distance_goal_km, burn_goal_kcal'
+      )
+      .eq('id', user.id)
+      .single(),
+    supabase
+      .from('google_health_connections')
+      .select('user_id, scopes, sync_enabled')
+      .eq('user_id', user.id)
+      .maybeSingle(),
+  ]);
 
   if (!profile) redirect('/onboarding');
 
   return (
-    <main className={ui.pageWrap}>
+    <main className={`${ui.pageWrapWide} lg:px-8`}>
       <div>
         <AppHeader title="Settings" backHref="/home" backLabel="Back to today" />
-        <p className="mt-1 text-sm text-ink/60 dark:text-slate-400">
+        <p className="mt-1 text-sm text-slate-500 dark:text-sky-400">
           Update your details or change your goal — your daily targets recalculate
           automatically.
         </p>
       </div>
-      <SettingsClient initialProfile={profile} />
+      <SettingsClient
+        initialProfile={profile}
+        googleHealthConnected={!!googleHealthConnection}
+        googleHealthSync={{
+          enabled: googleHealthConnection?.sync_enabled !== false,
+          canWrite:
+            (googleHealthConnection?.scopes ?? '').includes('nutrition.writeonly') &&
+            (googleHealthConnection?.scopes ?? '').includes('health_metrics_and_measurements.writeonly'),
+        }}
+      />
     </main>
   );
 }

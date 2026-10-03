@@ -1,36 +1,52 @@
-import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono, Instrument_Serif, PT_Sans_Narrow } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const fraunces = Fraunces({
+// Same families as before (Fraunces, IBM Plex Sans/Mono, Instrument Serif,
+// PT Sans Narrow) and the same CSS variable names, but self-hosted from
+// ./fonts instead of fetched from Google at build/dev time. When that fetch
+// fails (offline, firewall, locked .next cache on Windows) Next silently
+// swaps in generic fallback fonts, which is what made everything look like
+// plain Arial.
+const fraunces = localFont({
   variable: "--font-fraunces",
-  subsets: ["latin"],
-  weight: ["500", "600"],
+  src: [{ path: "./fonts/fraunces-latin-wght-normal.woff2", weight: "100 900", style: "normal" }],
+  display: "swap",
 });
 
-const plexSans = IBM_Plex_Sans({
+const plexSans = localFont({
   variable: "--font-plex-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  src: [
+    { path: "./fonts/ibm-plex-sans-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-latin-600-normal.woff2", weight: "600", style: "normal" },
+  ],
+  display: "swap",
 });
 
-const plexMono = IBM_Plex_Mono({
+const plexMono = localFont({
   variable: "--font-plex-mono",
-  subsets: ["latin"],
-  weight: ["500", "600"],
+  src: [
+    { path: "./fonts/ibm-plex-mono-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/ibm-plex-mono-latin-600-normal.woff2", weight: "600", style: "normal" },
+  ],
+  display: "swap",
 });
 
-const instrumentSerif = Instrument_Serif({
+const instrumentSerif = localFont({
   variable: "--font-instrument-serif",
-  subsets: ["latin"],
-  weight: ["400"],
+  src: [{ path: "./fonts/instrument-serif-latin-400-normal.woff2", weight: "400", style: "normal" }],
+  display: "swap",
 });
 
 // Heading font for everything EXCEPT the logo/wordmark (that stays on
 // font-brand / Instrument Serif, used in BottomNav.js and the login page).
-const ptSansNarrow = PT_Sans_Narrow({
+const ptSansNarrow = localFont({
   variable: "--font-pt-narrow",
-  subsets: ["latin"],
-  weight: ["400", "700"],
+  src: [
+    { path: "./fonts/pt-sans-narrow-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/pt-sans-narrow-latin-700-normal.woff2", weight: "700", style: "normal" },
+  ],
+  display: "swap",
 });
 
 export const metadata = {

@@ -1,6 +1,6 @@
 export const ui = {
   pageWrap: 'mx-auto max-w-md md:max-w-4xl lg:max-w-5xl px-4 sm:px-6 md:px-8 py-6 pb-28 md:pb-12 space-y-6',
-  pageWrapWide: 'mx-auto max-w-md md:max-w-5xl lg:max-w-6xl px-4 sm:px-6 py-6 pb-28 md:pb-12 space-y-6',
+  pageWrapWide: 'w-full max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 pb-28 md:pb-8 space-y-4 sm:space-y-5',
 
   // Modern Cards with high-visibility borders in dark mode
   card: 'rounded-2xl border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-slate-900/90 p-3 shadow-xs shadow-slate-200/50 dark:shadow-slate-950/60 hover:border-slate-300 dark:hover:border-slate-500 transition-all',
@@ -12,6 +12,13 @@ export const ui = {
     'mt-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 py-2 text-sm text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all focus:border-slate-900 dark:focus:border-white focus:outline-none focus:ring-4 focus:ring-slate-900/5 dark:focus:ring-white/10',
   select:
     'mt-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 py-2 text-sm text-slate-800 dark:text-white transition-all focus:border-slate-900 dark:focus:border-white focus:outline-none focus:ring-4 focus:ring-slate-900/5 dark:focus:ring-white/10',
+
+  // Settings workspace (dark = deep navy surfaces with blue borders)
+  panel: 'rounded-2xl border border-slate-200 dark:border-[#1b3050] bg-white dark:bg-[#0a1224] shadow-xs shadow-slate-200/50 dark:shadow-black/40',
+  panelInner: 'rounded-xl border border-slate-200/80 dark:border-[#1b2d4b] bg-slate-50/70 dark:bg-[#0d1830]/70',
+  fieldLabel: 'flex flex-col text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400',
+  fieldInput:
+    'mt-1.5 w-full rounded-lg border border-slate-200 dark:border-[#1d3050] bg-white dark:bg-[#060c19] px-3 py-2 text-sm text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-all focus:border-emerald-500 dark:focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10',
 
   btnPrimary:
     'inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 dark:bg-white px-4 py-2 text-xs sm:text-sm font-semibold text-white dark:text-slate-950 shadow-sm shadow-slate-900/10 dark:shadow-white/10 transition-all hover:bg-slate-800 dark:hover:bg-slate-200 active:scale-[0.98] disabled:opacity-50',

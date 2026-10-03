@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ChefHat } from 'lucide-react';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { todayLocalDate, addDays, clampDate } from '@/lib/dateUtils';
+import { MEAL_CATEGORIES } from '@/lib/mealCategories';
 import AppHeader from '@/components/layout/AppHeader';
 import LogFoodBuilder from '@/components/logging/LogFoodBuilder';
 
@@ -20,6 +21,8 @@ export default async function LogFoodPage({ searchParams }) {
   const today = todayLocalDate();
   const minDate = addDays(today, -90);
   const initialDate = clampDate(params?.date, minDate, today);
+  // ?meal= pre-selects the meal when arriving from an empty slot on home.
+  const initialMeal = MEAL_CATEGORIES.some((m) => m.value === params?.meal) ? params.meal : undefined;
 
   return (
     // Deliberately NOT ui.pageWrapWide here. That wrapper is sized for
@@ -40,7 +43,7 @@ export default async function LogFoodPage({ searchParams }) {
           </Link>
         }
       />
-      <LogFoodBuilder today={today} minDate={minDate} initialDate={initialDate} />
+      <LogFoodBuilder today={today} minDate={minDate} initialDate={initialDate} initialMeal={initialMeal} />
     </main>
   );
 }

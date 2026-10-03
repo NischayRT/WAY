@@ -4,8 +4,16 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ProfileForm from '@/components/forms/ProfileForm';
 import BodyMeasurementsForm from '@/components/onboarding/BodyMeasurementsForm';
+import GoogleHealthOnboardingStep from '@/components/onboarding/GoogleHealthOnboardingStep';
 
-const STEPS = ['Profile', 'Body'];
+// While the Google OAuth app is still in "Testing" mode, only accounts on
+// its Test users list can complete the Google consent screen — anyone else
+// hits "Access blocked". So the step is opt-in per environment: set
+// NEXT_PUBLIC_GOOGLE_HEALTH_ENABLED=true only where that's acceptable
+// (your own local/dev setup), and flip it on everywhere once the app is
+// verified/published.
+const HEALTH_STEP_ENABLED = process.env.NEXT_PUBLIC_GOOGLE_HEALTH_ENABLED === 'true';
+const STEPS = HEALTH_STEP_ENABLED ? ['Profile', 'Body', 'Activity'] : ['Profile', 'Body'];
 
 export default function OnboardingClient({ userId }) {
   const router = useRouter();
@@ -13,6 +21,10 @@ export default function OnboardingClient({ userId }) {
   const [profileBasics, setProfileBasics] = useState(null);
 
   const goHome = () => router.push('/home');
+
+  // After the body step (saved or skipped): on to the optional Google
+  // Health step if it's enabled, otherwise straight to the dashboard.
+  const handleBodyDone = () => (HEALTH_STEP_ENABLED ? setStep(2) : goHome());
 
   const handleProfileSaved = (basics) => {
     // Defensive: if ProfileForm's onSaved ever gets called without a
@@ -64,10 +76,12 @@ export default function OnboardingClient({ userId }) {
           heightCm={profileBasics?.heightCm ?? 170}
           weightKg={profileBasics?.weightKg ?? 70}
           sex={profileBasics?.sex ?? 'male'}
-          onSaved={goHome}
-          onSkip={goHome}
+          onSaved={handleBodyDone}
+          onSkip={handleBodyDone}
         />
       )}
+
+      {step === 2 && <GoogleHealthOnboardingStep onSkip={goHome} />}
     </div>
   );
 }

@@ -8,7 +8,7 @@ import {
   Home,
   TrendingUp,
   Plus,
-  Scale,
+  Activity,
   Settings,
   MoreVertical,
   LogOut,
@@ -87,17 +87,17 @@ export default function BottomNav() {
             <span className="text-[10px] tracking-tight">Today</span>
           </Link>
 
-          {/* 2. Trends */}
+          {/* 2. Nutrition */}
           <Link
-            href="/trends"
+            href="/nutrition"
             className={`flex flex-col items-center gap-1 rounded-xl px-2.5 py-1 transition-all active:scale-95 ${
-              pathname === '/trends' || pathname.startsWith('/trends/')
+              pathname === '/nutrition' || pathname.startsWith('/nutrition/')
                 ? 'text-slate-900 dark:text-white font-bold'
                 : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 font-medium'
             }`}
           >
-            <TrendingUp size={19} strokeWidth={pathname.startsWith('/trends') ? 2.5 : 1.8} />
-            <span className="text-[10px] tracking-tight">Trends</span>
+            <TrendingUp size={19} strokeWidth={pathname.startsWith('/nutrition') ? 2.5 : 1.8} />
+            <span className="text-[10px] tracking-tight">Nutrition</span>
           </Link>
 
           {/* 3. Log Food (Special Prominent Action Button) */}
@@ -123,17 +123,17 @@ export default function BottomNav() {
             </span>
           </Link>
 
-          {/* 4. Weight */}
+          {/* 4. Activity (weight + activity) */}
           <Link
-            href="/weight"
+            href="/activity"
             className={`flex flex-col items-center gap-1 rounded-xl px-2.5 py-1 transition-all active:scale-95 ${
-              pathname === '/weight' || pathname.startsWith('/weight/')
+              pathname === '/activity' || pathname.startsWith('/activity/')
                 ? 'text-slate-900 dark:text-white font-bold'
                 : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 font-medium'
             }`}
           >
-            <Scale size={19} strokeWidth={pathname.startsWith('/weight') ? 2.5 : 1.8} />
-            <span className="text-[10px] tracking-tight">Weight</span>
+            <Activity size={19} strokeWidth={pathname.startsWith('/activity') ? 2.5 : 1.8} />
+            <span className="text-[10px] tracking-tight">Activity</span>
           </Link>
 
           {/* 5. Settings */}
@@ -171,7 +171,7 @@ export default function BottomNav() {
           </Link>
         </div>
 
-        {/* Navigation Items (Home -> Trends -> Log Food Action Button -> Weight -> Settings) */}
+        {/* Navigation Items (Home -> Nutrition -> Log Food Action Button -> Weight -> Settings) */}
         <nav className="w-full space-y-2">
           {/* 1. Today */}
           <Link
@@ -191,21 +191,21 @@ export default function BottomNav() {
             </span>
           </Link>
 
-          {/* 2. Trends */}
+          {/* 2. Nutrition */}
           <Link
-            href="/trends"
-            title="Trends"
+            href="/nutrition"
+            title="Nutrition"
             className={`flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-              pathname === '/trends' || pathname.startsWith('/trends/')
+              pathname === '/nutrition' || pathname.startsWith('/nutrition/')
                 ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <div className="h-5 w-5 shrink-0 flex items-center justify-center">
-              <TrendingUp size={20} strokeWidth={pathname.startsWith('/trends') ? 2.5 : 2} />
+              <TrendingUp size={20} strokeWidth={pathname.startsWith('/nutrition') ? 2.5 : 2} />
             </div>
             <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-250 delay-75 whitespace-nowrap overflow-hidden">
-              Trends
+              Nutrition
             </span>
           </Link>
 
@@ -237,21 +237,21 @@ export default function BottomNav() {
             </Link>
           </div>
 
-          {/* 4. Weight */}
+          {/* 4. Activity (weight + activity) */}
           <Link
-            href="/weight"
-            title="Weight"
+            href="/activity"
+            title="Activity"
             className={`flex items-center gap-3.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-              pathname === '/weight' || pathname.startsWith('/weight/')
+              pathname === '/activity' || pathname.startsWith('/activity/')
                 ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <div className="h-5 w-5 shrink-0 flex items-center justify-center">
-              <Scale size={20} strokeWidth={pathname.startsWith('/weight') ? 2.5 : 2} />
+              <Activity size={20} strokeWidth={pathname.startsWith('/activity') ? 2.5 : 2} />
             </div>
             <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-250 delay-75 whitespace-nowrap overflow-hidden">
-              Weight
+              Activity
             </span>
           </Link>
 

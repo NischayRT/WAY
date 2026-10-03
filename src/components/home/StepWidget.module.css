@@ -1,0 +1,162 @@
+/* Container tile inside widget card */
+.widgetStage {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  overflow: hidden;
+  container-type: size;
+  contain: strict;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stage {
+  --u: calc(100cqw / 200);
+  --step-time: 1.4s;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* ---------- Endless Stairs ---------- */
+.stairs {
+  position: absolute;
+  left: calc(var(--u) * -140);
+  top: calc(var(--u) * -40);
+  width: calc(var(--u) * 480);
+  height: calc(var(--u) * 320);
+  fill: rgba(56, 189, 248, 0.08);
+  stroke: #38bdf8;
+  stroke-width: 4;
+  stroke-linejoin: round;
+  will-change: transform;
+  animation: scroll-stairs var(--step-time) linear infinite;
+}
+
+@keyframes scroll-stairs {
+  to {
+    transform: translate(calc(var(--u) * -70), calc(var(--u) * 34));
+  }
+}
+
+/* ---------- Shoe Mechanics ---------- */
+.shoe {
+  position: absolute;
+  width: calc(var(--u) * 75);
+  transform-origin: 85% 100%;
+  will-change: transform;
+}
+
+.shoe svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Stair Climbing Shoes */
+.climb {
+  left: calc(var(--u) * 110);
+  top: calc(var(--u) * 78);
+  animation: climb calc(var(--step-time) * 2) linear infinite;
+}
+
+.climbB {
+  animation-delay: calc(var(--step-time) * -1);
+}
+
+@keyframes climb {
+  0% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(calc(var(--u) * -70), calc(var(--u) * 34));
+    animation-timing-function: ease-out;
+  }
+  56% {
+    transform: translate(calc(var(--u) * -72), calc(var(--u) * 28)) rotate(24deg);
+    animation-timing-function: ease-in-out;
+  }
+  68% {
+    transform: translate(calc(var(--u) * -62), calc(var(--u) * -8)) rotate(-8deg);
+  }
+  82% {
+    transform: translate(calc(var(--u) * -26), calc(var(--u) * -30)) rotate(-6deg);
+  }
+  93% {
+    transform: translate(calc(var(--u) * -5), calc(var(--u) * -12)) rotate(0deg);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* ---------- Walking Shoes & Ground Line ---------- */
+.stride {
+  top: calc(var(--u) * 95);
+  width: calc(var(--u) * 85);
+  animation: stride 1.6s linear infinite;
+}
+
+.strideA {
+  left: calc(var(--u) * 10);
+}
+
+.strideB {
+  left: calc(var(--u) * 105);
+  animation-delay: -0.8s;
+}
+
+@keyframes stride {
+  0%, 40% {
+    transform: translate(0, 0);
+    animation-timing-function: ease-out;
+  }
+  48% {
+    transform: translate(calc(var(--u) * 2), calc(var(--u) * -2)) rotate(42deg);
+    animation-timing-function: ease-in-out;
+  }
+  60% {
+    transform: translate(calc(var(--u) * 14), calc(var(--u) * -26)) rotate(-6deg);
+  }
+  74% {
+    transform: translate(calc(var(--u) * 22), calc(var(--u) * -12)) rotate(-2deg);
+    animation-timing-function: ease-in;
+  }
+  85% {
+    transform: translate(calc(var(--u) * 16), 0) rotate(0deg);
+    animation-timing-function: linear;
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* Moving ground line underneath walking shoes */
+.singleGroundLine {
+  position: absolute;
+  top: calc(var(--u) * 155);
+  left: 0;
+  width: calc(var(--u) * 400);
+  height: calc(var(--u) * 6);
+  stroke: #38bdf8;
+  stroke-width: 4;
+  stroke-linecap: round;
+  will-change: transform;
+  animation: stream 1.4s linear infinite;
+}
+
+@keyframes stream {
+  to {
+    transform: translateX(calc(var(--u) * -200));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stairs,
+  .shoe,
+  .singleGroundLine {
+    animation: none;
+  }
+}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabaseClient';
 import { ui } from '@/lib/ui';
 import { getCurrentUserId } from '@/lib/currentUser';
+import { syncToGoogleHealth } from '@/lib/googleHealthSyncClient';
 
 function todayLocalDate() {
   return new Date().toISOString().split('T')[0];
@@ -43,6 +44,7 @@ export default function WeighInForm() {
       setError(upsertError.message);
       return;
     }
+    syncToGoogleHealth({ action: 'weight_upsert', date: loggedAt });
     setWeightKg('');
     router.refresh();
   };

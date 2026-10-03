@@ -9,7 +9,7 @@ import Cart from './Cart';
 import MyDishesPanel from './MyDishesPanel';
 import { ui } from '@/lib/ui';
 
-export default function LogFoodBuilder({ today, minDate, initialDate }) {
+export default function LogFoodBuilder({ today, minDate, initialDate, initialMeal }) {
   const router = useRouter();
   const [cart, setCart] = useState([]);
   const [showExitModal, setShowExitModal] = useState(false);
@@ -100,6 +100,7 @@ export default function LogFoodBuilder({ today, minDate, initialDate }) {
         <Cart
           items={cart}
           loggedAt={loggedAt}
+          initialMeal={initialMeal}
           onUpdateQuantity={updateQuantity}
           onRemove={removeItem}
           onLogged={() => setCart([])}

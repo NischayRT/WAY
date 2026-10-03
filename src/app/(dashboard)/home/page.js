@@ -20,11 +20,11 @@ export default async function HomePage({ searchParams }) {
   if (!user) redirect('/login');
 
   // Single parallel pass fetching profile, week logs, and all user weight logs
-  const [{ data: profile }, { data: weightLogsData }] = await Promise.all([
+  const [{ data: profile }, { data: weightLogsData }, { data: ghConnection }] = await Promise.all([
     supabase
       .from('profiles')
       .select(
-        'height_cm, weight_kg, age, sex, activity_level, goal, override_calories, override_protein_g, override_carbs_g, override_fat_g'
+        'full_name, height_cm, weight_kg, age, sex, activity_level, goal, override_calories, override_protein_g, override_carbs_g, override_fat_g, dream_target_weight_kg, dream_target_date, step_goal, distance_goal_km, burn_goal_kcal'
       )
       .eq('id', user.id)
       .single(),
@@ -33,6 +33,7 @@ export default async function HomePage({ searchParams }) {
       .select('logged_at, weight_kg')
       .eq('user_id', user.id)
       .order('logged_at', { ascending: false }),
+    supabase.from('google_health_connections').select('user_id').eq('user_id', user.id).maybeSingle(),
   ]);
 
   if (!profile) redirect('/onboarding');
@@ -139,6 +140,7 @@ export default async function HomePage({ searchParams }) {
         initialTargets={initialTargets}
         goal={profile.goal}
         outOfRange={outOfRange}
+        googleHealth={{ connected: !!ghConnection }}
       />
     </main>
   );

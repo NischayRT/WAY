@@ -6,7 +6,7 @@ import { createServerClient } from '@supabase/ssr';
 // supposed to land (/onboarding), don't require a profile at all
 // (/login, /auth/*), or would break if redirected instead of returning
 // JSON (/api/*).
-const PROFILE_CHECK_EXEMPT_PREFIXES = ['/onboarding', '/login', '/auth', '/api'];
+const PROFILE_CHECK_EXEMPT_PREFIXES = ['/onboarding', '/login', '/auth', '/api', '/privacy', '/terms'];
 
 export async function middleware(request) {
   // If this is a Next.js prefetch request (from hovering over desktop links),

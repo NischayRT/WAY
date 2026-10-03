@@ -49,7 +49,7 @@ function formatDay(dateStr) {
  *
  * Draws the raw weigh-ins as a faint smoothed line and a 7-point trailing
  * average as the primary line, because day-to-day scale movement is mostly
- * water and reading it as progress is misleading.
+ * water and reading it as activity is misleading.
  *
  * @param entries [{ logged_at, weight_kg }] in ascending date order
  */

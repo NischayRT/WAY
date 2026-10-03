@@ -74,7 +74,7 @@ export const metadata = {
 // (only the content="..." value) for the Production environment in Vercel.
 // Rendered by hand inside <head> so it is always in the first HTML the verifier
 // downloads (streamed metadata can otherwise land in <body>).
-const SITE_VERIFICATION = (process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || '')
+const SITE_VERIFICATION = (process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || LEGAL.GOOGLE_SITE_VERIFICATION || '')
   .trim()
   .replace(/^["']|["']$/g, '');
 

@@ -4,8 +4,12 @@ export const LEGAL = {
   // Must match the app name on the Google OAuth consent screen exactly.
   APP_NAME: 'WAY Studio',
   SITE_URL: 'https://way-the-studio.vercel.app',
+  // Google Search Console HTML-tag token (only the content="..." value).
+  // Paste it here so verification does not depend on a Vercel env variable.
+  // It is public in the page source anyway, so this is safe to commit.
+  GOOGLE_SITE_VERIFICATION: 'Q2Z-HSqNb0z0PJYA05r3NFltquO351AmZ0pVVi22UmY',
   OPERATOR: 'Nischay (individual developer)',
-  CONTACT_EMAIL: 'way-the-studio@gmail.com',
+  CONTACT_EMAIL: 'nischayreddy.t@gmail.com',
   EFFECTIVE_DATE: '3 October 2026',
   GOVERNING_LAW: 'India',
   JURISDICTION: 'Hyderabad, Telangana',

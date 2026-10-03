@@ -1,5 +1,6 @@
 import localFont from "next/font/local";
 import "./globals.css";
+import { LEGAL } from "@/lib/legal";
 
 // Same families as before (Fraunces, IBM Plex Sans/Mono, Instrument Serif,
 // PT Sans Narrow) and the same CSS variable names, but self-hosted from
@@ -50,12 +51,32 @@ const ptSansNarrow = localFont({
 });
 
 export const metadata = {
-  title: "WAY — Diet & Physique Studio",
-  description: "Indian-food-focused macro tracking and 3D physique projection",
+  metadataBase: new URL(LEGAL.SITE_URL),
+  title: {
+    default: "WAY Studio — Indian food diet & physique tracker",
+    template: "%s | WAY Studio",
+  },
+  description:
+    "WAY Studio is a diet and nutrition tracking app for Indian food. Log meals, track calories and macros, record your weight, and optionally sync with Google Health.",
+  applicationName: "WAY Studio",
+  openGraph: {
+    title: "WAY Studio",
+    description: "Indian-food-focused calorie and macro tracking, weight logging and physique projection.",
+    siteName: "WAY Studio",
+    type: "website",
+  },
   icons: {
-    icon: '/favicon.ico', // or your custom path like '/icon.png'
+    icon: '/favicon.ico',
   },
 };
+
+// Google Search Console HTML-tag verification. Set NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+// (only the content="..." value) for the Production environment in Vercel.
+// Rendered by hand inside <head> so it is always in the first HTML the verifier
+// downloads (streamed metadata can otherwise land in <body>).
+const SITE_VERIFICATION = (process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || '')
+  .trim()
+  .replace(/^["']|["']$/g, '');
 
 export default function RootLayout({ children }) {
   return (
@@ -63,6 +84,9 @@ export default function RootLayout({ children }) {
       lang="en"
       className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable} ${instrumentSerif.variable} ${ptSansNarrow.variable} h-full antialiased`}
     >
+      <head>
+        {SITE_VERIFICATION && <meta name="google-site-verification" content={SITE_VERIFICATION} />}
+      </head>
       <body className="min-h-full flex flex-col bg-leaf text-ink">{children}</body>
     </html>
   );

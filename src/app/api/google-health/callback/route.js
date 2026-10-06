@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { exchangeCodeForTokens, NUTRITION_WRITE_SCOPE, METRICS_WRITE_SCOPE } from '@/lib/googleHealth';
 
-const ALLOWED_RETURN_TO = ['/settings', '/home', '/progress'];
+// Must match the list in ../connect/route.js (it said '/progress' here but
+// '/activity' there, so returning to Activity silently fell back to Settings).
+const ALLOWED_RETURN_TO = ['/settings', '/home', '/activity'];
 const COOKIE_PATH = '/api/google-health';
 
 export async function GET(request) {
@@ -23,12 +25,14 @@ export async function GET(request) {
     return response;
   };
 
-  // Failures always land on /settings, because that's where the error
-  // banner is shown — even when the flow started from onboarding.
-  const failure = (message) =>
-    redirectTo(`/settings?google_health_error=${encodeURIComponent(message)}`);
+  // Failures always land on /settings, where the error banner is shown.
+  // Only fixed codes go in the URL. Free text here used to be displayed
+  // verbatim by Settings, so anyone could send a victim a link like
+  // /settings?google_health_error=<fake security warning> rendered inside
+  // the real app.
+  const failure = (code) => redirectTo(`/settings?google_health_error=${code}`);
 
-  if (oauthError) return failure(oauthError);
+  if (oauthError) return failure(oauthError === 'access_denied' ? 'access_denied' : 'oauth_error');
   if (!code) return failure('missing_code');
   if (!expectedState || returnedState !== expectedState) return failure('state_mismatch');
 
@@ -46,7 +50,7 @@ export async function GET(request) {
     // prompt=consent should make Google return a refresh_token every
     // time; guard anyway rather than store a row that can never refresh.
     if (!tokens.refresh_token) {
-      throw new Error('Google did not return a refresh token. Try disconnecting in Settings and reconnecting.');
+      return failure('no_refresh_token');
     }
 
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
@@ -68,7 +72,8 @@ export async function GET(request) {
     const granted = tokens.scope ?? '';
     writeMissing = !(granted.includes(NUTRITION_WRITE_SCOPE) && granted.includes(METRICS_WRITE_SCOPE));
   } catch (err) {
-    return failure(err.message);
+    console.error('[google-health/callback]', err?.message ?? err);
+    return failure('token_exchange_failed');
   }
 
   // Settings shows a success banner via this flag; other destinations

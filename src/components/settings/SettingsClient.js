@@ -59,7 +59,19 @@ export default function SettingsClient({
       setGoogleHealthBanner({ type: 'success', message: 'Google Health connected.' });
       router.replace('/settings');
     } else if (error) {
-      setGoogleHealthBanner({ type: 'error', message: `Could not connect Google Health: ${error}` });
+      // Only known codes map to text; anything else shows a generic message,
+      // so a crafted link can't put arbitrary text in this banner.
+      const GH_ERRORS = {
+        access_denied: 'Google Health access was not granted.',
+        state_mismatch: 'The connection request expired. Please try again.',
+        missing_code: 'Google did not complete the connection. Please try again.',
+        no_refresh_token: 'Google did not return a refresh token. Disconnect in Settings and reconnect.',
+        token_exchange_failed: 'Google rejected the connection. Please try again.',
+      };
+      setGoogleHealthBanner({
+        type: 'error',
+        message: `Could not connect Google Health. ${GH_ERRORS[error] ?? 'Please try again.'}`,
+      });
       router.replace('/settings');
     }
   }, [router]);
@@ -489,4 +501,4 @@ export default function SettingsClient({
       </div>
     </div>
   );
-}
+}

@@ -45,6 +45,7 @@ export async function GET(request) {
     // Neither service is connected
     return NextResponse.json({ connected: false, steps: 0, distanceKm: 0, provider: null });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[api]', err);
+    return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
   }
-}
+}

@@ -53,7 +53,10 @@ export async function POST(request) {
         .from('google_health_connections')
         .update({ sync_enabled: !!body.enabled })
         .eq('user_id', user.id);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) {
+        console.error('[google-health/sync] set_enabled', error.message);
+        return NextResponse.json({ error: 'Could not update sync setting' }, { status: 500 });
+      }
       return NextResponse.json({ ok: true, enabled: !!body.enabled });
     }
     default:

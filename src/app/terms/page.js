@@ -1,5 +1,6 @@
 import LegalPage, { Section, UL, ContactLine } from '@/components/legal/LegalPage';
 import { LEGAL } from '@/lib/legal';
+import { MODEL_CREDITS } from '@/lib/bodyModels';
 
 export const metadata = {
   title: 'Terms of Service',
@@ -53,6 +54,22 @@ export default function TermsPage() {
           on Google&apos;s services and the permissions you grant, so it may be delayed, incomplete or unavailable. We are not
           responsible for Google&apos;s services or for data held in your Google account.
         </p>
+        <p>The 3D body models are used under Creative Commons licences:</p>
+        <UL
+          items={MODEL_CREDITS.map((c) => (
+            <span key={c.title}>
+              {c.use}: &ldquo;
+              <a className="underline underline-offset-2" href={c.url} target="_blank" rel="noopener noreferrer">
+                {c.title}
+              </a>
+              &rdquo; by {c.author}, licensed under{' '}
+              <a className="underline underline-offset-2" href={c.licenseUrl} target="_blank" rel="noopener noreferrer">
+                {c.license}
+              </a>
+              , {c.changes}.
+            </span>
+          ))}
+        />
       </Section>
 
       <Section title="7. Acceptable use">

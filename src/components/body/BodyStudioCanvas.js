@@ -65,6 +65,7 @@ function SingleAvatarStage({
     <group position={[positionX, 0, 0]}>
       <group ref={rotationRef}>
         <RealisticAvatar3D
+          sex={data.sex}
           heightCm={data.heightCm}
           weightKg={data.weightKg}
           chestCm={data.chestCm}

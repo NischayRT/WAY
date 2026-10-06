@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
-import { addDays } from '@/lib/dateUtils';
+import { addDays, isValidDateStr, todayLocalDate } from '@/lib/dateUtils';
+import { MEAL_CATEGORIES } from '@/lib/mealCategories';
+
+const MEAL_TYPES = MEAL_CATEGORIES.map((c) => c.value);
 import { syncFoodLogs } from '@/lib/googleHealthSync';
 
 export async function POST(request) {
@@ -11,7 +14,22 @@ export async function POST(request) {
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { targetDate, mealType } = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+  const { targetDate, mealType } = body ?? {};
+
+  // Without these checks any string reached the insert (junk dates, far
+  // future dates, unknown meal types).
+  if (!isValidDateStr(targetDate) || targetDate > todayLocalDate()) {
+    return NextResponse.json({ error: 'targetDate must be a valid YYYY-MM-DD, not in the future' }, { status: 400 });
+  }
+  if (mealType != null && !MEAL_TYPES.includes(mealType)) {
+    return NextResponse.json({ error: 'Unknown mealType' }, { status: 400 });
+  }
   const yesterday = addDays(targetDate, -1);
 
   // Fetch yesterday's logs for this specific meal category (or all if not specified)
@@ -43,7 +61,8 @@ export async function POST(request) {
     .insert(newRows)
     .select('id');
   if (insertErr) {
-    return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    console.error('[repeat-meal] insert failed:', insertErr.message);
+    return NextResponse.json({ error: 'Could not copy meals' }, { status: 500 });
   }
 
   // Mirror into Google Health; a failure there must not fail the repeat.
@@ -54,4 +73,4 @@ export async function POST(request) {
   }
 
   return NextResponse.json({ success: true, count: newRows.length });
-}
+}

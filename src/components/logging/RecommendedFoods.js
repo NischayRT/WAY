@@ -62,7 +62,7 @@ export default function RecommendedFoods({ onAdd }) {
         {recommendations.map(({ food, reason }) => (
           <div
             key={food.id}
-            className="rounded-2xl border rounded-2xl transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] bg-white border-slate-200/90 p-4 shadow-xs transition-all hover:border-slate-300 dark:hover:border-slate-600"
+            className="rounded-2xl border rounded-2xl transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-[#071530] dark:to-[#050e22] bg-white border-slate-200/90 p-4 shadow-xs transition-all hover:border-slate-300 dark:hover:border-slate-600"
           >
             <div className="space-y-1">
               <div className="flex items-start justify-between gap-2">

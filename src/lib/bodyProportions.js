@@ -3,11 +3,62 @@
  * Validated Multi-Metric Body Composition & Transformation Engine
  */
 
+/**
+ * Neck circumference estimate, used by the US Navy body-fat formula when
+ * the user hasn't measured their neck. The Navy formula subtracts neck
+ * from waist, so every extra cm here lowers the body-fat result.
+ *
+ * The old height-based estimate gave ~42 cm for a 176 cm / 79 kg man and
+ * ~35 cm for a 163 cm / 55 kg woman, about 4 cm above typical adult values
+ * (adult means are roughly 38 cm for men and 33 cm for women, rising with
+ * BMI). That under-read body fat by several points for everyone. This
+ * BMI-based version tracks those population values:
+ *   men:   BMI 22 -> 36.9 cm, BMI 25 -> 38.3 cm, BMI 30 -> 40.5 cm
+ *   women: BMI 20 -> 31.5 cm, BMI 22 -> 32.4 cm, BMI 30 -> 36.0 cm
+ * A measured neck is always better; pass neckCm to analyzeCurrentPhysique.
+ * (chestCm is kept in the signature so existing callers don't change.)
+ */
 export function estimateNeckCircumference(heightCm, weightKg, chestCm, sex = 'male') {
-  if (sex === 'male') {
-    return 0.20 * heightCm + 0.04 * weightKg + 0.04 * chestCm;
+  const h = Number(heightCm) || 170;
+  const bmi = (Number(weightKg) || 70) / (h / 100) ** 2;
+  return sex === 'female' ? 22.5 + 0.45 * bmi : 27.0 + 0.45 * bmi;
+}
+
+/**
+ * Starting circumferences (cm) for someone who hasn't measured yet. These
+ * are only placeholders for the sliders, never stored as the user's own
+ * numbers, but they decide the first body a new user sees, so they are
+ * split by sex:
+ *  - Waist: BMI-scaled; women's waist runs ~6–7 cm smaller than men's at
+ *    the same height and BMI.
+ *  - Hips: from a typical waist-to-hip ratio, ~0.90 for adult men and
+ *    ~0.80 for adult women (WHO's abdominal-obesity lines are 0.90 / 0.85).
+ *    The old female ratio (1.18, i.e. WHR 0.85) put every new woman exactly
+ *    on the obesity line.
+ *  - Chest: men's chest vs women's bust, both ~0.53–0.54 x height, with
+ *    bust gaining more per kg because breast tissue is mostly fat.
+ *  - Upper arm: women's runs ~6–8 cm smaller than men's at the same weight.
+ */
+export function estimateDefaultMeasurementsCm({ heightCm, weightKg, sex = 'male' }) {
+  const h = Number(heightCm) || (sex === 'female' ? 162 : 175);
+  const w = Number(weightKg) || (sex === 'female' ? 60 : 75);
+  const bmi = w / (h / 100) ** 2;
+  if (sex === 'female') {
+    const waistCm = bmi * 1.55 + h * 0.24;
+    return {
+      waistCm,
+      hipCm: waistCm / 0.8,
+      chestCm: h * 0.53 + (w - 60) * 0.3,
+      bicepCm: 20 + w / 8,
+    };
   }
-  return 0.18 * heightCm + 0.04 * weightKg + 0.04 * chestCm;
+  const waistCm = bmi * 1.55 + h * 0.28;
+  return {
+    waistCm,
+    hipCm: waistCm / 0.9,
+    chestCm: h * 0.54 + (w - 70) * 0.2,
+    bicepCm: 28 + w / 10,
+  };
 }
 
 /**

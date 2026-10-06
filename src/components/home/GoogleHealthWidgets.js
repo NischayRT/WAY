@@ -75,7 +75,7 @@ function MetricCard({
         </div>
       </div>
 
-      <p className="font-numeric mt-4 text-3xl font-bold leading-none tracking-tight text-slate-900 dark:text-white">
+      <p className="font-numeric mt-4 text-[1.7rem] font-bold leading-none tracking-tight text-slate-900 dark:text-white">
         {value}
       </p>
       <p className="font-numeric mt-1.5 min-h-[1.25rem] text-sm text-slate-500 dark:text-sky-200/60">{sub}</p>

@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { analyzeCurrentPhysique, projectScientificDream, minWaistCmForBfFloor } from '@/lib/bodyProportions';
+import {
+  analyzeCurrentPhysique,
+  projectScientificDream,
+  minWaistCmForBfFloor,
+  estimateDefaultMeasurementsCm,
+} from '@/lib/bodyProportions';
 
 // three.js is only downloaded the first time the panel is opened.
 export const prefetchWeightBody = () => {
@@ -31,21 +36,14 @@ export default function WeightBodyPreview({ open, profile, weightKg: weightProp,
   const model = useMemo(() => {
     const heightCm = Number(profile?.height_cm) || 175;
     const weightKg = Number(weightProp) || Number(profile?.weight_kg) || 75;
-    const sex = profile?.sex || 'male';
+    const sex = profile?.sex === 'female' ? 'female' : 'male';
 
-    // Same measurement defaults the Body Measurements tab uses.
-    const waistIn0 = profile?.waist_cm
-      ? half(Number(profile.waist_cm) / 2.54)
-      : half(((weightKg / (heightCm / 100) ** 2) * 1.55 + heightCm * 0.28) / 2.54);
-    const hipIn = profile?.hip_cm
-      ? half(Number(profile.hip_cm) / 2.54)
-      : half((waistIn0 * 2.54 * (sex === 'male' ? 1.07 : 1.18)) / 2.54);
-    const chestIn = profile?.chest_cm
-      ? half(Number(profile.chest_cm) / 2.54)
-      : half((heightCm * 0.54 + (weightKg - 70) * 0.2) / 2.54);
-    const bicepIn = profile?.bicep_cm
-      ? half(Number(profile.bicep_cm) / 2.54)
-      : half((28 + weightKg / 10) / 2.54);
+    // Same sex-specific defaults the Body Measurements tab uses.
+    const est = estimateDefaultMeasurementsCm({ heightCm, weightKg, sex });
+    const waistIn0 = half(Number(profile?.waist_cm || est.waistCm) / 2.54);
+    const hipIn = half(Number(profile?.hip_cm || est.hipCm) / 2.54);
+    const chestIn = half(Number(profile?.chest_cm || est.chestCm) / 2.54);
+    const bicepIn = half(Number(profile?.bicep_cm || est.bicepCm) / 2.54);
 
     const chestCm = chestIn * 2.54;
     const hipCm = hipIn * 2.54;
@@ -57,7 +55,7 @@ export default function WeightBodyPreview({ open, profile, weightKg: weightProp,
     const bicepCm = bicepIn * 2.54;
 
     const stats = analyzeCurrentPhysique({ heightCm, weightKg, sex, waistCm, hipCm, chestCm, bicepCm });
-    const currentData = { heightCm, weightKg, chestCm, waistCm, hipCm, bicepCm, bodyFatPct: stats.bodyFatPct };
+    const currentData = { sex, heightCm, weightKg, chestCm, waistCm, hipCm, bicepCm, bodyFatPct: stats.bodyFatPct };
 
     const targetKg = profile?.dream_target_weight_kg ? Number(profile.dream_target_weight_kg) : null;
     if (!targetKg) return { currentData, targetData: null, targetKg: null, bodyFatPct: stats.bodyFatPct };
@@ -80,6 +78,7 @@ export default function WeightBodyPreview({ open, profile, weightKg: weightProp,
       targetKg,
       bodyFatPct: stats.bodyFatPct,
       targetData: {
+        sex,
         heightCm,
         weightKg: targetKg,
         chestCm: forecast.dimensions.chestCm,
@@ -125,7 +124,7 @@ export default function WeightBodyPreview({ open, profile, weightKg: weightProp,
       aria-hidden={!open}
     >
       <div className="min-h-0 overflow-hidden">
-        <div className="border-t border-slate-100 bg-gradient-to-b from-slate-50/60 to-white px-3 pb-3 pt-3 dark:border-slate-800 dark:from-slate-900/60 dark:to-slate-900 sm:px-4 sm:pb-4">
+        <div className="border-t border-slate-100 bg-gradient-to-b from-slate-50/60 to-white px-3 pb-3 pt-3 dark:border-slate-800 dark:from-[#071530]/60 dark:to-slate-900 sm:px-4 sm:pb-4">
           {/* Labels */}
           <div className="grid grid-cols-2 gap-2">
             <div className="min-w-0">

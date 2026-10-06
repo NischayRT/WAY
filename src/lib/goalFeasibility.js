@@ -48,10 +48,20 @@ export function calculateTimelineAndFeasibility({
   const dailyCalorieAdjustment = Math.round(totalCalorieDelta / days);
   const calculatedDailyCalories = Math.round(tdee + dailyCalorieAdjustment);
 
-  // Clinical safety thresholds
-  const minCalorieFloor = sex === 'male' ? 1450 : 1200;
-  // In lib/goalFeasibility.js -> calculateTimelineAndFeasibility
-const minEssentialBf = sex === 'male' ? 5.0 : 12.0;
+  // Clinical safety thresholds, by sex.
+  // Calorie floor: the commonly used minimums for unsupervised dieting are
+  // ~1,500 kcal/day for men and ~1,200 kcal/day for women.
+  const isFemale = sex === 'female';
+  const minCalorieFloor = isFemale ? 1200 : 1500;
+  // Warn once the projection leaves the ACE "athletes" band and approaches
+  // essential fat (men 2–5%, women 10–13%). The projection itself is
+  // already floored at 5% / 12%, so a check at those exact values could
+  // never fire; 6% / 14% is the edge of the essential range.
+  const minEssentialBf = isFemale ? 14.0 : 6.0;
+  // Realistic lean-gain ceiling: women gain muscle at roughly half the
+  // absolute rate of men, so a surplus pace that is aggressive for a man
+  // is clearly too fast for a woman.
+  const maxGainRateKgPerWeek = isFemale ? 0.35 : 0.6;
 
   const failureReasons = [];
 
@@ -73,7 +83,7 @@ const minEssentialBf = sex === 'male' ? 5.0 : 12.0;
       );
     }
   } else if (weightDelta > 0) {
-    if (weeklyRate > 0.6) {
+    if (weeklyRate > maxGainRateKgPerWeek) {
       failureReasons.push(
         `A surplus rate of ${weeklyRate.toFixed(2)} kg/week exceeds natural muscular hypertrophy limits and will be mostly stored as fat.`
       );

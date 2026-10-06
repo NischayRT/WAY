@@ -44,6 +44,7 @@ function Stage({ currentData, targetData, progress, sway }) {
       <group ref={rotRef}>
         {merged && (
           <RealisticAvatar3D
+            sex={targetData.sex}
             heightCm={targetData.heightCm}
             weightKg={targetData.weightKg}
             chestCm={targetData.chestCm}
@@ -58,6 +59,7 @@ function Stage({ currentData, targetData, progress, sway }) {
           />
         )}
         <RealisticAvatar3D
+          sex={currentData.sex}
           heightCm={currentData.heightCm}
           weightKg={currentData.weightKg}
           chestCm={currentData.chestCm}
@@ -106,7 +108,7 @@ export default function WeightBodyCanvas({ currentData, targetData = null, progr
         </>
       )}
       <span>
-        <a className="absolute bottom-2 right-14 z-10 p-2 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-[#14305a] bg-white dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] px-4 py-2 text-xs MyDishesPanel:text-sm font-medium text-slate-700 dark:text-slate-200 shadow-2xs transition-shadow hover:shadow-lg hover:bg-slate-50 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-white active:scale-[0.98] disabled:opacity-50" href="/settings?tab=body">Change Goal</a>
+        <a className="absolute bottom-2 right-14 z-10 p-2 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-[#14305a] bg-white dark:bg-gradient-to-b dark:from-[#071530] dark:to-[#050e22] px-4 py-2 text-xs MyDishesPanel:text-sm font-medium text-slate-700 dark:text-slate-200 shadow-2xs transition-shadow hover:shadow-lg hover:bg-slate-50 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-white active:scale-[0.98] disabled:opacity-50" href="/settings?tab=body">Change Goal</a>
       <button
         type="button"
         onClick={() => setSway((s) => !s)}

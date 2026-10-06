@@ -7,7 +7,8 @@
  * ----------------------------------------------------------------
  */
 
-const ACTIVITY_MULTIPLIERS = {
+// Physical-activity multipliers on BMR (standard PAL values).
+export const ACTIVITY_MULTIPLIERS = {
   sedentary: 1.2,      // little to no exercise
   light: 1.375,        // light exercise 1-3 days/week
   moderate: 1.55,      // moderate exercise 3-5 days/week
@@ -15,14 +16,44 @@ const ACTIVITY_MULTIPLIERS = {
   very_active: 1.9,    // very hard exercise + physical job
 };
 
-// Calorie offset and protein-per-kg target by goal.
+/**
+ * Lowest daily intake the app will ever suggest without medical
+ * supervision: the widely used 1,200 kcal (women) / 1,500 kcal (men).
+ * The old flat "-500 kcal" could take a small, sedentary woman to ~900.
+ */
+export const CALORIE_FLOOR = { male: 1500, female: 1200 };
+
+/**
+ * Goal settings.
+ *  - Weight loss: a 20% deficit off TDEE, kept between 300 and 750 kcal.
+ *    A percentage scales with body size; a flat 500 kcal is a far bigger
+ *    cut for a 50 kg woman than for a 90 kg man.
+ *  - Muscle gain: smaller surpluses for women, who add lean mass at
+ *    roughly half the absolute rate of men, so extra calories mostly
+ *    become fat.
+ *  - Protein (g per kg of reference weight, see referenceWeightKg):
+ *    1.6–2.2 g/kg covers the evidence range for people who train,
+ *    with the higher end during a deficit to protect lean mass. The same
+ *    per-kg targets apply to women and men.
+ */
 const GOAL_CONFIG = {
-  lose_weight: { calorieOffset: -500, proteinPerKg: 1.8 },
-  gain_muscle: { calorieOffset: 300, proteinPerKg: 2.0 },
-  lean_mass: { calorieOffset: 150, proteinPerKg: 2.2 },
-  improve_cardio: { calorieOffset: 0, proteinPerKg: 1.6 },
-  maintain: { calorieOffset: 0, proteinPerKg: 1.6 },
+  lose_weight: { deficitPct: 0.2, minDeficit: 300, maxDeficit: 750, proteinPerKg: 1.8 },
+  gain_muscle: { surplus: { male: 300, female: 200 }, proteinPerKg: 2.0 },
+  lean_mass: { surplus: { male: 150, female: 100 }, proteinPerKg: 2.0 },
+  improve_cardio: { surplus: { male: 0, female: 0 }, proteinPerKg: 1.6 },
+  maintain: { surplus: { male: 0, female: 0 }, proteinPerKg: 1.6 },
 };
+
+// Fat: 30% of calories by default, never below 20% (the bottom of the
+// 20–35% acceptable range). Going lower is a particular problem for women,
+// where very-low-fat, low-energy diets are linked to menstrual disruption.
+const FAT_SHARE_DEFAULT = 0.3;
+const FAT_SHARE_MIN = 0.2;
+// 130 g/day carbohydrate is the RDA (the brain's glucose needs). If a plan
+// would go below it, fat is reduced (down to the 20% floor) to make room.
+const CARB_MIN_G = 130;
+
+const normSex = (sex) => (sex === 'female' ? 'female' : sex === 'male' ? 'male' : null);
 
 /**
  * Mifflin-St Jeor BMR formula.
@@ -31,7 +62,9 @@ const GOAL_CONFIG = {
  */
 export function calculateBMR({ weightKg, heightCm, age, sex }) {
   const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
-  return sex === 'male' ? base + 5 : base - 161;
+  const s = normSex(sex);
+  // Unknown sex: halfway between the male (+5) and female (-161) constants.
+  return base + (s === 'male' ? 5 : s === 'female' ? -161 : -78);
 }
 
 /**
@@ -49,27 +82,73 @@ export function calculateTDEE(bmr, activityLevel) {
 }
 
 /**
- * Goal-adjusted daily targets: calories, protein, and a simple
- * carb/fat split on the remaining calories.
+ * Body weight to base protein on. Above BMI 25, protein per kg of total
+ * weight overshoots (fat tissue needs little protein), so the weight at
+ * BMI 25 for the person's height is used instead.
+ */
+export function referenceWeightKg(weightKg, heightCm) {
+  const w = Number(weightKg);
+  const h = Number(heightCm) / 100;
+  if (!(h > 0)) return w;
+  return Math.min(w, 25 * h * h);
+}
+
+/** Daily protein target in grams for a goal. */
+export function proteinTargetG({ weightKg, heightCm, goal = 'maintain' }) {
+  const perKg = (GOAL_CONFIG[goal] || GOAL_CONFIG.maintain).proteinPerKg;
+  return Math.round(referenceWeightKg(weightKg, heightCm) * perKg);
+}
+
+/**
+ * Split a calorie target into carbs and fat once protein is fixed.
+ * Exported so screens that set their own calorie target (Body Studio's
+ * "set goal") produce macros that actually add up to it.
+ */
+export function splitCarbsFat(targetCalories, proteinG) {
+  const kcal = Math.max(Number(targetCalories) || 0, 0);
+  const proteinKcal = proteinG * 4;
+  let fatKcal = kcal * FAT_SHARE_DEFAULT;
+  let carbKcal = kcal - proteinKcal - fatKcal;
+  if (carbKcal < CARB_MIN_G * 4) {
+    const room = fatKcal - kcal * FAT_SHARE_MIN;
+    const shift = Math.min(room, CARB_MIN_G * 4 - carbKcal);
+    fatKcal -= shift;
+    carbKcal += shift;
+  }
+  return {
+    carbsG: Math.max(Math.round(carbKcal / 4), 0),
+    fatG: Math.round(fatKcal / 9),
+  };
+}
+
+/**
+ * Goal-adjusted daily targets.
  * @param {number} tdee
  * @param {number} weightKg
  * @param {keyof GOAL_CONFIG} goal
+ * @param {{sex?: 'male'|'female', heightCm?: number}} [opts]
  */
-export function calculateMacroTargets(tdee, weightKg, goal) {
+export function calculateMacroTargets(tdee, weightKg, goal, { sex, heightCm } = {}) {
   const config = GOAL_CONFIG[goal];
   if (!config) {
     throw new Error(`Unknown goal: ${goal}`);
   }
+  const s = normSex(sex) || 'female'; // unknown: use the more conservative values
 
-  const targetCalories = Math.round(tdee + config.calorieOffset);
-  const proteinG = Math.round(weightKg * config.proteinPerKg);
-  const proteinCalories = proteinG * 4;
+  let target;
+  if (config.deficitPct) {
+    const deficit = Math.min(config.maxDeficit, Math.max(config.minDeficit, tdee * config.deficitPct));
+    target = tdee - deficit;
+  } else {
+    target = tdee + config.surplus[s];
+  }
+  // Never below the safe floor, and never above TDEE when losing weight.
+  target = Math.max(target, CALORIE_FLOOR[s]);
+  if (config.deficitPct) target = Math.min(target, tdee);
+  const targetCalories = Math.round(target);
 
-  // Remaining calories split 50/50 carbs/fat as a sane default —
-  // make this user-adjustable later, don't hardcode forever.
-  const remainingCalories = Math.max(targetCalories - proteinCalories, 0);
-  const carbsG = Math.round((remainingCalories * 0.5) / 4);
-  const fatG = Math.round((remainingCalories * 0.5) / 9);
+  const proteinG = proteinTargetG({ weightKg, heightCm, goal });
+  const { carbsG, fatG } = splitCarbsFat(targetCalories, proteinG);
 
   return {
     targetCalories,
@@ -86,7 +165,10 @@ export function calculateMacroTargets(tdee, weightKg, goal) {
 export function getDailyTargets(profile) {
   const bmr = calculateBMR(profile);
   const tdee = calculateTDEE(bmr, profile.activityLevel);
-  const macros = calculateMacroTargets(tdee, profile.weightKg, profile.goal);
+  const macros = calculateMacroTargets(tdee, profile.weightKg, profile.goal, {
+    sex: profile.sex,
+    heightCm: profile.heightCm,
+  });
 
   return {
     bmr: Math.round(bmr),
@@ -112,12 +194,27 @@ export function resolveDailyTargets(dbProfile) {
     goal: dbProfile.goal,
   });
 
+  return { bmr: computed.bmr, tdee: computed.tdee, ...applyOverrides(computed, dbProfile) };
+}
+
+/**
+ * Overrides win field by field, but carbs and fat that were NOT overridden
+ * are re-split from the effective calorie and protein targets. Previously
+ * an overridden calorie target (e.g. from Body Studio) kept carbs and fat
+ * computed for the old target, so the macros added up to a different
+ * number of calories than the target shown.
+ */
+export function applyOverrides(computed, dbProfile) {
+  const targetCalories = dbProfile.override_calories ?? computed.targetCalories;
+  const proteinG = dbProfile.override_protein_g ?? computed.proteinG;
+  const resplit =
+    targetCalories !== computed.targetCalories || proteinG !== computed.proteinG
+      ? splitCarbsFat(targetCalories, proteinG)
+      : { carbsG: computed.carbsG, fatG: computed.fatG };
   return {
-    bmr: computed.bmr,
-    tdee: computed.tdee,
-    targetCalories: dbProfile.override_calories ?? computed.targetCalories,
-    proteinG: dbProfile.override_protein_g ?? computed.proteinG,
-    carbsG: dbProfile.override_carbs_g ?? computed.carbsG,
-    fatG: dbProfile.override_fat_g ?? computed.fatG,
+    targetCalories,
+    proteinG,
+    carbsG: dbProfile.override_carbs_g ?? resplit.carbsG,
+    fatG: dbProfile.override_fat_g ?? resplit.fatG,
   };
 }

@@ -126,8 +126,6 @@ const handleSubmit = async (e) => {
       setError(authError.message);
       return;
     }
-    const { data: { session } } = await supabase.auth.getSession();
-console.log('session user:', session?.user?.id, 'token present:', !!session?.access_token);
     const { error: upsertError } = await supabase.from('profiles').upsert({
       id: userId,
       full_name: form.fullName.trim() || null,
@@ -151,7 +149,14 @@ console.log('session user:', session?.user?.id, 'token present:', !!session?.acc
       setError(upsertError.message);
       return;
     }
-    onSaved?.();
+    // Hand the saved basics to the caller. Onboarding's body step builds
+    // its 3D preview from these; it used to receive nothing, so it always
+    // fell back to male / 170 cm / 70 kg whatever the user had just entered.
+    onSaved?.({
+      heightCm: Number(form.heightCm),
+      weightKg: Number(form.weightKg),
+      sex: form.sex === 'female' ? 'female' : 'male',
+    });
   };
   // Compact two-column workspace used on the Settings page. Same state and
   // submit handler as the default layout — only the markup differs.

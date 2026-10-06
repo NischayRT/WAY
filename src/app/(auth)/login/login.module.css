@@ -1,0 +1,192 @@
+/* Server-rendered with the HTML, so the first paint already has the full look. */
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Solid fallback colour = the gradient's mid tone, so even the very first
+     frame is never white. */
+  background-color: #1b2f4f;
+  color: #ffffff;
+}
+
+.bg {
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  background: linear-gradient(#7db9ff 0%, #335789 45%, #101215 70%, #000 100%);
+  background-size: 100% 180%;
+  background-position: 0% 0%;
+  transition: background-position 900ms cubic-bezier(0.16, 1, 0.3, 1), transform 800ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Hover/focus on any primary action deepens the sky (data-cta lives in LoginForm). */
+.hero:has([data-cta]:hover) .bg,
+.hero:has([data-cta]:focus-visible) .bg {
+  background-position: 0% 100%;
+  transform: scale(1.04);
+}
+
+/* ---------- food-icon lanes ---------- */
+.lanes {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 0.5rem;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.lane {
+  position: relative;
+  height: 100%;
+  width: 4rem;
+  overflow: hidden;
+}
+
+.laneTrack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5rem;
+  animation-name: laneScroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+.laneIcon {
+  flex: none;
+  color: rgba(241, 245, 249, 0.5);
+}
+
+@keyframes laneScroll {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+
+/* Hide the middle lanes on narrow phones so the form never sits on icons. */
+@media (max-width: 480px) {
+  .lane:nth-child(3),
+  .lane:nth-child(4) { display: none; }
+}
+
+@media (min-width: 640px) {
+  .lanes { padding: 0 1.5rem; }
+  .lane { width: 6rem; }
+  .laneTrack { gap: 6rem; }
+}
+
+@media (min-width: 768px) {
+  .lanes { padding: 0 4rem; }
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.62) 0%, rgba(15, 23, 42, 0.25) 45%, transparent 72%);
+}
+
+/* ---------- content column ---------- */
+.content {
+  width: 100%;
+  max-width: 28rem;
+  padding: 2.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  text-align: center;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Brand wordmark: Instrument Serif with the logo's own vertical gradient
+   (#F3F7FC -> #BFD3F0). */
+.wordmark {
+  margin: 0;
+  padding: 0.25rem 0 0.5rem;
+  font-family: var(--font-brand);
+  font-weight: 400;
+  font-size: 6rem;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  user-select: none;
+  background-image: linear-gradient(180deg, #f3f7fc 10%, #bfd3f0 90%);
+  background-size: 100% 200%;
+  background-position: 0% 0%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 6px 24px rgba(15, 30, 60, 0.35));
+}
+
+@media (min-width: 640px) {
+  .wordmark { font-size: 8rem; }
+}
+
+.tagline {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.card {
+  width: 100%;
+  padding: 1.5rem;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(10, 18, 36, 0.45);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  text-align: left;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.6875rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.footer a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.footer a:hover { color: #ffffff; }
+
+@media (prefers-reduced-motion: reduce) {
+  .laneTrack { animation: none; }
+  .bg { transition: none; }
+}

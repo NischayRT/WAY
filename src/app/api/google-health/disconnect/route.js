@@ -19,7 +19,10 @@ export async function POST() {
   if (connection?.refresh_token) await revokeGoogleToken(connection.refresh_token);
 
   const { error } = await supabase.from('google_health_connections').delete().eq('user_id', user.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error('[google-health/disconnect]', error.message);
+    return NextResponse.json({ error: 'Could not disconnect' }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true });
 }

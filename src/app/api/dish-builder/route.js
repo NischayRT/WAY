@@ -11,8 +11,16 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const { ingredientIds } = await request.json();
-  if (!Array.isArray(ingredientIds) || ingredientIds.length === 0) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+  const ingredientIds = Array.isArray(body?.ingredientIds)
+    ? body.ingredientIds.map(Number).filter(Number.isInteger).slice(0, 50)
+    : [];
+  if (ingredientIds.length === 0) {
     return NextResponse.json({ matches: [] });
   }
 
@@ -26,7 +34,7 @@ export async function POST(request) {
     return NextResponse.json({ matches: [] });
   }
 
-  const haveSet = new Set(ingredientIds.map(Number));
+  const haveSet = new Set(ingredientIds);
   const byFood = new Map();
 
   for (const line of recipeLines) {

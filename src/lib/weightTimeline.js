@@ -1,4 +1,4 @@
-import { getDailyTargets } from './bmrTdee';
+import { getDailyTargets, applyOverrides } from './bmrTdee';
 
 /**
  * Finds the weight log closest in calendar distance to targetDateStr.
@@ -50,9 +50,6 @@ export function resolveDateTargets({ profile, targetDateStr, weightLogs = [] }) 
     effectiveWeight,
     bmr: computed.bmr,
     tdee: computed.tdee,
-    targetCalories: profile.override_calories ?? computed.targetCalories,
-    proteinG: profile.override_protein_g ?? computed.proteinG,
-    carbsG: profile.override_carbs_g ?? computed.carbsG,
-    fatG: profile.override_fat_g ?? computed.fatG,
+    ...applyOverrides(computed, profile),
   };
 }

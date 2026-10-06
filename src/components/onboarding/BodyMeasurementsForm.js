@@ -4,7 +4,7 @@ import { useMemo, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { createClient } from '@/lib/supabaseClient';
-import { analyzeCurrentPhysique } from '@/lib/bodyProportions';
+import { analyzeCurrentPhysique, estimateDefaultMeasurementsCm } from '@/lib/bodyProportions';
 import { ui } from '@/lib/ui';
 import { Sparkles } from 'lucide-react';
 import { getCurrentUserId } from '@/lib/currentUser';
@@ -15,7 +15,7 @@ const RealisticAvatar3D = dynamic(() => import('@/components/body/RealisticAvata
 
 // components/onboarding/BodyMeasurementsForm.js
 
-function SpinningPreview({ heightCm, weightKg, chestCm, waistCm, hipCm, bicepCm, bodyFatPct }) {
+function SpinningPreview({ sex, heightCm, weightKg, chestCm, waistCm, hipCm, bicepCm, bodyFatPct }) {
   const rotationRef = useRef();
   useFrame((_, delta) => {
     if (rotationRef.current) rotationRef.current.rotation.y += delta * 0.4;
@@ -25,6 +25,7 @@ function SpinningPreview({ heightCm, weightKg, chestCm, waistCm, hipCm, bicepCm,
     <group position={[0, -0.95, 0]}>
       <group ref={rotationRef}>
         <RealisticAvatar3D
+          sex={sex}
           heightCm={heightCm}
           weightKg={weightKg}
           chestCm={chestCm}
@@ -43,25 +44,12 @@ function SpinningPreview({ heightCm, weightKg, chestCm, waistCm, hipCm, bicepCm,
 export default function BodyMeasurementsForm({ heightCm, weightKg, sex = 'male', onSaved, onSkip }) {
   const supabase = createClient();
 
-  const defaultWaistIn = useMemo(() => {
-    const estWaistCm = (weightKg / (heightCm / 100) ** 2) * 1.55 + heightCm * 0.28;
-    return Math.round((estWaistCm / 2.54) * 2) / 2;
-  }, [weightKg, heightCm]);
-
-  const defaultHipIn = useMemo(() => {
-    const estHipCm = defaultWaistIn * 2.54 * (sex === 'male' ? 1.07 : 1.18);
-    return Math.round((estHipCm / 2.54) * 2) / 2;
-  }, [defaultWaistIn, sex]);
-
-  const defaultChestIn = useMemo(() => {
-    const estChestCm = heightCm * 0.54 + (weightKg - 70) * 0.2;
-    return Math.round((estChestCm / 2.54) * 2) / 2;
-  }, [heightCm, weightKg]);
-
-  const defaultBicepIn = useMemo(() => {
-    const estBicepCm = 28 + weightKg / 10;
-    return Math.round((estBicepCm / 2.54) * 2) / 2;
-  }, [weightKg]);
+  // Sex-specific starting values (see estimateDefaultMeasurementsCm).
+  const est = useMemo(() => estimateDefaultMeasurementsCm({ heightCm, weightKg, sex }), [heightCm, weightKg, sex]);
+  const defaultWaistIn = Math.round((est.waistCm / 2.54) * 2) / 2;
+  const defaultHipIn = Math.round((est.hipCm / 2.54) * 2) / 2;
+  const defaultChestIn = Math.round((est.chestCm / 2.54) * 2) / 2;
+  const defaultBicepIn = Math.round((est.bicepCm / 2.54) * 2) / 2;
 
   const [waistIn, setWaistIn] = useState(defaultWaistIn);
   const [hipIn, setHipIn] = useState(defaultHipIn);
@@ -83,7 +71,7 @@ export default function BodyMeasurementsForm({ heightCm, weightKg, sex = 'male',
   const sliders = [
     { key: 'waist', label: 'Waist', value: waistIn, set: setWaistIn, min: 26, max: 46, step: 0.5, cm: waistCm },
     { key: 'hip', label: 'Hips', value: hipIn, set: setHipIn, min: 30, max: 50, step: 0.5, cm: hipCm },
-    { key: 'chest', label: 'Chest', value: chestIn, set: setChestIn, min: 32, max: 52, step: 0.5, cm: chestCm },
+    { key: 'chest', label: sex === 'female' ? 'Bust' : 'Chest', value: chestIn, set: setChestIn, min: 32, max: 52, step: 0.5, cm: chestCm },
     { key: 'bicep', label: 'Arms', value: bicepIn, set: setBicepIn, min: 10, max: 20, step: 0.25, cm: bicepCm },
   ];
 
@@ -135,6 +123,7 @@ export default function BodyMeasurementsForm({ heightCm, weightKg, sex = 'male',
             <directionalLight position={[4, 6, 4]} intensity={1.4} />
             <directionalLight position={[-4, 2, -2]} intensity={0.6} color="#ffffff" />
             <SpinningPreview
+              sex={sex}
               heightCm={heightCm}
               weightKg={weightKg}
               chestCm={chestCm}

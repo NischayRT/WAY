@@ -150,7 +150,7 @@ export default function MealTargetsCard({ breakdown, targets }) {
   }
 
   return (
-    <div className="border rounded-2xl transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-slate-900 dark:to-[#050e22] bg-white border-slate-200/90 p-3 sm:p-4 shadow-xs flex flex-col h-full min-h-[280px]">
+    <div className="border rounded-2xl transition-shadow hover:shadow-lg dark:border-[#14305a] dark:bg-gradient-to-b dark:from-[#071530] dark:to-[#050e22] bg-white border-slate-200/90 p-3 sm:p-4 shadow-xs flex flex-col h-full min-h-[280px]">
       <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
         <p className="text-[11px] font-bold uppercase tracking-widest text-slate-900 dark:text-white flex items-center gap-1.5">
           <Flame size={12} className="text-amber-500" /> Meal Targets

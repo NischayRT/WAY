@@ -5,8 +5,10 @@ import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { resolveCurrentPhysique } from '@/lib/currentPhysiqueLogic';
 import { resolveTargetPhysique } from '@/lib/targetPhysiqueLogic';
+import { bodyModelUrl, FEMALE_MESH_PROPORTIONS } from '@/lib/bodyModels';
 
 export default function RealisticAvatar3D({
+  sex = 'male',
   heightCm = 176.5,
   weightKg = 78,
   chestCm = 99,
@@ -17,40 +19,29 @@ export default function RealisticAvatar3D({
   color = '#94a3b8',
   roughness = 0.4,
   wireframe = false,
-  isTarget = false, // false = Current model (uses new logic), true = Target model (unchanged)
+  isTarget = false, // false = Current model, true = Target model
   clippingPlanes = null, // optional stable array of THREE.Plane (used by the home progress preview)
 }) {
-  const { scene } = useGLTF('/models/stylized_male_base_mesh_free.glb');
+  // Male and female files have the same five bodies in the same slots,
+  // so everything below works the same for both.
+  const modelUrl = bodyModelUrl(sex);
+  const { scene } = useGLTF(modelUrl);
 
-  // Compute model profile using the respective separate logic file
   const physiqueConfig = useMemo(() => {
-    if (isTarget) {
-      return resolveTargetPhysique({ bodyFatPct, weightKg, heightCm, chestCm, waistCm });
-    }
-    return resolveCurrentPhysique({ chestCm, waistCm, heightCm, weightKg, bodyFatPct });
-  }, [isTarget, chestCm, waistCm, heightCm, weightKg, bodyFatPct]);
+    const input = { sex, bodyFatPct, weightKg, heightCm, chestCm, waistCm, hipCm };
+    return isTarget ? resolveTargetPhysique(input) : resolveCurrentPhysique(input);
+  }, [isTarget, sex, chestCm, waistCm, hipCm, heightCm, weightKg, bodyFatPct]);
+
+  const slot = isTarget ? physiqueConfig.meshIndex : physiqueConfig.fallbackIndex;
 
   const singleMesh = useMemo(() => {
+    // Picked by position: GLTFLoader strips dots from node names, so the
+    // old name match ('guy.004') never worked. See lib/bodyModels.js.
     const meshes = [];
-    let matchedMesh = null;
-
     scene.traverse((child) => {
-      if (child.isMesh) {
-        meshes.push(child);
-        const nameLower = (child.name || '').toLowerCase();
-        if (physiqueConfig.meshKey && nameLower.includes(physiqueConfig.meshKey)) {
-          matchedMesh = child;
-        }
-      }
+      if (child.isMesh) meshes.push(child);
     });
-
-    // Fallback if name-matching misses
-    const targetMesh =
-      matchedMesh ||
-      (physiqueConfig.fallbackIndex != null ? meshes[physiqueConfig.fallbackIndex] : null) ||
-      (physiqueConfig.meshIndex != null ? meshes[physiqueConfig.meshIndex] : null) ||
-      meshes[0];
-
+    const targetMesh = meshes[slot] || meshes[0];
     if (!targetMesh) return null;
 
     const geom = targetMesh.geometry.clone();
@@ -72,51 +63,59 @@ export default function RealisticAvatar3D({
 
     const mesh = new THREE.Mesh(geom, material);
 
+    if (sex === 'female') {
+      // The female bodies already carry their shape (bust, waist, hips,
+      // belly), so they are only nudged by how far the user's own waist and
+      // hips differ from that body's measured proportions. Kept within
+      // ±10–12% so a body never stops looking like its type.
+      const ref = FEMALE_MESH_PROPORTIONS[slot] || FEMALE_MESH_PROPORTIONS[0];
+      const h = Number(heightCm) || 162;
+      const clampF = (v) => Math.max(0.9, Math.min(1.12, Number.isFinite(v) ? v : 1));
+      const fWaist = clampF(Number(waistCm) / h / ref.waistToHeight);
+      const fHip = clampF(Number(hipCm) / h / ref.hipToHeight);
+      mesh.scale.set(scaleFactor * ((fWaist + fHip) / 2), scaleFactor, scaleFactor * (0.6 * fWaist + 0.4 * fHip));
+      mesh.position.set(0, 1.0, 0);
+      return mesh;
+    }
+
+    // Reference circumferences as a fraction of height. Waist ~0.45 h and
+    // chest/bust ~0.55 h are typical adult values for both sexes (women's
+    // bust measurement sits close to men's chest relative to height; the
+    // female mesh itself already carries the narrower waist and wider hips).
+    const idealWaist = Number(heightCm) * (isTarget ? 0.44 : 0.45);
+    const idealChest = Number(heightCm) * 0.55;
+
     if (isTarget) {
-      // TARGET MODEL SCALING (Untouched original behavior)
-      const idealWaist = Number(heightCm) * 0.44;
-      const idealChest = Number(heightCm) * 0.55;
       const measuredWRatio = Math.max(0.88, Math.min(1.18, Number(waistCm) / idealWaist));
       const measuredCRatio = Math.max(0.88, Math.min(1.18, Number(chestCm) / idealChest));
       const boost = physiqueConfig.visualBoost;
       const wRatio = measuredWRatio * boost.waist;
       const cRatio = measuredCRatio * boost.chest;
-      const armFactor = boost.arm;
-
-      mesh.scale.set(
-        scaleFactor * ((wRatio + cRatio) / 2) * armFactor,
-        scaleFactor,
-        scaleFactor * wRatio
-      );
+      mesh.scale.set(scaleFactor * ((wRatio + cRatio) / 2) * boost.arm, scaleFactor, scaleFactor * wRatio);
     } else {
-      // CURRENT MODEL SCALING (Dynamically driven by chest & waist deltas)
       const boost = physiqueConfig.scaleBoost;
-      const idealWaist = Number(heightCm) * 0.45;
-      const idealChest = Number(heightCm) * 0.55;
-      const userWRatio = Math.max(0.75, Math.min(1.40, Number(waistCm) / idealWaist));
-      const userCRatio = Math.max(0.75, Math.min(1.40, Number(chestCm) / idealChest));
-
-      const scaleX = scaleFactor * ((userCRatio * 0.6 + userWRatio * 0.4) * boost.x);
-      const scaleY = scaleFactor;
-      const scaleZ = scaleFactor * (userWRatio * boost.z);
-
-      mesh.scale.set(scaleX, scaleY, scaleZ);
+      const userWRatio = Math.max(0.75, Math.min(1.4, Number(waistCm) / idealWaist));
+      const userCRatio = Math.max(0.75, Math.min(1.4, Number(chestCm) / idealChest));
+      mesh.scale.set(
+        scaleFactor * ((userCRatio * 0.6 + userWRatio * 0.4) * boost.x),
+        scaleFactor,
+        scaleFactor * (userWRatio * boost.z)
+      );
     }
 
     mesh.position.set(0, 1.0, 0);
     return mesh;
-  }, [scene, physiqueConfig, color, roughness, wireframe, heightCm, waistCm, chestCm, isTarget, clippingPlanes]);
+  }, [scene, slot, sex, physiqueConfig, color, roughness, wireframe, heightCm, waistCm, chestCm, hipCm, isTarget, clippingPlanes]);
 
   if (!singleMesh) return null;
 
   return (
     <primitive
       object={singleMesh}
-      key={`${isTarget ? 'target' : 'current'}-${physiqueConfig.meshKey}-${Math.round(waistCm)}-${Math.round(chestCm)}`}
+      key={`${modelUrl}-${isTarget ? 'target' : 'current'}-${physiqueConfig.key}-${Math.round(waistCm)}-${Math.round(chestCm)}-${Math.round(hipCm)}`}
     />
   );
 }
 
-if (typeof window !== 'undefined') {
-  useGLTF.preload('/models/stylized_male_base_mesh_free.glb');
-}
+// No module-level preload: each user only downloads the model for their
+// own sex. Callers warm it with prefetchBodyModel(sex) from lib/bodyModels.

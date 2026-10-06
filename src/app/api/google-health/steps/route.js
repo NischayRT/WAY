@@ -43,10 +43,11 @@ export async function GET(request) {
   } catch (err) {
     if (err.reauthRequired) {
       return NextResponse.json(
-        { connected: false, reauthRequired: true, error: err.message },
+        { connected: false, reauthRequired: true },
         { status: 401 }
       );
     }
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[api]', err);
+    return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
   }
 }

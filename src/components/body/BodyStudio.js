@@ -8,8 +8,11 @@ import {
   analyzeCurrentPhysique,
   projectScientificDream,
   minWaistCmForBfFloor,
+  estimateDefaultMeasurementsCm,
 } from '@/lib/bodyProportions';
+import { prefetchBodyModel } from '@/lib/bodyModels';
 import { calculateTimelineAndFeasibility } from '@/lib/goalFeasibility';
+import { ACTIVITY_MULTIPLIERS, proteinTargetG, splitCarbsFat } from '@/lib/bmrTdee';
 import {
   Sliders,
   CheckCircle2,
@@ -32,38 +35,47 @@ const BodyStudioCanvas = dynamic(() => import('./BodyStudioCanvas'), {
   ),
 });
 
+const toHalfIn = (cm) => Math.round((cm / 2.54) * 2) / 2;
+
 export default function BodyStudio({ profile }) {
   const supabase = createClient();
   const router = useRouter();
   const heightCm = Number(profile?.height_cm) || 175.0;
   const currentWeightKg = Number(profile?.weight_kg) || 75.0;
-  const userSex = profile?.sex || 'male';
+  const userSex = profile?.sex === 'female' ? 'female' : 'male';
   const [activeTab, setActiveTab] = useState('current');
+
+  // Start downloading this user's body model (male or female file only).
+  useEffect(() => {
+    prefetchBodyModel(userSex);
+  }, [userSex]);
+
+  // Sex-specific starting measurements for anyone who hasn't measured yet.
+  const estimates = useMemo(
+    () => estimateDefaultMeasurementsCm({ heightCm, weightKg: currentWeightKg, sex: userSex }),
+    [heightCm, currentWeightKg, userSex]
+  );
 
   // Default values matching onboarding calculations
   const defaultWaistIn = useMemo(() => {
-    if (profile?.waist_cm) return Math.round((Number(profile.waist_cm) / 2.54) * 2) / 2;
-    const estWaistCm = (currentWeightKg / (heightCm / 100) ** 2) * 1.55 + heightCm * 0.28;
-    return Math.round((estWaistCm / 2.54) * 2) / 2;
-  }, [profile?.waist_cm, currentWeightKg, heightCm]);
+    if (profile?.waist_cm) return toHalfIn(Number(profile.waist_cm));
+    return toHalfIn(estimates.waistCm);
+  }, [profile?.waist_cm, estimates]);
 
   const defaultHipIn = useMemo(() => {
-    if (profile?.hip_cm) return Math.round((Number(profile.hip_cm) / 2.54) * 2) / 2;
-    const estHipCm = defaultWaistIn * 2.54 * (userSex === 'male' ? 1.07 : 1.18);
-    return Math.round((estHipCm / 2.54) * 2) / 2;
-  }, [profile?.hip_cm, defaultWaistIn, userSex]);
+    if (profile?.hip_cm) return toHalfIn(Number(profile.hip_cm));
+    return toHalfIn(estimates.hipCm);
+  }, [profile?.hip_cm, estimates]);
 
   const defaultChestIn = useMemo(() => {
-    if (profile?.chest_cm) return Math.round((Number(profile.chest_cm) / 2.54) * 2) / 2;
-    const estChestCm = heightCm * 0.54 + (currentWeightKg - 70) * 0.2;
-    return Math.round((estChestCm / 2.54) * 2) / 2;
-  }, [profile?.chest_cm, heightCm, currentWeightKg]);
+    if (profile?.chest_cm) return toHalfIn(Number(profile.chest_cm));
+    return toHalfIn(estimates.chestCm);
+  }, [profile?.chest_cm, estimates]);
 
   const defaultBicepIn = useMemo(() => {
-    if (profile?.bicep_cm) return Math.round((Number(profile.bicep_cm) / 2.54) * 2) / 2;
-    const estBicepCm = 28 + currentWeightKg / 10;
-    return Math.round((estBicepCm / 2.54) * 2) / 2;
-  }, [profile?.bicep_cm, currentWeightKg]);
+    if (profile?.bicep_cm) return Math.round((Number(profile.bicep_cm) / 2.54) * 4) / 4;
+    return Math.round((estimates.bicepCm / 2.54) * 4) / 4;
+  }, [profile?.bicep_cm, estimates]);
 
   const [waistIn, setWaistIn] = useState(defaultWaistIn);
   const [hipIn, setHipIn] = useState(defaultHipIn);
@@ -168,8 +180,12 @@ export default function BodyStudio({ profile }) {
     });
   }, [currentWeightKg, waistCm, hipCm, chestCm, bicepCm, currentStats, targetWeight, heightCm, userSex, targetDate]);
 
+  // TDEE from the activity level in the profile (was a fixed x1.5, which
+  // overstated needs for sedentary users and understated them for active ones).
+  const activityMultiplier = ACTIVITY_MULTIPLIERS[profile?.activity_level] ?? 1.375;
+
   const feasibility = useMemo(() => {
-    const tdee = Math.round(currentStats.bmr * 1.5);
+    const tdee = Math.round(currentStats.bmr * activityMultiplier);
     return calculateTimelineAndFeasibility({
       currentWeightKg,
       targetWeightKg: targetWeight,
@@ -179,7 +195,16 @@ export default function BodyStudio({ profile }) {
       sex: userSex,
       targetBfPct: dreamForecast.targetBfPct,
     });
-  }, [currentWeightKg, targetWeight, targetDate, currentStats.bmr, userSex, dreamForecast.targetBfPct]);
+  }, [currentWeightKg, targetWeight, targetDate, currentStats.bmr, activityMultiplier, userSex, dreamForecast.targetBfPct]);
+
+  // Macros for the goal's calorie target, from the same rules as the rest of
+  // the app (protein on reference weight; fat 20–35% of calories; carbs the
+  // rest), so the saved targets add up to the calories shown.
+  const goalMacros = useMemo(() => {
+    const goal = targetWeight < currentWeightKg ? 'lose_weight' : 'gain_muscle';
+    const proteinG = proteinTargetG({ weightKg: currentWeightKg, heightCm, goal });
+    return { goal, proteinG, ...splitCarbsFat(feasibility.calculatedDailyCalories, proteinG) };
+  }, [targetWeight, currentWeightKg, heightCm, feasibility.calculatedDailyCalories]);
 
   // Current measurements save state
   const [savingCurrent, setSavingCurrent] = useState(false);
@@ -225,8 +250,12 @@ export default function BodyStudio({ profile }) {
         dream_target_weight_kg: targetWeight,
         dream_target_date: targetDate,
         override_calories: feasibility.calculatedDailyCalories,
-        override_protein_g: Math.round(currentWeightKg * 2.0),
-        goal: targetWeight < currentWeightKg ? 'lose_weight' : 'gain_muscle',
+        override_protein_g: goalMacros.proteinG,
+        // Cleared, so carbs and fat are always re-split from the calories
+        // and protein above (lib/bmrTdee.js applyOverrides) and add up.
+        override_carbs_g: null,
+        override_fat_g: null,
+        goal: goalMacros.goal,
       })
       .eq('id', profile.id);
     setSavingGoal(false);
@@ -240,16 +269,17 @@ export default function BodyStudio({ profile }) {
   const currentSliders = [
     { key: 'waist', label: 'Waist', value: waistIn, set: setWaistIn, min: minWaistIn, max: 46, step: 0.5, cm: waistCm },
     { key: 'hip', label: 'Hips', value: hipIn, set: setHipIn, min: 30, max: 50, step: 0.5, cm: hipCm },
-    { key: 'chest', label: 'Chest', value: chestIn, set: setChestIn, min: 32, max: 52, step: 0.5, cm: chestCm },
+    { key: 'chest', label: userSex === 'female' ? 'Bust' : 'Chest', value: chestIn, set: setChestIn, min: 32, max: 52, step: 0.5, cm: chestCm },
     { key: 'bicep', label: 'Arms (Biceps)', value: bicepIn, set: setBicepIn, min: 10, max: 20, step: 0.25, cm: bicepCm },
   ];
 
   return (
     <div className="space-y-5 max-w-2xl mx-auto pb-10 w-full px-1 sm:px-0">
       {/* 3D Visualizer Canvas Box */}
-      <div className={`${ui.card} relative overflow-hidden bg-gradient-to-b from-slate-50/50 dark:from-slate-900/60 to-white dark:to-slate-900 p-2 sm:pt-3 sm:pb-2`}>
+      <div className={`${ui.card} relative overflow-hidden bg-gradient-to-b from-slate-50/50 dark:from-[#071530]/60 to-white dark:to-slate-900 p-2 sm:pt-3 sm:pb-2`}>
         <BodyStudioCanvas
           currentData={{
+            sex: userSex,
             heightCm,
             weightKg: currentWeightKg,
             chestCm,
@@ -259,6 +289,7 @@ export default function BodyStudio({ profile }) {
             bodyFatPct: currentStats.bodyFatPct,
           }}
           targetData={{
+            sex: userSex,
             heightCm,
             weightKg: targetWeight,
             chestCm: dreamForecast.dimensions.chestCm,
@@ -514,7 +545,7 @@ export default function BodyStudio({ profile }) {
                   </div>
                   <p className="text-xs text-emerald-700 dark:text-emerald-400 font-numeric mt-1">
                     Suggested target:{' '}
-                    <strong>{feasibility.calculatedDailyCalories} kcal/day</strong> (with ~{Math.round(currentWeightKg * 2)}g protein)
+                    <strong>{feasibility.calculatedDailyCalories} kcal/day</strong> (protein {goalMacros.proteinG}g · carbs {goalMacros.carbsG}g · fat {goalMacros.fatG}g)
                   </p>
                 </div>
                 <button

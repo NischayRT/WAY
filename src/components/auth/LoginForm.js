@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Mail, KeyRound, Loader2, Check, ArrowLeft } from 'lucide-react';
@@ -46,6 +46,18 @@ export default function LoginForm({ initialError = null }) {
   const [busy, setBusy] = useState(null); // null | 'google' | 'send' | 'verify'
   const [error, setError] = useState(initialError);
   const [cooldown, setCooldown] = useState(0);
+  const optionsRef = useRef(null);
+
+  // While the sign-in options are folded away (Terms not yet accepted) they
+  // must not be reachable by Tab or screen readers either.
+  useEffect(() => {
+    if (optionsRef.current) optionsRef.current.inert = !accepted;
+  }, [accepted]);
+
+  // The page background darkens once the person actually starts signing in
+  // (clicks Google or sends an email code), not on hover. The login page's
+  // CSS reacts to this attribute with :has([data-engaged]).
+  const engaged = busy === 'google' || busy === 'send' || busy === 'verify' || step === 'code';
 
   // Remember acceptance of the current Terms version on this device.
   useEffect(() => {
@@ -135,8 +147,8 @@ export default function LoginForm({ initialError = null }) {
   };
 
   return (
-    <div className="space-y-5">
-      {/* 1. Consent */}
+    <div data-engaged={engaged ? 'true' : undefined}>
+      {/* 1. Consent: the only thing shown until it is ticked */}
       <div>
         <label
           className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 transition-colors ${
@@ -145,6 +157,7 @@ export default function LoginForm({ initialError = null }) {
         >
           <input
             type="checkbox"
+            data-terms
             checked={accepted}
             onChange={(e) => onAcceptChange(e.target.checked)}
             className="peer sr-only"
@@ -175,6 +188,14 @@ export default function LoginForm({ initialError = null }) {
         )}
       </div>
 
+      {/* 2 + 3. Sign-in options: unfold (grid-rows 0fr -> 1fr) once the Terms are accepted */}
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-700 ease-[cubic-bezier(0.2,0.9,0.25,1)] motion-reduce:transition-none ${
+          accepted ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
+      >
+      <div ref={optionsRef} className="min-h-0 overflow-hidden">
+      <div className="space-y-5 px-0.5 pb-0.5 pt-5">
       {/* 2. Google */}
       <button type="button" data-cta onClick={signInWithGoogle} disabled={!!busy} className={primaryCls}>
         {busy === 'google' ? <Loader2 size={16} className="animate-spin" /> : <GoogleMark />}
@@ -189,7 +210,7 @@ export default function LoginForm({ initialError = null }) {
 
       {/* 3. Email code */}
       {step === 'email' ? (
-        <form onSubmit={sendCode} className="space-y-3" noValidate={false}>
+        <form onSubmit={sendCode} className="space-y-3">
           <label htmlFor="login-email" className="sr-only">
             Email address
           </label>
@@ -268,7 +289,11 @@ export default function LoginForm({ initialError = null }) {
         </form>
       )}
 
-      <p role="alert" aria-live="polite" className={`min-h-[1rem] px-1 text-xs font-medium text-rose-300 ${error ? '' : 'sr-only'}`}>
+      </div>
+      </div>
+      </div>
+
+      <p role="alert" aria-live="polite" className={`mt-4 min-h-[1rem] px-1 text-xs font-medium text-rose-300 ${error ? '' : 'sr-only'}`}>
         {error}
       </p>
     </div>

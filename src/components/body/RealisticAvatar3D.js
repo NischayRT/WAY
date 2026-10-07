@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
-import { resolveCurrentPhysique } from '@/lib/currentPhysiqueLogic';
+import { resolveCurrentPhysique, CURRENT_ARCHETYPES } from '@/lib/currentPhysiqueLogic';
 import { resolveTargetPhysique } from '@/lib/targetPhysiqueLogic';
 import { bodyModelUrl, FEMALE_MESH_PROPORTIONS } from '@/lib/bodyModels';
 
@@ -21,6 +21,7 @@ export default function RealisticAvatar3D({
   wireframe = false,
   isTarget = false, // false = Current model, true = Target model
   clippingPlanes = null, // optional stable array of THREE.Plane (used by the home progress preview)
+  archetypeKey = null, // optional: show this body type as modelled ('SLIM', 'LEAN', ...), no measurement scaling (landing page showcase)
 }) {
   // Male and female files have the same five bodies in the same slots,
   // so everything below works the same for both.
@@ -28,11 +29,12 @@ export default function RealisticAvatar3D({
   const { scene } = useGLTF(modelUrl);
 
   const physiqueConfig = useMemo(() => {
+    if (archetypeKey && CURRENT_ARCHETYPES[archetypeKey]) return CURRENT_ARCHETYPES[archetypeKey];
     const input = { sex, bodyFatPct, weightKg, heightCm, chestCm, waistCm, hipCm };
     return isTarget ? resolveTargetPhysique(input) : resolveCurrentPhysique(input);
-  }, [isTarget, sex, chestCm, waistCm, hipCm, heightCm, weightKg, bodyFatPct]);
+  }, [archetypeKey, isTarget, sex, chestCm, waistCm, hipCm, heightCm, weightKg, bodyFatPct]);
 
-  const slot = isTarget ? physiqueConfig.meshIndex : physiqueConfig.fallbackIndex;
+  const slot = archetypeKey ? physiqueConfig.fallbackIndex : isTarget ? physiqueConfig.meshIndex : physiqueConfig.fallbackIndex;
 
   const singleMesh = useMemo(() => {
     // Picked by position: GLTFLoader strips dots from node names, so the
@@ -62,6 +64,13 @@ export default function RealisticAvatar3D({
     });
 
     const mesh = new THREE.Mesh(geom, material);
+
+    if (archetypeKey) {
+      // Showcase: the body exactly as modelled.
+      mesh.scale.setScalar(scaleFactor);
+      mesh.position.set(0, 1.0, 0);
+      return mesh;
+    }
 
     if (sex === 'female') {
       // The female bodies already carry their shape (bust, waist, hips,
@@ -105,7 +114,7 @@ export default function RealisticAvatar3D({
 
     mesh.position.set(0, 1.0, 0);
     return mesh;
-  }, [scene, slot, sex, physiqueConfig, color, roughness, wireframe, heightCm, waistCm, chestCm, hipCm, isTarget, clippingPlanes]);
+  }, [scene, slot, sex, archetypeKey, physiqueConfig, color, roughness, wireframe, heightCm, waistCm, chestCm, hipCm, isTarget, clippingPlanes]);
 
   if (!singleMesh) return null;
 

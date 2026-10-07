@@ -19,7 +19,7 @@ export default function BodyShowcase() {
   const ref = useRef(null);
   const [inView, setInView] = useState(false);
   const [ready, setReady] = useState(false);
-  const [sex, setSex] = useState('female');
+  const [sex, setSex] = useState('male');
   const [index, setIndex] = useState(1);
   const [auto, setAuto] = useState(true);
 

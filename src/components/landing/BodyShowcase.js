@@ -90,7 +90,7 @@ export default function BodyShowcase() {
 
       <div className={styles.showcaseControls}>
         <div className={styles.segment} role="radiogroup" aria-label="Body model">
-          {['female', 'male'].map((s) => (
+          {['male', 'female'].map((s) => (
             <button
               key={s}
               type="button"
@@ -99,7 +99,7 @@ export default function BodyShowcase() {
               className={sex === s ? styles.segmentOn : undefined}
               onClick={() => pickSex(s)}
             >
-              {s === 'female' ? 'Female' : 'Male'}
+              {s === 'male' ? 'Male' : 'Female'}
             </button>
           ))}
         </div>

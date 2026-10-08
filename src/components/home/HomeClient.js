@@ -2,9 +2,9 @@
 
 import { useMemo, useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Scale, CheckCircle2, Target, Calendar, RefreshCw, Activity, ChevronDown } from 'lucide-react';
-import WeightBodyPreview, { prefetchWeightBody } from '@/components/home/WeightBodyPreview';
+import { Activity } from 'lucide-react';
+import WeightBodyPreview from '@/components/home/WeightBodyPreview';
+import WeightBar from '@/components/home/WeightBar';
 import { ui } from '@/lib/ui';
 import { resolveDateTargets } from '@/lib/weightTimeline';
 import WeekDateStrip from '@/components/home/WeekDateStrip';
@@ -157,6 +157,12 @@ export default function HomeClient({
     };
   }, [selectedDate, today]);
 
+  const shortDateLabel = useMemo(() => {
+    if (selectedDate === today) return 'Today';
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  }, [selectedDate, today]);
+
   // Profile target attributes
   // Saved from Settings → Body Measurements → "Set goal".
   const targetWeight = profile?.dream_target_weight_kg ? Number(profile.dream_target_weight_kg) : null;
@@ -179,128 +185,48 @@ export default function HomeClient({
           today={today}
           minDate={minDate}
           userName={profile?.full_name}
+          middle={
+            <div className={`h-full transition-opacity ${isNavigating ? 'opacity-60' : ''}`}>
+              <WeightBar
+                dateLabel={shortDateLabel}
+                isLogged={isDateWeighedIn}
+                weightKg={currentTargets.effectiveWeight}
+                targetWeight={targetWeight}
+                targetDate={targetFinalDate}
+                previewOpen={weightPreviewOpen}
+                onTogglePreview={() => setWeightPreviewOpen((o) => !o)}
+                onLogWeight={() => setWeightModalOpen(true)}
+                showSync={showSyncWeight}
+                syncing={weightSyncing}
+                syncMsg={weightSyncMsg}
+                onSync={handleSyncWeight}
+              />
+            </div>
+          }
         />
+
+        {/* Body preview for the weight bar: opens full width under the header */}
+        <div
+          className={`overflow-hidden rounded-2xl border transition-colors ${
+            weightPreviewOpen ? 'border-slate-200/90 shadow-xs dark:border-slate-800' : 'border-transparent'
+          }`}
+        >
+          <WeightBodyPreview
+            open={weightPreviewOpen}
+            profile={profile}
+            weightKg={currentTargets.effectiveWeight}
+            weightLogs={weightLogs}
+          />
+        </div>
 
         <div className={`space-y-6 transition-opacity ${isNavigating ? 'opacity-60' : ''}`}>
           {/* Header Bar */}
-          <div className="flex items-center justify-between pb-3 border-b-2 border-dotted dark:border-slate-700">
+          {/* <div className="flex items-center justify-between pb-3 border-b-2 border-dotted dark:border-slate-700">
             <div>
               <h1 className={ui.heading}>{titleText}</h1>
               <p className="mt-0.5 text-xs text-slate-500 font-medium font-numeric">{fullDateStr}</p>
             </div>
-          </div>
-{/* Quick Weight & Target Banner for the selected date */}
-<div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-xs overflow-hidden">
-<div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 md:gap-4 p-3 sm:p-4">
-  {/* Weight Status */}
-  <div className="flex items-center gap-3 min-w-0">
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">
-      <Scale size={18} />
-    </div>
-    <div className="min-w-0 flex-1">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-        <p className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white truncate">
-          Weight for {selectedDate === today ? 'Today' : fullDateStr}
-        </p>
-        {isDateWeighedIn && (
-          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-            <CheckCircle2 size={13} className="shrink-0" /> Logged
-          </span>
-        )}
-      </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-        Current basis:{' '}
-        <strong className="font-numeric text-slate-800 dark:text-slate-200">
-          {currentTargets.effectiveWeight} kg
-        </strong>
-        {!isDateWeighedIn && <span className="text-[10px] ml-1 opacity-75">(nearest)</span>}
-      </p>
-    </div>
-    <button
-      type="button"
-      onClick={() => setWeightPreviewOpen((o) => !o)}
-      onMouseEnter={prefetchWeightBody}
-      onFocus={prefetchWeightBody}
-      onTouchStart={prefetchWeightBody}
-      aria-expanded={weightPreviewOpen}
-      aria-label={weightPreviewOpen ? 'Hide body preview' : 'Show body preview'}
-      title={weightPreviewOpen ? 'Hide body preview' : 'Show body preview'}
-      className="ml-auto shrink-0 rounded-full border border-slate-200 p-1.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-    >
-      <ChevronDown size={16} className={`transition-transform duration-300 ${weightPreviewOpen ? 'rotate-180' : ''}`} />
-    </button>
-  </div>
-
-  {/* Target Weight & Action Buttons
-      Mobile: 2-col grid -> [Target | Change Target] / [Update Weight | Sync weight].
-      md+: single wrapping row. */}
-  <div className="grid grid-cols-2 gap-1.5 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800 min-w-0 md:flex md:flex-wrap md:items-center md:gap-2.5">
-    {targetWeight && (
-      
-      <div className="flex justify-center min-w-0 items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2 py-1.5 md:px-3 rounded-xl border border-slate-200/80 dark:border-slate-700">
-        <Target size={14} className="text-emerald-500 shrink-0" />
-        <div className="min-w-0 truncate text-xs font-medium">
-          <span className="text-slate-500 dark:text-slate-400">Target: </span>
-          <strong className="font-numeric text-slate-900 dark:text-white">{targetWeight} kg</strong>
-          {targetFinalDate && (
-            <span className="ml-2 hidden sm:inline-flex items-center gap-1 text-[11px] text-slate-400 font-numeric">
-              <Calendar size={11} /> {targetFinalDate}
-            </span>
-          )}
-        </div>
-      </div>
-    )}
-
-    <Link
-      href="/settings?tab=body"
-      className={`${ui.btnSecondary} ${!targetWeight ? 'col-span-2' : ''} md:flex-none justify-center items-center whitespace-nowrap !gap-1 !px-2 !py-1.5 md:!gap-1.5 md:!px-3 md:!py-2 text-xs font-semibold ${
-        !targetWeight ? 'text-emerald-600 dark:text-emerald-400' : ''
-      }`}
-    >
-      <Target size={14} className="shrink-0" />
-      {targetWeight ? 'Change Target' : 'Add Target'}
-    </Link>
-
-    <button
-      type="button"
-      onClick={() => setWeightModalOpen(true)}
-      className={`${isDateWeighedIn ? ui.btnSecondary : ui.btnPrimary} ${showSyncWeight ? '' : 'col-span-2'} md:flex-none justify-center whitespace-nowrap !px-2 !py-1.5 md:!px-3.5 md:!py-2 text-xs font-semibold`}
-    >
-      {isDateWeighedIn ? 'Update Weight' : 'Log Weight'}
-    </button>
-
-    {showSyncWeight && (
-      <button
-        type="button"
-        onClick={handleSyncWeight}
-        disabled={weightSyncing}
-        title="Send this day's weight to Google Health"
-        className={`${ui.btnSecondary} md:flex-none justify-center items-center whitespace-nowrap !gap-1 !px-2 !py-1.5 md:!gap-1.5 md:!px-3 md:!py-2 text-xs font-semibold disabled:opacity-60`}
-      >
-        <RefreshCw size={13} className={`shrink-0 ${weightSyncing ? 'animate-spin' : ''}`} />
-        {weightSyncing ? 'Syncing...' : 'Sync weight'}
-      </button>
-    )}
-
-    {weightSyncMsg && (
-      <p
-        className={`col-span-2 text-[11px] font-medium md:w-full md:text-right ${
-          weightSyncMsg.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-        }`}
-      >
-        {weightSyncMsg.text}
-      </p>
-    )}
-  </div>
-</div>
-
-<WeightBodyPreview
-  open={weightPreviewOpen}
-  profile={profile}
-  weightKg={currentTargets.effectiveWeight}
-  weightLogs={weightLogs}
-/>
-</div>
+          </div> */}
 
           {/* Orbit + Meal Targets + Weekly Chart */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">

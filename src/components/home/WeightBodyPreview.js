@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
+import WeightTrendChart from '@/components/weight/WeightTrendChart';
 import {
   analyzeCurrentPhysique,
   projectScientificDream,
@@ -18,13 +20,14 @@ export const prefetchWeightBody = () => {
 const WeightBodyCanvas = dynamic(() => import('@/components/body/WeightBodyCanvas'), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[270px] w-full items-center justify-center text-xs font-medium text-slate-400 sm:h-[340px]">
+    <div className="flex h-[300px] w-full items-center justify-center text-xs font-medium text-slate-400 sm:h-[360px]">
       Loading 3D model...
     </div>
   ),
 });
 
 const half = (inches) => Math.round(inches * 2) / 2;
+const CHART_DAYS = 30;
 
 export default function WeightBodyPreview({ open, profile, weightKg: weightProp, weightLogs = [] }) {
   // Keep the canvas mounted after the first open so re-opening is instant.
@@ -90,6 +93,17 @@ export default function WeightBodyPreview({ open, profile, weightKg: weightProp,
     };
   }, [profile, weightProp]);
 
+  // Weigh-ins for the graph: the last 30 days up to the latest entry,
+  // oldest first (the page loads them newest first).
+  const chartEntries = useMemo(() => {
+    if (!weightLogs.length) return [];
+    const latest = weightLogs[0].logged_at;
+    const d = new Date(`${latest}T00:00:00`);
+    d.setDate(d.getDate() - (CHART_DAYS - 1));
+    const from = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return weightLogs.filter((w) => w.logged_at >= from).slice().reverse();
+  }, [weightLogs]);
+
   // How close are we? Measured from the first weight ever logged.
   const progress = useMemo(() => {
     const { targetKg, currentData } = model;
@@ -124,7 +138,9 @@ export default function WeightBodyPreview({ open, profile, weightKg: weightProp,
       aria-hidden={!open}
     >
       <div className="min-h-0 overflow-hidden">
-        <div className="border-t border-slate-100 bg-gradient-to-b from-slate-50/60 to-white px-3 pb-3 pt-3 dark:border-slate-800 dark:from-[#071530]/60 dark:to-slate-900 sm:px-4 sm:pb-4">
+        <div className="grid gap-3 border-t border-slate-100 bg-gradient-to-b from-slate-50/60 to-white px-3 pb-3 pt-3 dark:border-slate-800 dark:from-[#071530]/60 dark:to-slate-900 sm:px-4 sm:pb-4 lg:grid-cols-2 lg:gap-5">
+          {/* Column 1: the 3D body */}
+          <div className="min-w-0">
           {/* Labels */}
           <div className="grid grid-cols-2 gap-2">
             <div className="min-w-0">
@@ -154,7 +170,7 @@ export default function WeightBodyPreview({ open, profile, weightKg: weightProp,
               active={open}
             />
           ) : (
-            <div className="h-[270px] sm:h-[340px]" />
+            <div className="h-[300px] sm:h-[360px]" />
           )}
 
           {/* Progress */}
@@ -183,6 +199,30 @@ export default function WeightBodyPreview({ open, profile, weightKg: weightProp,
               </Link>
             </p>
           )}
+          </div>
+
+          {/* Column 2: weight graph */}
+          <div className="flex min-w-0 flex-col rounded-2xl border border-slate-200/80 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-900/50 sm:p-4">
+            {chartEntries.length ? (
+              <div className="flex-1">
+                <WeightTrendChart entries={chartEntries} />
+              </div>
+            ) : (
+              <div className="flex flex-1 flex-col items-center justify-center gap-1 py-10 text-center">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">No weigh-ins yet</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Log your weight to start your trend line.</p>
+              </div>
+            )}
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">Last {CHART_DAYS} days</span>
+              <Link
+                href="/activity"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+              >
+                View more <ArrowRight size={13} />
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>

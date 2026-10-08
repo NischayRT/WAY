@@ -17,31 +17,26 @@ export const TARGET_ARCHETYPES = {
     key: 'LEAN',
     meshIndex: MESH_SLOT.LEAN,
     label: 'Lean / Athletic',
-    visualBoost: { waist: 0.95, chest: 1.05, arm: 1.0 },
   },
   SOFT_BELLY: {
     key: 'SOFT_BELLY',
     meshIndex: MESH_SLOT.SOFT_BELLY,
     label: 'Average / Soft Belly',
-    visualBoost: { waist: 1.15, chest: 0.98, arm: 0.92 },
   },
   OBESE: {
     key: 'OBESE',
     meshIndex: MESH_SLOT.OBESE,
     label: 'Heavyset / Obese',
-    visualBoost: { waist: 1.1, chest: 1.05, arm: 1.0 },
   },
   MUSCULAR: {
     key: 'MUSCULAR',
     meshIndex: MESH_SLOT.MUSCULAR,
     label: 'Muscular',
-    visualBoost: { waist: 0.92, chest: 1.22, arm: 1.2 },
   },
   SLIM: {
     key: 'SLIM',
     meshIndex: MESH_SLOT.SLIM,
     label: 'Slim / Skinny',
-    visualBoost: { waist: 0.85, chest: 0.85, arm: 0.85 },
   },
 };
 

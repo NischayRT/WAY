@@ -1,7 +1,8 @@
 'use client';
 
 import { Suspense, useEffect, useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
+import Canvas from '@/components/body/SafeCanvas';
 import RealisticAvatar3D from '@/components/body/RealisticAvatar3D';
 
 const easeOutBack = (t) => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);

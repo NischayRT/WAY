@@ -1,7 +1,8 @@
 'use client';
 
 import { Suspense, useState, useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
+import Canvas from '@/components/body/SafeCanvas';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import RealisticAvatar3D from './RealisticAvatar3D';

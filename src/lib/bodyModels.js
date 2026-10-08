@@ -40,23 +40,6 @@ export const MESH_SLOT = {
   SLIM: 4,
 };
 
-/**
- * Each female body's own proportions, measured from the meshes with a
- * horizontal plane cut and a tape-measure (convex hull) girth:
- * natural waist = narrowest trunk girth at 60–68% of height,
- * hips = widest girth at 52–58% of height. Divided by height.
- * The renderer uses these to stretch a body only by how far the user's own
- * waist and hips differ from that body's built-in shape, instead of
- * comparing a woman to fixed male reference ratios.
- */
-export const FEMALE_MESH_PROPORTIONS = {
-  [MESH_SLOT.SOFT_BELLY]: { waistToHeight: 0.392, hipToHeight: 0.647 },
-  [MESH_SLOT.LEAN]: { waistToHeight: 0.352, hipToHeight: 0.591 },
-  [MESH_SLOT.MUSCULAR]: { waistToHeight: 0.365, hipToHeight: 0.621 },
-  [MESH_SLOT.OBESE]: { waistToHeight: 0.475, hipToHeight: 0.767 },
-  [MESH_SLOT.SLIM]: { waistToHeight: 0.258, hipToHeight: 0.472 },
-};
-
 export const MODEL_CREDITS = [
   {
     use: 'Female 3D bodies',
@@ -68,13 +51,22 @@ export const MODEL_CREDITS = [
     changes: 'split into separate bodies, simplified and rescaled',
   },
   {
-    use: 'Male 3D bodies',
-    title: 'Stylized male Base mesh FREE',
-    author: 'Gostbento',
-    url: 'https://sketchfab.com/3d-models/stylized-male-base-mesh-free-5264bf0ed23045c5843a56d7ff1a923a',
-    license: 'CC BY-NC 4.0',
-    licenseUrl: 'https://creativecommons.org/licenses/by-nc/4.0/',
-    changes: 'rescaled',
+    use: 'Male and female 3D bodies',
+    title: 'Humans Base Mesh',
+    author: 'Neslihan Çakmak',
+    url: 'https://sketchfab.com/3d-models/humans-base-mesh-410626cce1454fb4bf01b7f507429a5c',
+    license: 'CC BY 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+    changes: 'split into separate bodies, simplified and rescaled',
+  },
+  {
+    use: 'Male and female 3D bodies',
+    title: 'Body Types Basemesh',
+    author: 'Peter Seifert',
+    url: 'https://sketchfab.com/3d-models/body-types-basemesh-read-description-7eb782a9d9a64031a1784d9a19aadf13',
+    license: 'CC BY 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+    changes: 'split into separate bodies, simplified and rescaled',
   },
 ];
 
@@ -83,14 +75,14 @@ export function bodyModelUrl(sex) {
 }
 
 /**
- * Warm the browser cache for this user's model only (instead of preloading
- * both files for everyone). Safe to call from any client component; it
- * does not pull in three.js.
+ * Warm the browser cache with the most common body for this sex. Bodies are
+ * separate ~280 KB files now (lib/bodyLibrary.js), so this is cheap. Safe to
+ * call from any client component; it does not pull in three.js.
  */
 const warmed = new Set();
 export function prefetchBodyModel(sex) {
   if (typeof window === 'undefined') return;
-  const url = bodyModelUrl(sex);
+  const url = sex === 'female' ? '/models/bodies/f-average.glb' : '/models/bodies/m-average.glb';
   if (warmed.has(url)) return;
   warmed.add(url);
   fetch(url, { priority: 'low' }).catch(() => warmed.delete(url));

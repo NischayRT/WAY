@@ -1,11 +1,13 @@
 'use client';
-​
-import { useMemo, useState } from 'react';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { X, Plus, ArrowRight } from 'lucide-react';
 import { ui } from '@/lib/ui';
 import MacroBarChart from './MacroBarChart';
-​
+
 const RANGES = [7, 14, 30];
-​
+
 /* Colour classes are written out in full so Tailwind's scanner can see them.
    Building them dynamically (`bg-${c}-500`) silently yields colourless bars. */
 const MACROS = [
@@ -34,7 +36,7 @@ const MACROS = [
     targetKey: 'fatG',
   },
 ];
-​
+
 /**
  * Nutrition view. The server sends the widest window (30 days) in one query and
  * this component slices it, so switching range costs no round trip.
@@ -44,16 +46,79 @@ const MACROS = [
  */
 export default function NutritionClient({ days, targets }) {
   const [range, setRange] = useState(7);
-​
+  // One selected day shared by all four charts, plus which chart it came
+  // from (that chart shows the details window; the others just highlight the
+  // day). `pinned` = tap / click / scrub / arrow keys; `hovered` = mouse
+  // preview, which takes over while the mouse is on a chart.
+  const [pinned, setPinned] = useState(null); // { index, key } | null
+  const [hovered, setHovered] = useState(null); // { index, key } | null
+
   const windowDays = useMemo(() => days.slice(-range), [days, range]);
-​
+  const current = hovered ?? pinned;
+  const activeIndex = current ? current.index : null;
+  const activeDay = activeIndex === null ? null : windowDays[activeIndex] ?? null;
+  const isPinnedView = !hovered && !!pinned;
+
+  // Indexes mean different days in another range, so start fresh.
+  useEffect(() => {
+    setPinned(null);
+    setHovered(null);
+  }, [range]);
+
+  useEffect(() => {
+    if (pinned === null) return undefined;
+    const onKey = (e) => e.key === 'Escape' && setPinned(null);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pinned]);
+
+  // Per-chart data, built once per range. Rebuilding these arrays on every
+  // render made each chart think it had NEW data, which replayed its bar
+  // grow-in animation on every hover: that was the constant "refresh".
+  const chartData = useMemo(() => {
+    const pick = (key) =>
+      windowDays.map((d) => ({ dayLabel: d.dayLabel, dateLabel: d.dateLabel, value: d[key] }));
+    return { calories: pick('calories'), protein: pick('protein'), carbs: pick('carbs'), fat: pick('fat') };
+  }, [windowDays]);
+
+  // Stable handlers (same function identity every render) that only update
+  // state when the day or chart actually changes, not on every pixel moved.
+  const handleHover = useCallback((key, index) => {
+    setHovered((prev) => {
+      if (index === null) return prev === null ? prev : null;
+      return prev && prev.index === index && prev.key === key ? prev : { index, key };
+    });
+  }, []);
+  const handleSelect = useCallback((key, index) => {
+    setPinned((prev) => (prev && prev.index === index && prev.key === key ? prev : { index, key }));
+  }, []);
+  const closePinned = useCallback(() => setPinned(null), []);
+
+  // The details window is drawn by the chart the pointer is on (an
+  // absolutely positioned overlay, so it never moves the layout).
+  const overlay = useMemo(
+    () =>
+      activeDay ? (
+        <DayDetails day={activeDay} targets={targets} onClose={isPinnedView ? closePinned : null} floating />
+      ) : null,
+    [activeDay, targets, isPinnedView, closePinned]
+  );
+  const selectionFor = (key) => ({
+    chartKey: key,
+    activeIndex,
+    onHover: handleHover,
+    onSelect: handleSelect,
+    overlay: current?.key === key ? overlay : null,
+    overlayInteractive: isPinnedView,
+  });
+
   const stats = useMemo(() => {
     const logged = windowDays.filter((d) => d.calories > 0);
-​
+
     const avgCalories = logged.length
       ? Math.round(logged.reduce((a, d) => a + d.calories, 0) / logged.length)
       : 0;
-​
+
     // Days landing within ±10% of the calorie target. Kept separate from the
     // average, because a clean mean can hide alternating 1,200 / 3,200 days.
     const onTarget = targets.targetCalories
@@ -61,21 +126,21 @@ export default function NutritionClient({ days, targets }) {
           (d) => Math.abs(d.calories - targets.targetCalories) <= targets.targetCalories * 0.1
         ).length
       : 0;
-​
+
     // Longest run of consecutive logged days, scanned newest-first.
     let streak = 0;
     for (let i = windowDays.length - 1; i >= 0; i -= 1) {
       if (windowDays[i].calories > 0) streak += 1;
       else break;
     }
-​
+
     return { avgCalories, onTarget, streak, loggedCount: logged.length };
   }, [windowDays, targets]);
-​
+
   const pctOfTarget = targets.targetCalories
     ? Math.round((stats.avgCalories / targets.targetCalories) * 100)
     : null;
-​
+
   return (
     <div className="space-y-4">
       {/* Range switcher */}
@@ -100,7 +165,7 @@ export default function NutritionClient({ days, targets }) {
           ))}
         </div>
       </div>
-​
+
       {/* Three headline numbers — deliberately not more than three */}
       <div className="grid grid-cols-3 gap-2.5">
         <Stat
@@ -118,7 +183,7 @@ export default function NutritionClient({ days, targets }) {
         />
         <Stat label="Streak" value={stats.streak} unit="days" sub="consecutive logs" />
       </div>
-​
+
       {/* Rigid 2 x 2 from sm up, stacked below it. Tailwind's grid-cols-2
          resolves to repeat(2, minmax(0, 1fr)), and the min-w-0 on each cell
          keeps a chart's intrinsic width from widening its column — that
@@ -129,29 +194,23 @@ export default function NutritionClient({ days, targets }) {
           <MacroBarChart
             title="Calories"
             unit=" kcal"
-            data={windowDays.map((d) => ({
-              dayLabel: d.dayLabel,
-              dateLabel: d.dateLabel,
-              value: d.calories,
-            }))}
+            data={chartData.calories}
             target={targets.targetCalories}
+            {...selectionFor('calories')}
             barClass="bg-amber-500"
             lineClass="border-amber-500"
             textClass={ui.macroText.calories}
           />
         </div>
-​
+
         {MACROS.map((m) => (
           <div key={m.key} className={`${ui.card} min-w-0`}>
             <MacroBarChart
               title={m.label}
               unit="g"
-              data={windowDays.map((d) => ({
-                dayLabel: d.dayLabel,
-                dateLabel: d.dateLabel,
-                value: d[m.key],
-              }))}
+              data={chartData[m.key]}
               target={targets[m.targetKey]}
+              {...selectionFor(m.key)}
               barClass={m.bar}
               lineClass={m.line}
               textClass={m.text}
@@ -159,14 +218,109 @@ export default function NutritionClient({ days, targets }) {
           </div>
         ))}
       </div>
-​
+
       <p className="text-center text-[10px] text-slate-400">
-        Dotted line = your average · dashed line = target · averages skip unlogged days
+        Hover, tap or drag across the bars to see a day · dotted line = your average · dashed line = target · each chart
+        scales to its highest day · averages skip unlogged days
       </p>
+
+      {/* Selected day on phones: a sheet above the bottom navigation */}
+      {isPinnedView && activeDay && (
+        <div className="fixed inset-x-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-40 animate-[sheetUp_220ms_ease-out] sm:hidden">
+          <DayDetails day={activeDay} targets={targets} onClose={closePinned} floating />
+        </div>
+      )}
+      <style>{`@keyframes sheetUp{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}`}</style>
     </div>
   );
 }
-​
+
+const DETAIL_ROWS = [
+  { key: 'calories', label: 'Calories', unit: ' kcal', targetKey: 'targetCalories', bar: 'bg-amber-500', text: ui.macroText.calories },
+  { key: 'protein', label: 'Protein', unit: 'g', targetKey: 'proteinG', bar: 'bg-emerald-500', text: ui.macroText.protein },
+  { key: 'carbs', label: 'Carbs', unit: 'g', targetKey: 'carbsG', bar: 'bg-blue-500', text: ui.macroText.carbs },
+  { key: 'fat', label: 'Fat', unit: 'g', targetKey: 'fatG', bar: 'bg-violet-500', text: ui.macroText.fat },
+];
+
+/** Everything about one day: each macro against its target. */
+function DayDetails({ day, targets, onClose, floating = false }) {
+  const logged = day.calories > 0;
+  return (
+    <div
+      role="region"
+      aria-label={`Nutrition for ${day.dayLabel}, ${day.dateLabel}`}
+      aria-live="polite"
+      className={`rounded-2xl border border-slate-200/90 bg-white p-3 dark:border-slate-700/80 dark:bg-slate-900 ${
+        floating ? 'shadow-2xl' : 'shadow-xs'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-bold text-slate-900 dark:text-white">
+          {day.dayLabel}, {day.dateLabel}
+        </p>
+        <div className="flex items-center gap-1.5">
+          <Link
+            href={`/home?date=${day.date}`}
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+          >
+            Open day <ArrowRight size={12} />
+          </Link>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close day details"
+              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {logged ? (
+        <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2.5">
+          {DETAIL_ROWS.map((r) => {
+            const value = day[r.key];
+            const target = targets[r.targetKey];
+            const pct = target ? Math.round((value / target) * 100) : null;
+            return (
+              <div key={r.key} className="min-w-0">
+                <div className="flex items-baseline justify-between gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{r.label}</span>
+                  {pct !== null && (
+                    <span className={`font-numeric text-[10px] font-bold ${pct > 110 ? 'text-rose-500' : r.text}`}>{pct}%</span>
+                  )}
+                </div>
+                <p className="mt-0.5 font-numeric text-sm font-bold text-slate-900 dark:text-white">
+                  {value.toLocaleString('en-IN')}
+                  <span className="text-[10px] font-semibold text-slate-400">
+                    {r.unit}
+                    {target ? ` / ${Math.round(target).toLocaleString('en-IN')}` : ''}
+                  </span>
+                </p>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div className={`h-full rounded-full ${r.bar}`} style={{ width: `${Math.min(pct ?? 0, 100)}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-slate-500 dark:text-slate-400">No food logged on this day.</p>
+          <Link
+            href={`/log-food?date=${day.date}`}
+            className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[11px] font-semibold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+          >
+            <Plus size={12} /> Log food
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Stat({ label, value, unit, sub, tone = 'text-slate-900 dark:text-white' }) {
   return (
     <div className="min-w-0 rounded-2xl border border-slate-200/90 bg-white p-2.5 shadow-xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700/80 dark:bg-slate-900/90">
@@ -183,4 +337,3 @@ function Stat({ label, value, unit, sub, tone = 'text-slate-900 dark:text-white'
     </div>
   );
 }
-​

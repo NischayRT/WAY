@@ -1,12 +1,48 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { resolveCurrentPhysique, CURRENT_ARCHETYPES } from '@/lib/currentPhysiqueLogic';
 import { resolveTargetPhysique } from '@/lib/targetPhysiqueLogic';
-import { bodyModelUrl, FEMALE_MESH_PROPORTIONS } from '@/lib/bodyModels';
+import { bodyUrl, selectBody, showcaseBody } from '@/lib/bodyLibrary';
+import { analyzeBody, measurementFactors, deformBody } from '@/lib/bodyDeform';
 
+// Each body mesh is measured once (its own chest, waist, hips and upper arm),
+// then reused for every reshape. Keyed by the source geometry.
+const analysisCache = new WeakMap();
+
+function readPositions(geometry) {
+  const attr = geometry.attributes.position;
+  const out = new Float32Array(attr.count * 3);
+  for (let i = 0; i < attr.count; i += 1) {
+    out[i * 3] = attr.getX(i);
+    out[i * 3 + 1] = attr.getY(i);
+    out[i * 3 + 2] = attr.getZ(i);
+  }
+  return out;
+}
+
+function getAnalysis(geometry, sex) {
+  let entry = analysisCache.get(geometry);
+  if (!entry || entry.sex !== sex) {
+    const base = readPositions(geometry);
+    entry = { sex, base, analysis: analyzeBody(base, { sex }) };
+    analysisCache.set(geometry, entry);
+  }
+  return entry;
+}
+
+/**
+ * One body, chosen and lightly shaped from the person's numbers:
+ *  1. Body TYPE from body fat, FFMI and waist-to-height
+ *     (lib/physiqueClassifier.js via current/targetPhysiqueLogic).
+ *  2. Which BODY: the library body (lib/bodyLibrary.js, 7 male / 13 female)
+ *     whose own chest, waist, hip and upper-arm proportions are closest to
+ *     the person's, preferring bodies tagged for their type.
+ *  3. A light FINE-TUNE from the same four measurements (lib/bodyDeform.js),
+ *     limited to +/-6% per region so the body stays true to its source model.
+ */
 export default function RealisticAvatar3D({
   sex = 'male',
   heightCm = 176.5,
@@ -21,110 +57,81 @@ export default function RealisticAvatar3D({
   wireframe = false,
   isTarget = false, // false = Current model, true = Target model
   clippingPlanes = null, // optional stable array of THREE.Plane (used by the home progress preview)
-  archetypeKey = null, // optional: show this body type as modelled ('SLIM', 'LEAN', ...), no measurement scaling (landing page showcase)
+  archetypeKey = null, // optional: show this body type as modelled ('SLIM', 'LEAN', ...), no reshaping (landing page showcase)
 }) {
-  // Male and female files have the same five bodies in the same slots,
-  // so everything below works the same for both.
-  const modelUrl = bodyModelUrl(sex);
-  const { scene } = useGLTF(modelUrl);
-
   const physiqueConfig = useMemo(() => {
     if (archetypeKey && CURRENT_ARCHETYPES[archetypeKey]) return CURRENT_ARCHETYPES[archetypeKey];
     const input = { sex, bodyFatPct, weightKg, heightCm, chestCm, waistCm, hipCm };
     return isTarget ? resolveTargetPhysique(input) : resolveCurrentPhysique(input);
   }, [archetypeKey, isTarget, sex, chestCm, waistCm, hipCm, heightCm, weightKg, bodyFatPct]);
 
-  const slot = archetypeKey ? physiqueConfig.fallbackIndex : isTarget ? physiqueConfig.meshIndex : physiqueConfig.fallbackIndex;
+  const body = useMemo(
+    () =>
+      archetypeKey
+        ? showcaseBody(sex, archetypeKey)
+        : selectBody({ sex, typeKey: physiqueConfig.key, heightCm, chestCm, waistCm, hipCm, bicepCm }),
+    [archetypeKey, sex, physiqueConfig.key, heightCm, chestCm, waistCm, hipCm, bicepCm]
+  );
 
-  const singleMesh = useMemo(() => {
-    // Picked by position: GLTFLoader strips dots from node names, so the
-    // old name match ('guy.004') never worked. See lib/bodyModels.js.
-    const meshes = [];
+  // Each body is its own small file; only the one on screen is downloaded.
+  const { scene } = useGLTF(bodyUrl(body.id));
+
+  const sourceGeometry = useMemo(() => {
+    let geometry = null;
     scene.traverse((child) => {
-      if (child.isMesh) meshes.push(child);
+      if (!geometry && child.isMesh) geometry = child.geometry;
     });
-    const targetMesh = meshes[slot] || meshes[0];
-    if (!targetMesh) return null;
+    return geometry;
+  }, [scene]);
 
-    const geom = targetMesh.geometry.clone();
+  const geometry = useMemo(() => {
+    if (!sourceGeometry) return null;
+    const geom = sourceGeometry.clone();
+
+    if (!archetypeKey) {
+      const { base, analysis } = getAnalysis(sourceGeometry, sex);
+      const factors = measurementFactors(
+        analysis,
+        { heightCm, chestCm, waistCm, hipCm, bicepCm },
+        undefined,
+        body.refs
+      );
+      const shaped = deformBody(base, analysis, factors);
+      geom.setAttribute('position', new THREE.BufferAttribute(shaped, 3));
+    }
+
     geom.center();
     geom.computeVertexNormals();
     geom.computeBoundingBox();
+    return geom;
+  }, [sourceGeometry, archetypeKey, sex, body, heightCm, chestCm, waistCm, hipCm, bicepCm]);
 
-    const size = geom.boundingBox.getSize(new THREE.Vector3());
-    const scaleFactor = 2.0 / (size.y || 1);
+  // Free GPU memory for reshaped copies as they are replaced.
+  useEffect(() => () => geometry?.dispose(), [geometry]);
 
-    const material = new THREE.MeshStandardMaterial({
-      color,
-      roughness,
-      metalness: 0.08,
-      wireframe,
-      side: THREE.DoubleSide,
-      clippingPlanes: clippingPlanes || null,
-    });
+  const material = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color,
+        roughness,
+        metalness: 0.08,
+        wireframe,
+        side: THREE.DoubleSide,
+        clippingPlanes: clippingPlanes || null,
+      }),
+    [color, roughness, wireframe, clippingPlanes]
+  );
+  useEffect(() => () => material.dispose(), [material]);
 
-    const mesh = new THREE.Mesh(geom, material);
+  if (!geometry) return null;
 
-    if (archetypeKey) {
-      // Showcase: the body exactly as modelled.
-      mesh.scale.setScalar(scaleFactor);
-      mesh.position.set(0, 1.0, 0);
-      return mesh;
-    }
-
-    if (sex === 'female') {
-      // The female bodies already carry their shape (bust, waist, hips,
-      // belly), so they are only nudged by how far the user's own waist and
-      // hips differ from that body's measured proportions. Kept within
-      // ±10–12% so a body never stops looking like its type.
-      const ref = FEMALE_MESH_PROPORTIONS[slot] || FEMALE_MESH_PROPORTIONS[0];
-      const h = Number(heightCm) || 162;
-      const clampF = (v) => Math.max(0.9, Math.min(1.12, Number.isFinite(v) ? v : 1));
-      const fWaist = clampF(Number(waistCm) / h / ref.waistToHeight);
-      const fHip = clampF(Number(hipCm) / h / ref.hipToHeight);
-      mesh.scale.set(scaleFactor * ((fWaist + fHip) / 2), scaleFactor, scaleFactor * (0.6 * fWaist + 0.4 * fHip));
-      mesh.position.set(0, 1.0, 0);
-      return mesh;
-    }
-
-    // Reference circumferences as a fraction of height. Waist ~0.45 h and
-    // chest/bust ~0.55 h are typical adult values for both sexes (women's
-    // bust measurement sits close to men's chest relative to height; the
-    // female mesh itself already carries the narrower waist and wider hips).
-    const idealWaist = Number(heightCm) * (isTarget ? 0.44 : 0.45);
-    const idealChest = Number(heightCm) * 0.55;
-
-    if (isTarget) {
-      const measuredWRatio = Math.max(0.88, Math.min(1.18, Number(waistCm) / idealWaist));
-      const measuredCRatio = Math.max(0.88, Math.min(1.18, Number(chestCm) / idealChest));
-      const boost = physiqueConfig.visualBoost;
-      const wRatio = measuredWRatio * boost.waist;
-      const cRatio = measuredCRatio * boost.chest;
-      mesh.scale.set(scaleFactor * ((wRatio + cRatio) / 2) * boost.arm, scaleFactor, scaleFactor * wRatio);
-    } else {
-      const boost = physiqueConfig.scaleBoost;
-      const userWRatio = Math.max(0.75, Math.min(1.4, Number(waistCm) / idealWaist));
-      const userCRatio = Math.max(0.75, Math.min(1.4, Number(chestCm) / idealChest));
-      mesh.scale.set(
-        scaleFactor * ((userCRatio * 0.6 + userWRatio * 0.4) * boost.x),
-        scaleFactor,
-        scaleFactor * (userWRatio * boost.z)
-      );
-    }
-
-    mesh.position.set(0, 1.0, 0);
-    return mesh;
-  }, [scene, slot, sex, archetypeKey, physiqueConfig, color, roughness, wireframe, heightCm, waistCm, chestCm, hipCm, isTarget, clippingPlanes]);
-
-  if (!singleMesh) return null;
+  // Every body is drawn 2.0 units tall, standing on y = 0.
+  const size = geometry.boundingBox.getSize(new THREE.Vector3());
+  const scaleFactor = 2.0 / (size.y || 1);
 
   return (
-    <primitive
-      object={singleMesh}
-      key={`${modelUrl}-${isTarget ? 'target' : 'current'}-${physiqueConfig.key}-${Math.round(waistCm)}-${Math.round(chestCm)}-${Math.round(hipCm)}`}
-    />
+    <mesh geometry={geometry} material={material} scale={scaleFactor} position={[0, 1.0, 0]} />
   );
 }
 
-// No module-level preload: each user only downloads the model for their
-// own sex. Callers warm it with prefetchBodyModel(sex) from lib/bodyModels.
+// No module-level preload: only the chosen body's ~280 KB file is fetched.

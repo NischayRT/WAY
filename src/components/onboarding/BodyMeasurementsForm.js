@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
+import Canvas from '@/components/body/SafeCanvas';
 import { createClient } from '@/lib/supabaseClient';
 import { analyzeCurrentPhysique, estimateDefaultMeasurementsCm } from '@/lib/bodyProportions';
 import { ui } from '@/lib/ui';

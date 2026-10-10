@@ -99,23 +99,28 @@ function MealRow({ meal, totals, targets }) {
             <Icon size={13} />
           </div>
           <span className="text-xs font-bold text-slate-900 dark:text-white truncate">{meal.label}</span>
-          {status !== 'progress' && (
-            <span
-              key={status}
-              role="status"
-              className={`${fx.badge} inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px text-[9px] font-bold ${
-                status === 'over'
-                  ? 'border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                  : 'border-emerald-300 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-              }`}
-            >
-              {status === 'over' ? <AlertTriangle size={9} /> : <CheckCircle2 size={9} />}
-              {status === 'over' ? `+${overBy}` : 'On target'}
-            </span>
-          )}
         </div>
-        <span className="font-numeric text-[10px] font-semibold text-slate-400 shrink-0">
-          {isEmpty ? `${Math.round(meal.frac * 100)}% of day` : `${Math.round(consumedKcal)} / ${Math.round(targetKcal)} kcal`}
+        {/* Status lives in the figure itself (icon + colour), not a separate
+            badge, so narrow cards never squeeze out the meal name. */}
+        <span
+          className={`inline-flex shrink-0 items-center gap-1 font-numeric text-[10px] font-semibold ${
+            status === 'over'
+              ? 'text-rose-600 dark:text-rose-400'
+              : status === 'onTarget'
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-slate-400'
+          }`}
+          title={
+            status === 'over'
+              ? `${overBy} kcal over this meal's budget`
+              : status === 'onTarget'
+                ? 'On target for this meal'
+                : undefined
+          }
+        >
+          {status === 'over' && <AlertTriangle key="over" size={10} className={`shrink-0 ${fx.badge}`} aria-label="Over budget" />}
+          {status === 'onTarget' && <CheckCircle2 key="ok" size={10} className={`shrink-0 ${fx.badge}`} aria-label="On target" />}
+          {isEmpty ? `${Math.round(meal.frac * 100)}% of day` : `${Math.round(consumedKcal)}/${Math.round(targetKcal)} kcal`}
         </span>
       </div>
 

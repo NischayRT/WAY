@@ -229,12 +229,12 @@ export default function HomeClient({
 
         <div className={`space-y-6 transition-opacity ${isNavigating ? 'opacity-60' : ''}`}>
           {/* Header Bar */}
-          <div className="flex items-center justify-between pb-3 border-b-2 border-dotted dark:border-slate-700">
+          {/* <div className="flex items-center justify-between pb-3 border-b-2 border-dotted dark:border-slate-700">
             <div>
               <h1 className={ui.heading}>{titleText}</h1>
               <p className="mt-0.5 text-xs text-slate-500 font-medium font-numeric">{fullDateStr}</p>
             </div>
-          </div>
+          </div> */}
 
           {/* Orbit + Meal Targets + Weekly Chart */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">

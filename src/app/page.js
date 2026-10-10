@@ -131,7 +131,7 @@ export default async function HomePage() {
               {app} is a free web app that helps you track the calories and macros (protein, carbohydrates and fat)
               of the Indian food you actually eat, log your weight, and follow your progress toward a goal such as
               losing weight, maintaining, or building muscle. You can optionally connect Google Health to bring in
-              your steps, distance and calories burned, and to send your logged meals and weight to the Google
+              your steps, distance, calories burned, floors, heart rate, blood oxygen, VO₂ max, glucose and (optionally) sleep, and to send your logged meals and weight to the Google
               Health app.
             </p>
             <div className={`${styles.ctaRow} ${styles.in}`} style={{ '--d': '380ms' }}>
@@ -275,6 +275,14 @@ export default async function HomePage() {
             <ul>
               <li>
                 <strong>Read your activity</strong> (steps, distance and calories burned) to show on your dashboard.
+              </li>
+              <li>
+                <strong>Read your heart and vitals</strong> (resting heart rate and the day&apos;s low and high, overnight
+                blood oxygen, VO₂ max and blood glucose) to show on the dashboard tiles you choose. These are not stored by {app}.
+              </li>
+              <li>
+                <strong>Optionally, read your sleep and irregular heart rhythm notifications</strong>, only if you add the Sleep
+                tile or turn on irregular rhythm alerts. Not stored by {app}; an irregular rhythm alert is not a diagnosis.
               </li>
               <li>
                 <strong>Write nutrition data</strong> (calories, protein, carbohydrates and fat) for meals you log in{' '}

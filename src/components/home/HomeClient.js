@@ -15,7 +15,8 @@ import WeekMacroChart from '@/components/home/WeekMacroChart';
 import RepeatMealBanner from '@/components/home/RepeatMealBanner';
 import DailyLog from '@/components/home/DailyLog';
 import QuickWeightLogModal from '@/components/home/QuickWeightLogModal';
-import { StepsWidget, DistanceWidget, CaloriesBurnedWidget, RemainingGoalWidget } from '@/components/home/GoogleHealthWidgets';
+import { RemainingGoalWidget } from '@/components/home/GoogleHealthWidgets';
+import TileBoard from '@/components/home/TileBoard';
 import { syncToGoogleHealthAndWait, describeSyncResult } from '@/lib/googleHealthSyncClient';
 
 export default function HomeClient({
@@ -228,12 +229,12 @@ export default function HomeClient({
 
         <div className={`space-y-6 transition-opacity ${isNavigating ? 'opacity-60' : ''}`}>
           {/* Header Bar */}
-          {/* <div className="flex items-center justify-between pb-3 border-b-2 border-dotted dark:border-slate-700">
+          <div className="flex items-center justify-between pb-3 border-b-2 border-dotted dark:border-slate-700">
             <div>
               <h1 className={ui.heading}>{titleText}</h1>
               <p className="mt-0.5 text-xs text-slate-500 font-medium font-numeric">{fullDateStr}</p>
             </div>
-          </div> */}
+          </div>
 
           {/* Orbit + Meal Targets + Weekly Chart */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
@@ -266,6 +267,9 @@ export default function HomeClient({
             healthData={healthData}
             healthConnected={healthConnected}
             healthLoading={healthLoading}
+            today={today}
+            selectedDate={selectedDate}
+            userId={profile?.id}
           />
 
           <DailyLog
@@ -288,7 +292,7 @@ export default function HomeClient({
   );
 }
 
-function HealthRow({ consumed, currentTargets, healthData, healthConnected, healthLoading, goals = {} }) {
+function HealthRow({ consumed, currentTargets, healthData, healthConnected, healthLoading, today, selectedDate, userId, goals = {} }) {
   const remaining = (
     <RemainingGoalWidget consumedCalories={consumed?.calories ?? 0} targetCalories={currentTargets.targetCalories} />
   );
@@ -321,17 +325,17 @@ function HealthRow({ consumed, currentTargets, healthData, healthConnected, heal
     );
   }
 
+  // Connected: the user's own choice of tiles (Edit tiles to change).
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
-      <StepsWidget steps={healthData.steps} targetSteps={goals.steps ?? null} loading={healthLoading} />
-      <DistanceWidget distanceKm={healthData.distanceKm} targetKm={goals.distanceKm ?? null} loading={healthLoading} />
-      <CaloriesBurnedWidget
-        caloriesBurned={healthData.caloriesBurned}
-        activeCalories={healthData.activeCalories}
-        targetBurn={goals.burnKcal ?? null}
-        loading={healthLoading}
-      />
-      {remaining}
-    </div>
+    <TileBoard
+      userId={userId}
+      selectedDate={selectedDate}
+      today={today}
+      healthData={healthData}
+      healthLoading={healthLoading}
+      goals={goals}
+      consumed={consumed}
+      currentTargets={currentTargets}
+    />
   );
 }

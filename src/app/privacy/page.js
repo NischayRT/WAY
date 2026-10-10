@@ -10,8 +10,23 @@ export const metadata = {
 const SCOPES = [
   {
     scope: 'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
-    what: 'Read-only access to your daily steps, distance and calories burned.',
+    what: 'Read-only access to your daily steps, distance, calories burned and floors climbed.',
     why: 'To show these figures on your dashboard and Activity page next to your food intake, and to compare them with goals you set.',
+  },
+  {
+    scope: 'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
+    what: 'Read-only access to your heart rate (daily resting rate, and the day\'s low and high), overnight blood oxygen (SpO2), VO2 max and blood glucose readings.',
+    why: 'To show these on the dashboard tiles you choose. We do not store these values; they are read from Google Health each time the dashboard loads.',
+  },
+  {
+    scope: 'https://www.googleapis.com/auth/googlehealth.sleep.readonly (optional)',
+    what: 'Read-only access to your sleep sessions (time asleep, bedtime, wake time and sleep stages).',
+    why: 'Only requested if you add the Sleep tile, to show last night\'s sleep on your dashboard. Not stored by us.',
+  },
+  {
+    scope: 'https://www.googleapis.com/auth/googlehealth.irn.readonly (optional)',
+    what: 'Read-only access to irregular heart rhythm notifications from your device.',
+    why: 'Only requested if you turn on irregular rhythm alerts in the Heart rate tile, to show a warning when your device has sent one in the last 7 days. Not stored by us, and not a diagnosis.',
   },
   {
     scope: 'https://www.googleapis.com/auth/googlehealth.nutrition.writeonly',
@@ -64,6 +79,7 @@ export default function PrivacyPage() {
         <UL
           items={[
             'Your daily steps, distance and calories burned (read from Google Health).',
+            'Heart rate, blood oxygen (SpO2), VO2 max, blood glucose, floors climbed and, if you add those tiles, sleep and irregular rhythm notifications (read from Google Health and shown on your dashboard; not stored by us).',
             'OAuth access and refresh tokens that Google issues so the connection keeps working (see section 4).',
           ]}
         />

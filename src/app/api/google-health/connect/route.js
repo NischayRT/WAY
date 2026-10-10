@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
-import { buildAuthUrl } from '@/lib/googleHealth';
+import { buildAuthUrl, OPTIONAL_SCOPES } from '@/lib/googleHealth';
 
 // Only these paths may be used as a post-connect destination. Anything
 // else (including an attacker-supplied URL) falls back to /settings, so
@@ -25,7 +25,14 @@ export async function GET(request) {
   // actually started.
   const state = randomBytes(16).toString('hex');
 
-  const response = NextResponse.redirect(buildAuthUrl(state));
+  // Optional permissions for tiles that need them, e.g. ?extra=sleep,irn.
+  // Whitelisted keys only; anything else is ignored.
+  const extra = (searchParams.get('extra') || '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter((x) => Object.prototype.hasOwnProperty.call(OPTIONAL_SCOPES, x));
+
+  const response = NextResponse.redirect(buildAuthUrl(state, extra));
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

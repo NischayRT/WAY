@@ -293,3 +293,56 @@
 @media (prefers-reduced-motion: reduce) {
   .planetExceeded { animation: none; }
 }
+
+/* ---------- vitals: heartbeat + ECG trace, both at the resting heart rate (--beat = 60/bpm seconds) */
+.heartbeat {
+  transform-origin: center;
+  animation: beat var(--beat, 1s) ease-out infinite;
+}
+
+@keyframes beat {
+  0%, 100% { transform: scale(1); }
+  12% { transform: scale(1.22); }
+  24% { transform: scale(0.96); }
+  36% { transform: scale(1.12); }
+  55% { transform: scale(1); }
+}
+
+/* A small monitor trace beside the bpm figure: one beat per 80px tile,
+   scrolling 80px per heartbeat, faded at both ends. */
+.ecg {
+  position: absolute;
+  right: 18px;
+  top: 74px;
+  width: 46%;
+  height: 34px;
+  z-index: -1;
+  pointer-events: none;
+  background-color: rgb(var(--accent) / 0.75);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 34'%3E%3Cpath d='M0 20 H28 L32 16 L35 20 L39 20 L42 3 L46 31 L49 20 L55 20 L59 15 L64 20 H80' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x 0 0 / 80px 34px, linear-gradient(to right, transparent, #000 30%, #000 80%, transparent);
+  -webkit-mask-composite: source-in;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 34'%3E%3Cpath d='M0 20 H28 L32 16 L35 20 L39 20 L42 3 L46 31 L49 20 L55 20 L59 15 L64 20 H80' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x 0 0 / 80px 34px, linear-gradient(to right, transparent, #000 30%, #000 80%, transparent);
+  mask-composite: intersect;
+  animation: ecgScroll var(--beat, 1s) linear infinite;
+}
+
+@keyframes ecgScroll {
+  from { -webkit-mask-position: 0 0, 0 0; mask-position: 0 0, 0 0; }
+  to { -webkit-mask-position: -80px 0, 0 0; mask-position: -80px 0, 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heartbeat,
+  .ecg { animation: none; }
+}
+
+/* ---------- irregular rhythm warning: expands on hover / keyboard focus (and tap, via <details>) */
+.irregular > p {
+  display: none;
+}
+.irregular[open] > p,
+.irregular:hover > p,
+.irregular:focus-within > p {
+  display: block;
+  animation: popIn 240ms ease-out both;
+}

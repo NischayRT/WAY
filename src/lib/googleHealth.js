@@ -12,9 +12,19 @@ const ACTIVITY_SCOPE = 'https://www.googleapis.com/auth/googlehealth.activity_an
 // Write scopes let WAY push food logs (macros) and weigh-ins into Google Health.
 export const NUTRITION_WRITE_SCOPE = 'https://www.googleapis.com/auth/googlehealth.nutrition.writeonly';
 export const METRICS_WRITE_SCOPE = 'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.writeonly';
-export const ALL_SCOPES = [ACTIVITY_SCOPE, NUTRITION_WRITE_SCOPE, METRICS_WRITE_SCOPE];
+// Read scope for vitals (resting heart rate, SpO2, VO2 max). Users who
+// connected before this was added must reconnect once to grant it.
+export const METRICS_READ_SCOPE = 'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly';
+export const ALL_SCOPES = [ACTIVITY_SCOPE, METRICS_READ_SCOPE, NUTRITION_WRITE_SCOPE, METRICS_WRITE_SCOPE];
 
-export function buildAuthUrl(state) {
+// Optional scopes, requested only when the user turns on a tile that needs
+// them (incremental authorisation: include_granted_scopes keeps the rest).
+export const OPTIONAL_SCOPES = {
+  sleep: 'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
+  irn: 'https://www.googleapis.com/auth/googlehealth.irn.readonly', // irregular rhythm notifications
+};
+
+export function buildAuthUrl(state, extra = []) {
   const params = new URLSearchParams({
     client_id: process.env.NEXT_PUBLIC_GOOGLE_HEALTH_CLIENT_ID,
     redirect_uri: process.env.GOOGLE_HEALTH_REDIRECT_URI,
@@ -22,7 +32,7 @@ export function buildAuthUrl(state) {
     access_type: 'offline',
     include_granted_scopes: 'true', // keep read access if a reconnect only adds the write scopes
     prompt: 'consent', // forces a refresh_token on every authorization, not just the first-ever consent
-    scope: ALL_SCOPES.join(' '),
+    scope: [...ALL_SCOPES, ...extra.map((k) => OPTIONAL_SCOPES[k]).filter(Boolean)].join(' '),
     state,
   });
   return `${AUTH_ENDPOINT}?${params.toString()}`;
@@ -269,4 +279,281 @@ export async function revokeGoogleToken(token) {
   } catch {
     return false;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Vitals: resting heart rate, SpO2, VO2 max                           */
+/* ------------------------------------------------------------------ */
+//
+// All three are DAILY SUMMARY data types. The Google Health API has no live
+// stream: wearables sync periodically and these summaries are calculated
+// from the day's (or night's) measurements, so today's value often isn't
+// there until after sleep. We read the last few days and return the most
+// recent value on or before the requested date, with the date it belongs to.
+//
+// Needs the health_metrics_and_measurements.readonly scope.
+
+const VITALS_LOOKBACK_DAYS = 7;
+
+const toNum = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+const dateStrOf = (d) => (d && d.year ? `${d.year}-${pad(d.month)}-${pad(d.day)}` : null);
+
+/** Daily summary points for a data type between two dates (inclusive). */
+async function listDaily(accessToken, dataType, field, fromStr, toStr) {
+  const filter = `${field}.date >= "${fromStr}" AND ${field}.date < "${shiftDate(toStr, 1)}"`;
+  const url = `${HEALTH_BASE}/${dataType}/dataPoints?pageSize=50&filter=${encodeURIComponent(filter)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }, cache: 'no-store' });
+  if (res.status === 403) {
+    const err = new Error('Missing permission for health metrics');
+    err.permissionDenied = true;
+    throw err;
+  }
+  if (!res.ok) throw new Error(`${dataType} list failed: ${res.status}`);
+  const data = await res.json();
+  return (data.dataPoints || []).map((p) => p[field]).filter(Boolean);
+}
+
+/** Most recent point (by its date) on or before toStr. */
+function latest(points) {
+  return points
+    .map((p) => ({ p, date: dateStrOf(p.date) }))
+    .filter((x) => x.date)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))[0] || null;
+}
+
+/** First numeric field whose name contains `hint` (field names vary between summary types). */
+function numberField(obj, hint) {
+  const key = Object.keys(obj || {}).find((k) => k !== 'date' && k.toLowerCase().includes(hint) && toNum(obj[k]) !== null);
+  return key ? toNum(obj[key]) : null;
+}
+
+/**
+ * @returns {{ restingHeartRate: {bpm, date}|null, spo2: {percent, low, high, date}|null,
+ *             vo2Max: {value, level, date}|null }}
+ * Throws with err.permissionDenied when the user hasn't granted the vitals scope.
+ */
+export async function fetchVitals(accessToken, targetDateStr = null) {
+  const toStr = targetDateStr || todayLocalDate();
+  const fromStr = shiftDate(toStr, -(VITALS_LOOKBACK_DAYS - 1));
+
+  const [rhr, spo2, vo2] = await Promise.allSettled([
+    listDaily(accessToken, 'daily-resting-heart-rate', 'dailyRestingHeartRate', fromStr, toStr),
+    listDaily(accessToken, 'daily-oxygen-saturation', 'dailyOxygenSaturation', fromStr, toStr),
+    listDaily(accessToken, 'daily-vo2-max', 'dailyVo2Max', fromStr, toStr),
+  ]);
+
+  // If every call was refused for permission, surface that to the caller.
+  const results = [rhr, spo2, vo2];
+  if (results.every((r) => r.status === 'rejected' && r.reason?.permissionDenied)) {
+    throw results[0].reason;
+  }
+  const ok = (r) => (r.status === 'fulfilled' ? r.value : []);
+
+  const r = latest(ok(rhr));
+  const s = latest(ok(spo2));
+  const v = latest(ok(vo2));
+
+  return {
+    restingHeartRate: r && toNum(r.p.beatsPerMinute) ? { bpm: Math.round(toNum(r.p.beatsPerMinute)), date: r.date } : null,
+    spo2: s && numberField(s.p, 'average') !== null
+      ? {
+          percent: Math.round(numberField(s.p, 'average') * 10) / 10,
+          low: numberField(s.p, 'lower'),
+          high: numberField(s.p, 'upper'),
+          date: s.date,
+        }
+      : null,
+    vo2Max: v && numberField(v.p, 'vo2') !== null
+      ? { value: Math.round(numberField(v.p, 'vo2') * 10) / 10, level: v.p.cardioFitnessLevel || null, date: v.date }
+      : null,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Extra home tiles: heart, floors, sleep, glucose                     */
+/* ------------------------------------------------------------------ */
+//
+// The roll-up value messages (HeartRateRollupValue, FloorsRollupValue) are
+// read by field-name pattern (min / max / avg, count) rather than hard-coded
+// names, so a field rename upstream degrades to "no data" instead of an error.
+
+const isPerm = (res) => res.status === 403;
+
+function statsOf(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj || {})) {
+    const n = toNum(v);
+    if (n === null) continue;
+    const key = k.toLowerCase();
+    if (key.includes('min')) out.min = n;
+    else if (key.includes('max')) out.max = n;
+    else if (key.includes('avg') || key.includes('average') || key.includes('mean')) out.avg = n;
+    else if (key.includes('count') || key.includes('sum')) out.sum = n;
+  }
+  return out;
+}
+
+async function rollupOneDay(accessToken, dataType, dateStr) {
+  const res = await fetch(`${HEALTH_BASE}/${dataType}/dataPoints:dailyRollUp`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ range: { start: civil(dateStr), end: civil(shiftDate(dateStr, 1)) }, windowSizeDays: 1 }),
+    cache: 'no-store',
+  });
+  if (isPerm(res)) {
+    const err = new Error('permission');
+    err.permissionDenied = true;
+    throw err;
+  }
+  if (!res.ok) throw new Error(`${dataType} rollup ${res.status}`);
+  const data = await res.json().catch(() => ({}));
+  const point = (data.rollupDataPoints || [])[0];
+  if (!point) return null;
+  // the value object is the one non-time field
+  const key = Object.keys(point).find((k) => !/time/i.test(k) && point[k] && typeof point[k] === 'object');
+  return key ? point[key] : null;
+}
+
+async function listPoints(accessToken, dataType, filter, pageSize = 100) {
+  const url = `${HEALTH_BASE}/${dataType}/dataPoints?pageSize=${pageSize}&filter=${encodeURIComponent(filter)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }, cache: 'no-store' });
+  if (isPerm(res)) {
+    const err = new Error('permission');
+    err.permissionDenied = true;
+    throw err;
+  }
+  if (!res.ok) throw new Error(`${dataType} list ${res.status}`);
+  const data = await res.json().catch(() => ({}));
+  return data.dataPoints || [];
+}
+
+/** Wrap a fetcher so one tile's failure (or missing permission) never breaks the others. */
+async function settle(fn) {
+  try {
+    return { data: await fn() };
+  } catch (err) {
+    if (err.permissionDenied) return { needsPermission: true };
+    console.error('[google-health tile]', err?.message);
+    return { error: true };
+  }
+}
+
+const rethrowPerm = (fallback) => (e) => {
+  if (e.permissionDenied) throw e;
+  return fallback;
+};
+
+/** Resting HR (latest within 7 days) + today's high/low/average + irregular rhythm notifications (7 days). */
+async function heartTile(accessToken, dateStr) {
+  const from = shiftDate(dateStr, -6);
+  const [rhr, day, irn] = await Promise.all([
+    listDaily(accessToken, 'daily-resting-heart-rate', 'dailyRestingHeartRate', from, dateStr).catch(rethrowPerm([])),
+    rollupOneDay(accessToken, 'heart-rate', dateStr).catch(rethrowPerm(null)),
+    settle(() =>
+      listPoints(
+        accessToken,
+        'irregular-rhythm-notification',
+        `irregularRhythmNotification.interval.civil_start_time >= "${from}" AND irregularRhythmNotification.interval.civil_start_time < "${shiftDate(dateStr, 1)}"`,
+        10
+      )
+    ),
+  ]);
+  const r = latest(rhr);
+  const st = statsOf(day);
+  const notes = (irn.data || [])
+    .map((p) => dateStrOf(p.irregularRhythmNotification?.interval?.civilStartTime?.date))
+    .filter(Boolean)
+    .sort()
+    .reverse();
+  return {
+    restingBpm: r && toNum(r.p.beatsPerMinute) ? Math.round(toNum(r.p.beatsPerMinute)) : null,
+    restingDate: r?.date ?? null,
+    todayMin: st.min != null ? Math.round(st.min) : null,
+    todayMax: st.max != null ? Math.round(st.max) : null,
+    todayAvg: st.avg != null ? Math.round(st.avg) : null,
+    irregular: irn.needsPermission ? { needsPermission: true } : { count: notes.length, latestDate: notes[0] ?? null },
+  };
+}
+
+async function oxygenFitnessTile(accessToken, dateStr) {
+  const v = await fetchVitals(accessToken, dateStr);
+  return { spo2: v.spo2, vo2Max: v.vo2Max };
+}
+
+async function floorsTile(accessToken, dateStr) {
+  const value = await rollupOneDay(accessToken, 'floors', dateStr);
+  const st = statsOf(value);
+  return { floors: Math.round(st.sum ?? 0) };
+}
+
+/** Main sleep that ENDED on dateStr (i.e. last night, for today). */
+async function sleepTile(accessToken, dateStr) {
+  const points = await listPoints(
+    accessToken,
+    'sleep',
+    `sleep.interval.civil_end_time >= "${dateStr}" AND sleep.interval.civil_end_time < "${shiftDate(dateStr, 1)}"`,
+    25
+  );
+  const sessions = points.map((p) => p.sleep).filter(Boolean);
+  if (!sessions.length) return { minutesAsleep: null };
+  const main =
+    sessions.find((x) => x.metadata?.mainSleep) ||
+    sessions.sort((a, b) => (toNum(b.summary?.minutesAsleep) || 0) - (toNum(a.summary?.minutesAsleep) || 0))[0];
+  const stages = {};
+  for (const st of main.summary?.stagesSummary || []) stages[st.type] = toNum(st.minutes) || 0;
+  const t = (x) => (x?.time ? `${pad(x.time.hours ?? 0)}:${pad(x.time.minutes ?? 0)}` : null);
+  return {
+    minutesAsleep: toNum(main.summary?.minutesAsleep),
+    minutesAwake: toNum(main.summary?.minutesAwake),
+    stages, // { DEEP, LIGHT, REM, AWAKE } minutes (stages sleep) or { ASLEEP, RESTLESS, AWAKE } (classic)
+    bedtime: t(main.interval?.civilStartTime),
+    wake: t(main.interval?.civilEndTime),
+  };
+}
+
+/** Blood glucose readings logged on dateStr, in mg/dL (the unit used in India). */
+async function glucoseTile(accessToken, dateStr) {
+  const points = await listPoints(
+    accessToken,
+    'blood-glucose',
+    `bloodGlucose.sample_time.civil_time >= "${dateStr}" AND bloodGlucose.sample_time.civil_time < "${shiftDate(dateStr, 1)}"`,
+    200
+  );
+  const readings = points
+    .map((p) => p.bloodGlucose)
+    .filter(Boolean)
+    .map((g) => {
+      const entry = Object.entries(g).find(
+        ([k, v]) => /mill|mg|mol|value|level|concentration/i.test(k) && toNum(v?.value ?? v) !== null
+      );
+      if (!entry) return null;
+      const [k, raw] = entry;
+      const n = toNum(raw?.value ?? raw);
+      const mgdl = /mol/i.test(k) ? n * 18.0182 : n; // mmol/L -> mg/dL
+      return { mgdl: Math.round(mgdl), time: g.sampleTime?.physicalTime ?? '' };
+    })
+    .filter(Boolean)
+    .sort((a, b) => String(a.time).localeCompare(String(b.time)));
+  if (!readings.length) return { latest: null };
+  const vals = readings.map((r) => r.mgdl);
+  return { latest: readings[readings.length - 1].mgdl, min: Math.min(...vals), max: Math.max(...vals), count: readings.length };
+}
+
+export const EXTRA_TILE_FETCHERS = {
+  heart: heartTile,
+  oxygen: oxygenFitnessTile,
+  floors: floorsTile,
+  sleep: sleepTile,
+  glucose: glucoseTile,
+};
+
+/** { [tileKey]: { data } | { needsPermission: true } | { error: true } } */
+export async function fetchExtraTiles(accessToken, dateStr, keys) {
+  const wanted = keys.filter((k) => EXTRA_TILE_FETCHERS[k]);
+  const results = await Promise.all(wanted.map((k) => settle(() => EXTRA_TILE_FETCHERS[k](accessToken, dateStr))));
+  return Object.fromEntries(wanted.map((k, i) => [k, results[i]]));
 }

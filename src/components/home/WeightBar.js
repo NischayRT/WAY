@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { Scale, CheckCircle2, Target, Calendar, RefreshCw, ChevronDown } from 'lucide-react';
 import { prefetchWeightBody } from '@/components/home/WeightBodyPreview';
+import FluidFill from './FluidFill';
+import fx from './HealthTiles.module.css';
 
 /**
  * Weight-for-the-day bar. It sizes itself with a CONTAINER query (its own
@@ -32,7 +34,10 @@ export default function WeightBar({
   syncing,
   syncMsg,
   onSync,
+  progress = null, // 0..1 of the way from the first logged weight to the target (lib/goalState weightProgress)
 }) {
+  const p = progress == null ? null : Math.max(0, Math.min(1, progress));
+  const reached = p !== null && p >= 1;
   const btn =
     'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl @min-[340px]:rounded-full px-3 py-2 text-xs font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60';
   const btnGhost = `${btn} border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800`;
@@ -40,7 +45,12 @@ export default function WeightBar({
 
   return (
     <div className="@container relative h-full min-w-0">
-      <div className="flex h-full flex-col gap-2.5 rounded-2xl border border-slate-200/90 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900/80 @min-[340px]:flex-row @min-[340px]:items-center @min-[340px]:justify-between @min-[340px]:gap-2 @min-[340px]:rounded-full @min-[340px]:py-1.5 @min-[340px]:pl-1.5 @min-[340px]:pr-1.5">
+      <div
+        style={{ '--accent': '16 185 129' }}
+        title={p !== null ? `${Math.round(p * 100)}% of the way to your target weight` : undefined}
+        className={`relative isolate flex h-full flex-col gap-2.5 rounded-2xl border ${reached ? fx.reached : ''} border-slate-200/90 bg-white p-2.5 shadow-xs dark:border-slate-800 dark:bg-slate-900/80 @min-[340px]:flex-row @min-[340px]:items-center @min-[340px]:justify-between @min-[340px]:gap-2 @min-[340px]:rounded-full @min-[340px]:py-1.5 @min-[340px]:pl-1.5 @min-[340px]:pr-1.5`}>
+        {/* Progress toward the target weight, as a liquid filling the bar */}
+        {p !== null && <FluidFill pct={p * 100} rgb="16 185 129" direction="right" strength={reached ? 1.3 : 1} />}
         {/* Status */}
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 @min-[340px]:rounded-full">
@@ -50,6 +60,11 @@ export default function WeightBar({
             <p className="flex items-center gap-1 truncate text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <span className="truncate">Weight · {dateLabel}</span>
               {isLogged && <CheckCircle2 size={12} className="shrink-0 text-emerald-500" aria-label="Logged" />}
+              {p !== null && (
+                <span className={`shrink-0 font-numeric normal-case tracking-normal ${reached ? 'text-emerald-500' : 'text-slate-400'}`}>
+                  · {reached ? 'goal reached 🎉' : `${Math.round(p * 100)}% to goal`}
+                </span>
+              )}
             </p>
             <p className="truncate text-sm font-bold text-slate-900 dark:text-white">
               <span className="font-numeric">{weightKg} kg</span>

@@ -223,8 +223,8 @@ export default function ActivityClient({
               </div>
               <div className={ui.card}>
                 <ActivityChart
-                  title="Calories burned"
-                  days={series('caloriesBurned')}
+                  title="Active calories burned"
+                  days={series('activeCalories')}
                   unit="kcal"
                   goal={goals.burnKcal}
                   barClass="fill-amber-500 dark:fill-amber-400"

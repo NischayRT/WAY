@@ -125,6 +125,8 @@ export async function fetchDailyMetrics(accessToken, targetDateStr = null) {
     steps: day?.steps ?? 0,
     distanceKm: day?.distanceKm ?? 0,
     caloriesBurned: day?.caloriesBurned ?? 0,
+    activeCalories: day?.activeCalories ?? 0,
+    totalCalories: day?.totalCalories ?? null,
   };
 }
 
@@ -207,11 +209,22 @@ const kcalOf = (point, key) => {
 };
 
 /**
- * Per-day steps, distance (km) and calories burned between two dates,
- * inclusive. Days Google has nothing for come back as null.
+ * Per-day steps, distance (km) and calories between two dates, inclusive.
+ * Days Google has nothing for come back as null.
+ *
+ * Calories come back three ways:
+ *   totalCalories   resting metabolism + activity: the number Google's own
+ *                   app headlines as calories burned
+ *   activeCalories  energy from movement only: what a burn GOAL (e.g. 400
+ *                   kcal) is measured against
+ *   caloriesBurned  total when Google has it, otherwise active
+ * The old code returned ACTIVE calories whenever any day in the range had
+ * them and only fell back to total otherwise, so the home tile showed a
+ * different (much smaller) number than Google's app, and could even switch
+ * meaning between date ranges.
  */
 export async function fetchDailyHistory(accessToken, fromStr, toStr) {
-  const [steps, distance, active] = await Promise.all([
+  const [steps, distance, active, total] = await Promise.all([
     dailyRollupRange(accessToken, 'steps', fromStr, toStr, 90, (p) => Number(p.steps?.countSum)),
     dailyRollupRange(accessToken, 'distance', fromStr, toStr, 90, (p) => {
       const mm = Number(p.distance?.millimetersSum);
@@ -220,16 +233,11 @@ export async function fetchDailyHistory(accessToken, fromStr, toStr) {
     dailyRollupRange(accessToken, 'active-energy-burned', fromStr, toStr, 90, (p) =>
       kcalOf(p, 'activeEnergyBurned')
     ).catch(() => new Map()),
-  ]);
-
-  // Same fallback the Burn card uses: no active-energy data at all -> total calories.
-  let burn = active;
-  const hasActive = [...active.values()].some((v) => v > 0);
-  if (!hasActive) {
-    burn = await dailyRollupRange(accessToken, 'total-calories', fromStr, toStr, 14, (p) =>
+    // Google caps total-calories roll-ups at 14 days per request (chunked).
+    dailyRollupRange(accessToken, 'total-calories', fromStr, toStr, 14, (p) =>
       kcalOf(p, 'totalCalories')
-    ).catch(() => new Map());
-  }
+    ).catch(() => new Map()),
+  ]);
 
   const days = [];
   for (let d = fromStr; d <= toStr; d = shiftDate(d, 1)) {
@@ -237,7 +245,9 @@ export async function fetchDailyHistory(accessToken, fromStr, toStr) {
       date: d,
       steps: steps.has(d) ? Math.round(steps.get(d)) : null,
       distanceKm: distance.has(d) ? Math.round(distance.get(d) * 100) / 100 : null,
-      caloriesBurned: burn.has(d) ? Math.round(burn.get(d)) : null,
+      totalCalories: total.has(d) ? Math.round(total.get(d)) : null,
+      activeCalories: active.has(d) ? Math.round(active.get(d)) : null,
+      caloriesBurned: total.has(d) ? Math.round(total.get(d)) : active.has(d) ? Math.round(active.get(d)) : null,
     });
   }
   return days;

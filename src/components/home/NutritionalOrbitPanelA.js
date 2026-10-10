@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Flame } from 'lucide-react';
+import fx from './HealthTiles.module.css';
 
 // Layout effect in the browser (so the graphic is sized before first paint,
 // no flash of an oversized ring), plain effect on the server (no SSR warning).
@@ -143,7 +144,7 @@ export function OrbitCenter({ consumed, targets, off, hovered, setHovered, plane
           const r=p.t>0?Math.min(p.v/p.t,1):0; const leftG=Math.max(0,Math.round((p.t-p.v)*10)/10);
           return (
             <div key={p.k} onMouseEnter={()=>setHovered(p)} onMouseLeave={()=>setHovered(null)} className="absolute cursor-pointer" style={{left: `${x}px`, top: `${y}px`, transform: `translate(-50%,-50%) scale(${sc})`, zIndex: Math.round(depth*30)}}>
-              <div className={`relative flex flex-col items-center justify-center rounded-full text-white font-numeric shadow-lg ${p.bg}`} style={{width: planetSize, height: planetSize, boxShadow: `0 0 ${20*scale}px ${p.glow}`}}>
+              <div className={`relative flex flex-col items-center justify-center rounded-full text-white font-numeric shadow-lg ${p.status==='over'?'bg-rose-500':p.bg} ${p.status==='exceeded'?fx.planetExceeded:p.status==='reached'||p.status==='onTarget'?fx.planetDone:p.status==='over'?fx.planetOver:''}`} style={{width: planetSize, height: planetSize, boxShadow: `0 0 ${20*scale}px ${p.glow}`}}>
                 <span className="font-black leading-none" style={{fontSize: 12*scale}}>{Math.round(p.v)}g</span>
                 <span className="font-bold uppercase tracking-wider" style={{fontSize: 8*scale}}>{p.n}</span>
                 <span className="font-medium opacity-95" style={{fontSize: 7*scale}}>{leftG}g left</span>

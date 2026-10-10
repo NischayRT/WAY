@@ -1,4 +1,4 @@
-'item client';
+'use client';
 
 import { Activity, ArrowRight } from 'lucide-react';
 
@@ -27,7 +27,7 @@ export default function GoogleHealthConnectBanner({ returnTo = '/home' }) {
         <button
           type="button"
           onClick={handleConnect}
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-black hover:bg-white-700 dark:bg-white dark:hover:bg-black text-white dark:text-black dark:hover:text-white py-1.5 px-3 text-xs font-semibold shadow-xs transition"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-black hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-black py-1.5 px-3 text-xs font-semibold shadow-xs transition"
         >
           Connect Google Health <ArrowRight size={13} />
         </button>

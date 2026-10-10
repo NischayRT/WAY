@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Activity } from 'lucide-react';
 import WeightBodyPreview from '@/components/home/WeightBodyPreview';
 import WeightBar from '@/components/home/WeightBar';
+import { weightProgress } from '@/lib/goalState';
 import { ui } from '@/lib/ui';
 import { resolveDateTargets } from '@/lib/weightTimeline';
 import WeekDateStrip from '@/components/home/WeekDateStrip';
@@ -37,7 +38,7 @@ export default function HomeClient({
   const [isNavigating, startTransition] = useTransition();
   const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
   const [weightModalOpen, setWeightModalOpen] = useState(false);
-  const [healthData, setHealthData] = useState({ steps: 0, distanceKm: 0, caloriesBurned: 0 });
+  const [healthData, setHealthData] = useState({ steps: 0, distanceKm: 0, caloriesBurned: 0, activeCalories: 0 });
   const [healthConnected, setHealthConnected] = useState(null);
   const [healthLoading, setHealthLoading] = useState(false);
   const [weightPreviewOpen, setWeightPreviewOpen] = useState(false);
@@ -61,7 +62,7 @@ export default function HomeClient({
         const res = await fetch(`/api/google-health/steps?date=${selectedDate}`, { signal: ctrl.signal });
         if (!res.ok) {
           if (isMounted) {
-            setHealthData({ steps: 0, distanceKm: 0, caloriesBurned: 0 });
+            setHealthData({ steps: 0, distanceKm: 0, caloriesBurned: 0, activeCalories: 0 });
             setHealthConnected(false);
           }
           return;
@@ -74,10 +75,11 @@ export default function HomeClient({
               steps: Number(data.steps) || 0,
               distanceKm: Number(data.distanceKm) || 0,
               caloriesBurned: Number(data.caloriesBurned) || 0,
+              activeCalories: Number(data.activeCalories) || 0,
             });
           } else {
             setHealthConnected(false);
-            setHealthData({ steps: 0, distanceKm: 0, caloriesBurned: 0 });
+            setHealthData({ steps: 0, distanceKm: 0, caloriesBurned: 0, activeCalories: 0 });
           }
         }
       } catch (err) {
@@ -166,6 +168,10 @@ export default function HomeClient({
   // Profile target attributes
   // Saved from Settings → Body Measurements → "Set goal".
   const targetWeight = profile?.dream_target_weight_kg ? Number(profile.dream_target_weight_kg) : null;
+  const weightProgressShare = useMemo(
+    () => weightProgress({ weightLogs, currentKg: currentTargets.effectiveWeight, targetKg: targetWeight }),
+    [weightLogs, currentTargets.effectiveWeight, targetWeight]
+  );
   const targetFinalDate = profile?.dream_target_date
     ? new Date(`${String(profile.dream_target_date).slice(0, 10)}T00:00:00`).toLocaleDateString('en-IN', {
         day: 'numeric',
@@ -192,6 +198,7 @@ export default function HomeClient({
                 isLogged={isDateWeighedIn}
                 weightKg={currentTargets.effectiveWeight}
                 targetWeight={targetWeight}
+                progress={weightProgressShare}
                 targetDate={targetFinalDate}
                 previewOpen={weightPreviewOpen}
                 onTogglePreview={() => setWeightPreviewOpen((o) => !o)}
@@ -318,7 +325,12 @@ function HealthRow({ consumed, currentTargets, healthData, healthConnected, heal
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
       <StepsWidget steps={healthData.steps} targetSteps={goals.steps ?? null} loading={healthLoading} />
       <DistanceWidget distanceKm={healthData.distanceKm} targetKm={goals.distanceKm ?? null} loading={healthLoading} />
-      <CaloriesBurnedWidget caloriesBurned={healthData.caloriesBurned} targetBurn={goals.burnKcal ?? null} loading={healthLoading} />
+      <CaloriesBurnedWidget
+        caloriesBurned={healthData.caloriesBurned}
+        activeCalories={healthData.activeCalories}
+        targetBurn={goals.burnKcal ?? null}
+        loading={healthLoading}
+      />
       {remaining}
     </div>
   );

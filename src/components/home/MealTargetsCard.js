@@ -1,7 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { UtensilsCrossed, Sun, Moon, Flame } from 'lucide-react';
+import { UtensilsCrossed, Sun, Moon, Flame, CheckCircle2, AlertTriangle } from 'lucide-react';
+import FluidFill from './FluidFill';
+import fx from './HealthTiles.module.css';
+import { intakeStatus } from '@/lib/goalState';
+
+// Meal rows: a liquid fill shows how much of the meal's calorie budget is
+// eaten; on target (within +/-10%, at least +/-30 kcal) turns it green,
+// going over turns it red. Rules in lib/goalState.js.
+const MEAL_RGB = { green: '16 185 129', blue: '59 130 246', purple: '139 92 246' };
+const STATUS_RGB = { onTarget: '16 185 129', over: '244 63 94' };
+const mealBuffer = (targetKcal) => Math.max(30, targetKcal * 0.1);
 
 const MEAL_CONFIG = [
   { key: 'breakfast', label: 'Breakfast', accent: 'green', icon: Sun, frac: 0.30 },
@@ -46,7 +56,10 @@ function MealRow({ meal, totals, targets }) {
   // Bar scale = the meal's calorie budget. If the meal goes over budget we
   // scale the segments down so the bar stays full but keeps its proportions.
   const scale = Math.max(targetKcal, consumedKcal, 1);
-  const pct = targetKcal > 0 ? Math.min(Math.round((consumedKcal / targetKcal) * 100), 999) : 0;
+
+  const status = isEmpty ? 'progress' : intakeStatus(consumedKcal, targetKcal, mealBuffer(targetKcal));
+  const fillRgb = STATUS_RGB[status] || MEAL_RGB[meal.accent];
+  const overBy = Math.round(consumedKcal - targetKcal);
 
   const handleClick = () => {
     if (isEmpty) {
@@ -74,14 +87,32 @@ function MealRow({ meal, totals, targets }) {
       }}
       aria-expanded={isEmpty ? undefined : pinned}
       aria-label={isEmpty ? `${meal.label}: nothing logged, go to log food` : `${meal.label} macros`}
-      className="group cursor-pointer rounded-xl border border-slate-200/70 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 p-2.5 transition-colors hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20 dark:focus-visible:ring-white/30"
+      style={{ '--accent': fillRgb }}
+      className={`group relative isolate cursor-pointer rounded-xl border border-slate-200/70 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 p-2.5 transition-colors hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20 dark:focus-visible:ring-white/30 ${
+        status === 'over' ? fx.over : status === 'onTarget' ? fx.reached : ''
+      }`}
     >
+      <FluidFill pct={targetKcal > 0 ? (consumedKcal / targetKcal) * 100 : 0} rgb={fillRgb} direction="right" strength={0.85} />
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border bg-white dark:bg-slate-900 ${ICON_BORDER[meal.accent]}`}>
             <Icon size={13} />
           </div>
           <span className="text-xs font-bold text-slate-900 dark:text-white truncate">{meal.label}</span>
+          {status !== 'progress' && (
+            <span
+              key={status}
+              role="status"
+              className={`${fx.badge} inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px text-[9px] font-bold ${
+                status === 'over'
+                  ? 'border-rose-300 bg-rose-50 text-rose-600 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                  : 'border-emerald-300 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+              }`}
+            >
+              {status === 'over' ? <AlertTriangle size={9} /> : <CheckCircle2 size={9} />}
+              {status === 'over' ? `+${overBy}` : 'On target'}
+            </span>
+          )}
         </div>
         <span className="font-numeric text-[10px] font-semibold text-slate-400 shrink-0">
           {isEmpty ? `${Math.round(meal.frac * 100)}% of day` : `${Math.round(consumedKcal)} / ${Math.round(targetKcal)} kcal`}
@@ -133,7 +164,11 @@ function MealRow({ meal, totals, targets }) {
                 </div>
               ))}
               <p className="col-span-3 text-[10px] font-semibold text-slate-400">
-                {pct >= 100 ? 'Meal target reached' : `${Math.max(0, Math.round(targetKcal - consumedKcal))} kcal left`}
+                {status === 'over'
+                  ? `${overBy} kcal over this meal's budget`
+                  : status === 'onTarget'
+                    ? 'Meal target reached'
+                    : `${Math.max(0, Math.round(targetKcal - consumedKcal))} kcal left`}
               </p>
             </div>
           )}

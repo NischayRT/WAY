@@ -227,7 +227,7 @@ export default function HomeClient({
           />
         </div>
 
-        <div className={`space-y-6 transition-opacity ${isNavigating ? 'opacity-60' : ''}`}>
+        <div className={`space-y-4 transition-opacity ${isNavigating ? 'opacity-60' : ''}`}>
           {/* Header Bar */}
           {/* <div className="flex items-center justify-between pb-3 border-b-2 border-dotted dark:border-slate-700">
             <div>

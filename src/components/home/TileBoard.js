@@ -54,27 +54,26 @@ function readSaved(userId) {
   }
 }
 
-export default function TileBoard({
-  userId,
-  selectedDate,
-  today,
-  healthData,
-  healthLoading,
-  goals = {},
-  consumed,
-  currentTargets,
-}) {
+/**
+ * The user's chosen tiles, shared by the home page and the Activity page
+ * (same saved list). Starts with the default during server render, then
+ * restores the saved choice after mount.
+ */
+export function useTileSelection(userId) {
   const [tiles, setTiles] = useState(DEFAULT_TILES);
-  const [editing, setEditing] = useState(false);
-  const [extras, setExtras] = useState({});
-  const [extrasLoading, setExtrasLoading] = useState(false);
-
-  // Restore after mount (localStorage isn't available during server render).
   useEffect(() => {
     const saved = readSaved(userId);
     if (saved) setTiles(saved);
+    // Keep pages in sync if the choice changes in another tab.
+    const onStorage = (e) => {
+      if (e.key === storageKey(userId)) {
+        const next = readSaved(userId);
+        if (next) setTiles(next);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, [userId]);
-
   const save = useCallback(
     (next) => {
       setTiles(next);
@@ -86,6 +85,53 @@ export default function TileBoard({
     },
     [userId]
   );
+  return [tiles, save];
+}
+
+/** "Edit tiles" button + picker, reusable on any page. */
+export function EditTilesButton({ tiles, onSave, label = 'Edit tiles', compact = false, className = '' }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={label}
+        title={label}
+        className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-600 shadow-xs transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white ${
+          compact ? 'p-2 sm:px-3 sm:py-1.5' : 'px-3 py-1.5'
+        } ${className}`}
+      >
+        <Pencil size={12} />
+        <span className={compact ? 'hidden sm:inline' : ''}>{label}</span>
+      </button>
+      {open && (
+        <TilePicker
+          current={tiles}
+          onClose={() => setOpen(false)}
+          onSave={(next) => {
+            onSave(next);
+            setOpen(false);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+export default function TileBoard({
+  userId,
+  selectedDate,
+  today,
+  healthData,
+  healthLoading,
+  goals = {},
+  consumed,
+  currentTargets,
+}) {
+  const [tiles, save] = useTileSelection(userId);
+  const [extras, setExtras] = useState({});
+  const [extrasLoading, setExtrasLoading] = useState(false);
 
   const extraKeys = useMemo(() => tiles.filter((k) => EXTRA_KEYS.has(k)), [tiles]);
 
@@ -154,13 +200,7 @@ export default function TileBoard({
   return (
     <section aria-label="Health tiles" className="space-y-2">
       <div className="flex items-center justify-end">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-xs transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
-        >
-          <Pencil size={12} /> Edit tiles
-        </button>
+        <EditTilesButton tiles={tiles} onSave={save} />
       </div>
 
       <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -171,13 +211,12 @@ export default function TileBoard({
         ))}
       </div>
 
-      {editing && <TilePicker current={tiles} onClose={() => setEditing(false)} onSave={(next) => { save(next); setEditing(false); }} />}
     </section>
   );
 }
 
 /** Modal: switch tiles on/off and reorder them. */
-function TilePicker({ current, onClose, onSave }) {
+export function TilePicker({ current, onClose, onSave }) {
   const [draft, setDraft] = useState(current);
 
   useEffect(() => {

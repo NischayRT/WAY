@@ -40,6 +40,7 @@ export default async function ActivityPage() {
       <AppHeader title="Activity" backHref="/home" backLabel="Back to today" />
 
       <ActivityClient
+        userId={user.id}
         entries={entries}
         heightCm={profile?.height_cm ?? null}
         goal={profile?.goal ?? 'maintain'}

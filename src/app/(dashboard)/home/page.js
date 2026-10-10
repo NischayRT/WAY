@@ -24,7 +24,7 @@ export default async function HomePage({ searchParams }) {
     supabase
       .from('profiles')
       .select(
-        'full_name, height_cm, weight_kg, age, sex, activity_level, goal, override_calories, override_protein_g, override_carbs_g, override_fat_g, dream_target_weight_kg, dream_target_date, step_goal, distance_goal_km, burn_goal_kcal, waist_cm, hip_cm, chest_cm, bicep_cm'
+        'id, full_name, height_cm, weight_kg, age, sex, activity_level, goal, override_calories, override_protein_g, override_carbs_g, override_fat_g, dream_target_weight_kg, dream_target_date, step_goal, distance_goal_km, burn_goal_kcal, waist_cm, hip_cm, chest_cm, bicep_cm'
       )
       .eq('id', user.id)
       .single(),

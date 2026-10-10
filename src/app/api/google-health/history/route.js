@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
-import { getValidAccessToken, fetchDailyHistory } from '@/lib/googleHealth';
+import { getValidAccessToken, fetchDailyHistory, fetchExtraHistory } from '@/lib/googleHealth';
 import { todayLocalDate, isValidDateStr, addDays } from '@/lib/dateUtils';
 
 const MAX_SPAN_DAYS = 366;
 
-// GET /api/google-health/history?from=YYYY-MM-DD&to=YYYY-MM-DD
+// GET /api/google-health/history?from=YYYY-MM-DD&to=YYYY-MM-DD[&keys=heart,sleep,...]
 //
-// Per-day steps, distance (km) and calories burned for the Activity page.
+// Per-day steps, distance (km) and calories burned for the Activity page,
+// plus optional series for the stats the user picked (`keys`): heart,
+// oxygen, floors, sleep, glucose. Each optional key comes back on its own
+// as { data } | { needsPermission } | { error }.
 export async function GET(request) {
   const supabase = await createServerSupabaseClient();
   const {
@@ -35,9 +38,16 @@ export async function GET(request) {
     const accessToken = await getValidAccessToken(supabase, user.id);
     if (!accessToken) return NextResponse.json({ connected: false, days: [] });
 
-    const days = await fetchDailyHistory(accessToken, from, to);
+    const keys = (searchParams.get('keys') || '')
+      .split(',')
+      .map((k) => k.trim())
+      .filter((k) => ['heart', 'oxygen', 'floors', 'sleep', 'glucose'].includes(k));
+    const [days, extras] = await Promise.all([
+      fetchDailyHistory(accessToken, from, to),
+      keys.length ? fetchExtraHistory(accessToken, from, to, keys) : Promise.resolve({}),
+    ]);
     return NextResponse.json(
-      { connected: true, from, to, days },
+      { connected: true, from, to, days, extras },
       { headers: { 'Cache-Control': 'private, max-age=60' } }
     );
   } catch (err) {

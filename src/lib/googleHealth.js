@@ -557,3 +557,184 @@ export async function fetchExtraTiles(accessToken, dateStr, keys) {
   const results = await Promise.all(wanted.map((k) => settle(() => EXTRA_TILE_FETCHERS[k](accessToken, dateStr))));
   return Object.fromEntries(wanted.map((k, i) => [k, results[i]]));
 }
+
+/* ------------------------------------------------------------------ */
+/* Range history for the Activity page's optional charts               */
+/* ------------------------------------------------------------------ */
+
+/** All pages of a list query (capped), for ranges longer than one page. */
+async function listAll(accessToken, dataType, filter, pageSize, maxPages = 20) {
+  const out = [];
+  let token = '';
+  for (let i = 0; i < maxPages; i += 1) {
+    const q = new URLSearchParams({ pageSize: String(pageSize), filter });
+    if (token) q.set('pageToken', token);
+    const res = await fetch(`${HEALTH_BASE}/${dataType}/dataPoints?${q.toString()}`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    if (isPerm(res)) {
+      const err = new Error('permission');
+      err.permissionDenied = true;
+      throw err;
+    }
+    if (!res.ok) throw new Error(`${dataType} list ${res.status}`);
+    const data = await res.json().catch(() => ({}));
+    out.push(...(data.dataPoints || []));
+    token = data.nextPageToken;
+    if (!token) break;
+  }
+  return out;
+}
+
+const dailyFilter = (field, from, to) => `${field}.date >= "${from}" AND ${field}.date < "${shiftDate(to, 1)}"`;
+
+/** Per-day roll-up value OBJECTS (not just one number), chunked by maxDays. */
+async function dailyRollupObjects(accessToken, dataType, fromStr, toStr, maxDays) {
+  const out = new Map();
+  let cursor = fromStr;
+  while (cursor <= toStr) {
+    const chunkEnd = shiftDate(cursor, maxDays - 1) < toStr ? shiftDate(cursor, maxDays - 1) : toStr;
+    const res = await fetch(`${HEALTH_BASE}/${dataType}/dataPoints:dailyRollUp`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ range: { start: civil(cursor), end: civil(shiftDate(chunkEnd, 1)) }, windowSizeDays: 1 }),
+      cache: 'no-store',
+    });
+    if (isPerm(res)) {
+      const err = new Error('permission');
+      err.permissionDenied = true;
+      throw err;
+    }
+    if (!res.ok) throw new Error(`${dataType} rollup ${res.status}`);
+    const data = await res.json().catch(() => ({}));
+    for (const point of data.rollupDataPoints ?? []) {
+      const d = dateStrOf(point.civilStartTime?.date);
+      const key = Object.keys(point).find((k) => !/time/i.test(k) && point[k] && typeof point[k] === 'object');
+      if (d && key) out.set(d, point[key]);
+    }
+    cursor = shiftDate(chunkEnd, 1);
+  }
+  return out;
+}
+
+// Heart-rate roll-ups are capped at 14 days per request; beyond this span
+// only the daily resting heart rate is charted (keeps long ranges fast).
+const HEART_RANGE_MAX_DAYS = 92;
+
+const HISTORY_FETCHERS = {
+  async heart(token, from, to) {
+    const span = Math.round((new Date(`${to}T00:00:00Z`) - new Date(`${from}T00:00:00Z`)) / 86400000) + 1;
+    const [rhr, day] = await Promise.all([
+      listAll(token, 'daily-resting-heart-rate', dailyFilter('dailyRestingHeartRate', from, to), 1000),
+      span <= HEART_RANGE_MAX_DAYS ? dailyRollupObjects(token, 'heart-rate', from, to, 14).catch(rethrowPerm(new Map())) : new Map(),
+    ]);
+    const resting = new Map();
+    for (const p of rhr) {
+      const v = p.dailyRestingHeartRate;
+      const d = dateStrOf(v?.date);
+      if (d && toNum(v.beatsPerMinute)) resting.set(d, Math.round(toNum(v.beatsPerMinute)));
+    }
+    return { resting, day: new Map([...day].map(([d, o]) => [d, statsOf(o)])) };
+  },
+  async oxygen(token, from, to) {
+    const [s, v] = await Promise.all([
+      listAll(token, 'daily-oxygen-saturation', dailyFilter('dailyOxygenSaturation', from, to), 1000),
+      listAll(token, 'daily-vo2-max', dailyFilter('dailyVo2Max', from, to), 1000).catch(rethrowPerm([])),
+    ]);
+    const spo2 = new Map();
+    for (const p of s) {
+      const o = p.dailyOxygenSaturation;
+      const d = dateStrOf(o?.date);
+      const n = numberField(o, 'average');
+      if (d && n !== null) spo2.set(d, Math.round(n * 10) / 10);
+    }
+    const vo2 = new Map();
+    for (const p of v) {
+      const o = p.dailyVo2Max;
+      const d = dateStrOf(o?.date);
+      const n = numberField(o, 'vo2');
+      if (d && n !== null) vo2.set(d, Math.round(n * 10) / 10);
+    }
+    return { spo2, vo2 };
+  },
+  async floors(token, from, to) {
+    const m = await dailyRollupObjects(token, 'floors', from, to, 90);
+    return { floors: new Map([...m].map(([d, o]) => [d, Math.round(statsOf(o).sum ?? 0)])) };
+  },
+  async sleep(token, from, to) {
+    const pts = await listAll(
+      token,
+      'sleep',
+      `sleep.interval.civil_end_time >= "${from}" AND sleep.interval.civil_end_time < "${shiftDate(to, 1)}"`,
+      25,
+      20
+    );
+    // One value per night, keyed by the date the sleep ENDED; the main sleep wins.
+    const byDay = new Map();
+    for (const p of pts) {
+      const sl = p.sleep;
+      const d = dateStrOf(sl?.interval?.civilEndTime?.date);
+      const mins = toNum(sl?.summary?.minutesAsleep);
+      if (!d || mins === null) continue;
+      const prev = byDay.get(d);
+      if (!prev || sl.metadata?.mainSleep || mins > prev.mins) byDay.set(d, { mins, main: !!sl.metadata?.mainSleep });
+    }
+    return { sleepHours: new Map([...byDay].map(([d, x]) => [d, Math.round((x.mins / 60) * 10) / 10])) };
+  },
+  async glucose(token, from, to) {
+    const pts = await listAll(
+      token,
+      'blood-glucose',
+      `bloodGlucose.sample_time.civil_time >= "${from}" AND bloodGlucose.sample_time.civil_time < "${shiftDate(to, 1)}"`,
+      1000,
+      5
+    );
+    const perDay = new Map();
+    for (const p of pts) {
+      const g = p.bloodGlucose;
+      if (!g) continue;
+      const entry = Object.entries(g).find(([k, v]) => /mill|mg|mol|value|level|concentration/i.test(k) && toNum(v?.value ?? v) !== null);
+      const d = dateStrOf(g.sampleTime?.civilTime?.date);
+      if (!entry || !d) continue;
+      const n = toNum(entry[1]?.value ?? entry[1]);
+      const mgdl = /mol/i.test(entry[0]) ? n * 18.0182 : n;
+      if (!perDay.has(d)) perDay.set(d, []);
+      perDay.get(d).push(mgdl);
+    }
+    const avg = new Map();
+    for (const [d, arr] of perDay) avg.set(d, Math.round(arr.reduce((a, b) => a + b, 0) / arr.length));
+    return { glucoseAvg: avg };
+  },
+};
+
+/**
+ * Optional per-day series for the Activity page. Returns
+ * { [key]: { data: { series: { name: [{date, value}] } } } | { needsPermission } | { error } }
+ * where every series has one entry per day in the range (null = no data).
+ */
+export async function fetchExtraHistory(accessToken, fromStr, toStr, keys) {
+  const dates = [];
+  for (let d = fromStr; d <= toStr; d = shiftDate(d, 1)) dates.push(d);
+  const toSeries = (map) => dates.map((date) => ({ date, value: map.has(date) ? map.get(date) : null }));
+
+  const wanted = keys.filter((k) => HISTORY_FETCHERS[k]);
+  const results = await Promise.all(
+    wanted.map((k) =>
+      settle(async () => {
+        const maps = await HISTORY_FETCHERS[k](accessToken, fromStr, toStr);
+        const series = {};
+        for (const [name, m] of Object.entries(maps)) {
+          if (name === 'day') {
+            series.low = dates.map((date) => ({ date, value: m.get(date)?.min ?? null }));
+            series.high = dates.map((date) => ({ date, value: m.get(date)?.max ?? null }));
+          } else {
+            series[name] = toSeries(m);
+          }
+        }
+        return { series };
+      })
+    )
+  );
+  return Object.fromEntries(wanted.map((k, i) => [k, results[i]]));
+}

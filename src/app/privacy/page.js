@@ -10,12 +10,12 @@ export const metadata = {
 const SCOPES = [
   {
     scope: 'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
-    what: 'Read-only access to your daily steps, distance, calories burned and floors climbed.',
+    what: 'Read-only access to your daily steps, distance, calories burned, floors climbed, Active Zone Minutes and workouts.',
     why: 'To show these figures on your dashboard and Activity page next to your food intake, and to compare them with goals you set.',
   },
   {
     scope: 'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
-    what: 'Read-only access to your heart rate (daily resting rate, and the day\'s low and high), overnight blood oxygen (SpO2), VO2 max and blood glucose readings.',
+    what: 'Read-only access to your heart rate (daily resting rate, and the day\'s low and high), heart rate variability, overnight blood oxygen (SpO2), VO2 max and blood glucose readings.',
     why: 'To show these on the dashboard tiles you choose. We do not store these values; they are read from Google Health each time the dashboard loads.',
   },
   {
@@ -80,6 +80,7 @@ export default function PrivacyPage() {
           items={[
             'Your daily steps, distance and calories burned (read from Google Health).',
             'Heart rate, blood oxygen (SpO2), VO2 max, blood glucose, floors climbed and, if you add those tiles, sleep and irregular rhythm notifications (read from Google Health and shown on your dashboard; not stored by us).',
+            'Body Age: your last 7 weeks of steps, Active Zone Minutes, workouts, sleep and resting heart rate, and your VO2 max from the last 90 days, are read from Google Health and combined with your body measurements to estimate an effective age (from the last 30 days, with a 4-week trend). It is calculated each time you view it and not stored. Readiness and recovery are estimated the same way from your heart rate variability, resting heart rate and sleep compared with your own recent baseline.',
             'OAuth access and refresh tokens that Google issues so the connection keeps working (see section 4).',
           ]}
         />

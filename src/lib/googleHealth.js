@@ -839,3 +839,202 @@ export async function fetchExtraHistory(accessToken, fromStr, toStr, keys) {
   );
   return Object.fromEntries(wanted.map((k, i) => [k, results[i]]));
 }
+
+/* ------------------------------------------------------------------ */
+/* Body Age inputs (lib/bodyAge.js)                                    */
+/* ------------------------------------------------------------------ */
+
+// 30-day Body Age window, recalculated weekly: fetch 30 + 3 weeks so the
+// last four weekly snapshots can be drawn as a trend.
+const BODY_AGE_WINDOW = 30;
+const BODY_AGE_WEEKS = 4;
+const BODY_AGE_FETCH_DAYS = BODY_AGE_WINDOW + (BODY_AGE_WEEKS - 1) * 7;
+const VO2_LOOKBACK_DAYS = 90;
+const STRENGTH_TYPES = /STRENGTH|WEIGHT|RESISTANCE|CROSSFIT|CALISTHENIC|CIRCUIT|KETTLEBELL|PILATES|BODYWEIGHT/i;
+
+/** Roll-up objects over a long range, chunks fetched in parallel (4 at a time). */
+async function rollupObjectsParallel(accessToken, dataType, fromStr, toStr, maxDays) {
+  const chunks = [];
+  for (let c = fromStr; c <= toStr; ) {
+    const end = shiftDate(c, maxDays - 1) < toStr ? shiftDate(c, maxDays - 1) : toStr;
+    chunks.push([c, end]);
+    c = shiftDate(end, 1);
+  }
+  const out = new Map();
+  for (let i = 0; i < chunks.length; i += 4) {
+    const maps = await Promise.all(chunks.slice(i, i + 4).map(([a, b]) => dailyRollupObjects(accessToken, dataType, a, b, maxDays)));
+    for (const m of maps) for (const [d, v] of m) out.set(d, v);
+  }
+  return out;
+}
+
+/** Local clock time of a civil date-time, as minutes on a continuous scale. */
+const civilMinutes = (c) => {
+  if (!c?.date?.year) return null;
+  const day = Date.UTC(c.date.year, (c.date.month || 1) - 1, c.date.day || 1) / 60000;
+  return day + (c.time?.hours ?? 0) * 60 + (c.time?.minutes ?? 0);
+};
+
+const minutesOfIso = (iso) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d.getTime() / 60000;
+};
+
+/**
+ * Everything Body Age needs: metric values for the last 30 days (Body Age),
+ * the last 7 (Pace of Aging) and four weekly 30-day snapshots (trend), plus
+ * day counts for the prerequisites. Each source fails on its own: a missing
+ * permission is reported, not thrown.
+ */
+export async function fetchBodyAgeInputs(accessToken, todayStr = null) {
+  const to = todayStr || todayLocalDate();
+  const from = shiftDate(to, -(BODY_AGE_FETCH_DAYS - 1));
+  const recentFrom = shiftDate(to, -(BODY_AGE_WINDOW - 1));
+  const weekFrom = shiftDate(to, -6);
+  const perm = {};
+  const guard = (key, p) =>
+    p.catch((e) => {
+      if (e.permissionDenied) perm[key] = true;
+      else console.warn(`[body-age] ${key}:`, e.message);
+      return null;
+    });
+
+  const [steps, zones, rhr, vo2, sleep, exercise, hrv] = await Promise.all([
+    guard('steps', dailyRollupRange(accessToken, 'steps', from, to, 90, (p) => toNum(p.steps?.countSum ?? p.steps?.count ?? statsOf(p.steps).sum))),
+    guard('zones', rollupObjectsParallel(accessToken, 'active-zone-minutes', from, to, 14)),
+    guard('restingHr', listAll(accessToken, 'daily-resting-heart-rate', dailyFilter('dailyRestingHeartRate', from, to), 1000)),
+    guard('vo2', listAll(accessToken, 'daily-vo2-max', dailyFilter('dailyVo2Max', shiftDate(to, -(VO2_LOOKBACK_DAYS + 21)), to), 1000)),
+    guard('sleep', listAll(accessToken, 'sleep', `sleep.interval.civil_end_time >= "${from}" AND sleep.interval.civil_end_time < "${shiftDate(to, 1)}"`, 25, 10)),
+    guard('exercise', listAll(accessToken, 'exercise', `exercise.interval.civil_start_time >= "${from}" AND exercise.interval.civil_start_time < "${shiftDate(to, 1)}"`, 25, 16)),
+    // Nightly HRV, for Readiness (lib/readiness.js); not used in Body Age.
+    guard('hrv', listAll(accessToken, 'daily-heart-rate-variability', dailyFilter('dailyHeartRateVariability', from, to), 1000)),
+  ]);
+
+  const avg = (arr) => (arr.length ? arr.reduce((x, y) => x + y, 0) / arr.length : null);
+  const between = (lo, hi) => (d) => d >= lo && d <= hi;
+
+  // Steps: days actually worn (>= 500 steps).
+  const stepDays = steps ? [...steps].filter(([, v]) => v >= 500) : [];
+  // Zone minutes per day: moderate = fat burn, vigorous = cardio + peak.
+  const zoneDays = [];
+  for (const [d, o] of zones || []) {
+    let mod = 0;
+    let vig = 0;
+    let any = false;
+    for (const [k, v] of Object.entries(o || {})) {
+      const n = toNum(v);
+      if (n === null) continue;
+      any = true;
+      if (/fat/i.test(k)) mod += n;
+      else if (/cardio|peak/i.test(k)) vig += n;
+    }
+    if (any) zoneDays.push({ d, mod, vig });
+  }
+  const rhrRows = (rhr || [])
+    .map((p) => ({ d: dateStrOf(p.dailyRestingHeartRate?.date), v: toNum(p.dailyRestingHeartRate?.beatsPerMinute) }))
+    .filter((r) => r.d && r.v);
+  const vo2Rows = (vo2 || [])
+    .map((p) => ({ d: dateStrOf(p.dailyVo2Max?.date), v: numberField(p.dailyVo2Max, 'vo2') }))
+    .filter((r) => r.d && r.v)
+    .sort((a, b) => (a.d < b.d ? 1 : -1));
+
+  // Sleep: main sleep per night, from local (civil) times.
+  const nights = new Map();
+  for (const p of sleep || []) {
+    const sl = p.sleep;
+    const d = dateStrOf(sl?.interval?.civilEndTime?.date);
+    const mins = toNum(sl?.summary?.minutesAsleep);
+    const start = civilMinutes(sl?.interval?.civilStartTime);
+    const end = civilMinutes(sl?.interval?.civilEndTime);
+    if (!d || !mins || start == null || end == null) continue;
+    const prev = nights.get(d);
+    if (!prev || sl.metadata?.mainSleep || mins > prev.mins) nights.set(d, { d, mins, mid: (start + end) / 2 });
+  }
+  const nightRows = [...nights.values()];
+  // Sleep midpoint as local clock minutes, unwrapped around midnight (noon..noon+24h).
+  const clockMid = (r) => {
+    let m = ((r.mid % 1440) + 1440) % 1440;
+    if (m < 720) m += 1440;
+    return m;
+  };
+  const sd = (arr) => {
+    if (arr.length < 2) return null;
+    const m = avg(arr);
+    return Math.sqrt(arr.reduce((x, v) => x + (v - m) ** 2, 0) / (arr.length - 1));
+  };
+
+  // Strength training sessions.
+  const strength = (exercise || [])
+    .map((p) => p.exercise)
+    .filter((e) => e && STRENGTH_TYPES.test(String(e.exerciseType || e.activityType || e.displayName || '')))
+    .map((e) => {
+      const d = dateStrOf(e.interval?.civilStartTime?.date);
+      const a = minutesOfIso(e.interval?.startTime);
+      const b = minutesOfIso(e.interval?.endTime);
+      const active = toNum(String(e.activeDuration || '').replace('s', ''));
+      return { d, min: active ? active / 60 : a != null && b != null ? b - a : 0 };
+    })
+    .filter((r) => r.d);
+
+  /**
+   * Metric values for one window of `days` days ending on `end`. Weekly
+   * figures (zone and strength minutes) are per 7 days of the window;
+   * daily ones (steps, sleep, resting HR) are averages over days with data.
+   */
+  const windowValues = (end, days, minNightsForSd = 7) => {
+    const inWin = between(shiftDate(end, -(days - 1)), end);
+    const z = zoneDays.filter((r) => inWin(r.d));
+    const n = nightRows.filter((r) => inWin(r.d));
+    const sDays = stepDays.filter(([d]) => inWin(d));
+    const zoneSpan = Math.max(z.length, 1);
+    const wornSpan = Math.max(sDays.length, Math.min(days, 7));
+    const v = vo2Rows.filter((r) => r.d <= end && r.d >= shiftDate(end, -(VO2_LOOKBACK_DAYS - 1)));
+    return {
+      steps: avg(sDays.map(([, x]) => x)),
+      moderateMinWeek: z.length ? (z.reduce((a, r) => a + r.mod, 0) / zoneSpan) * 7 : null,
+      vigorousMinWeek: z.length ? (z.reduce((a, r) => a + r.vig, 0) / zoneSpan) * 7 : null,
+      strengthMinWeek: sDays.length ? (strength.filter((r) => inWin(r.d)).reduce((a, r) => a + r.min, 0) / wornSpan) * 7 : null,
+      restingHr: avg(rhrRows.filter((r) => inWin(r.d)).map((r) => r.v)),
+      sleepHours: n.length ? avg(n.map((r) => r.mins / 60)) : null,
+      sleepMidpointSdMin: n.length >= minNightsForSd ? sd(n.map(clockMid)) : null,
+      vo2: v.length ? avg(v.slice(0, 3).map((r) => r.v)) : null,
+    };
+  };
+
+  // Per-day series for Readiness / Recovery: HRV, resting HR, sleep minutes.
+  const daily = new Map();
+  const put = (d, k, v) => {
+    if (!d || v == null) return;
+    daily.set(d, { ...(daily.get(d) || { date: d }), [k]: v });
+  };
+  for (const p of hrv || []) {
+    const o = p.dailyHeartRateVariability;
+    put(dateStrOf(o?.date), 'hrv', toNum(o?.averageHeartRateVariabilityMilliseconds) ?? numberField(o, 'variability'));
+  }
+  for (const r of rhrRows) put(r.d, 'rhr', r.v);
+  for (const n of nightRows) put(n.d, 'sleepMin', n.mins);
+
+  const inLast30 = between(recentFrom, to);
+  return {
+    daily: [...daily.values()],
+    sleepMidpointSd30: windowValues(to, BODY_AGE_WINDOW).sleepMidpointSdMin,
+    long: windowValues(to, BODY_AGE_WINDOW),
+    recent: windowValues(to, 7, 4),
+    // Body Age at the end of each of the last 4 weeks (oldest first).
+    snapshots: Array.from({ length: BODY_AGE_WEEKS }, (_, i) => {
+      const end = shiftDate(to, -7 * (BODY_AGE_WEEKS - 1 - i));
+      return { end, values: windowValues(end, BODY_AGE_WINDOW) };
+    }),
+    counts: {
+      steps: stepDays.filter(([d]) => inLast30(d)).length,
+      zones: zoneDays.filter((r) => inLast30(r.d)).length,
+      restingHr: rhrRows.filter((r) => inLast30(r.d)).length,
+      sleep: nightRows.filter((r) => inLast30(r.d)).length,
+      recent: stepDays.filter(([d]) => d >= weekFrom).length,
+      vo2: vo2Rows.filter((r) => r.d >= shiftDate(to, -(VO2_LOOKBACK_DAYS - 1))).length,
+      wornDays: stepDays.filter(([d]) => inLast30(d)).length,
+    },
+    latestVo2Date: vo2Rows[0]?.d ?? null,
+    needsPermission: perm,
+  };
+}

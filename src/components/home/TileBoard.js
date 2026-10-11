@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Pencil, X, ArrowUp, ArrowDown, RotateCcw, Footprints, Navigation, Flame, HeartPulse, Droplets, Building2, Moon, Activity, Target } from 'lucide-react';
+import { Pencil, X, ArrowUp, ArrowDown, RotateCcw, Footprints, Navigation, Flame, HeartPulse, Droplets, Building2, Moon, Activity, Target, Hourglass } from 'lucide-react';
+import BodyAgeCard from '@/components/body/BodyAgeCard';
 import {
   StepsWidget,
   DistanceWidget,
@@ -35,6 +36,7 @@ export const TILE_CATALOG = [
   { key: 'sleep', label: 'Sleep', Icon: Moon, hint: 'Last night’s sleep and stages (asks for sleep access)' },
   { key: 'glucose', label: 'Glucose', Icon: Activity, hint: 'Blood glucose readings logged today' },
   { key: 'consumed', label: 'Calories consumed', Icon: Target, hint: 'Calories eaten vs your target' },
+  { key: 'bodyAge', label: 'Healthspan · Body Age', Icon: Hourglass, hint: 'Body Age, readiness, recovery, sleep consistency, pace of aging' },
 ];
 export const DEFAULT_TILES = ['steps', 'distance', 'energy', 'heart'];
 const MAX_TILES = 8;
@@ -193,6 +195,8 @@ export default function TileBoard({
         return <SleepWidget {...common} />;
       case 'glucose':
         return <GlucoseWidget {...common} />;
+      case 'bodyAge':
+        return <BodyAgeCard compact />;
       default:
         return null;
     }

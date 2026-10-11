@@ -11,6 +11,7 @@ import WeighInForm from '@/components/weight/WeighInForm';
 import WeightHistoryList from '@/components/weight/WeightHistoryList';
 import ActivityChart from '@/components/activity/ActivityChart';
 import HeartTrendChart from '@/components/activity/HeartTrendChart';
+import BodyAgeCard from '@/components/body/BodyAgeCard';
 import { useTileSelection, EditTilesButton } from '@/components/home/TileBoard';
 import { FLOORS_GOAL } from '@/components/home/GoogleHealthWidgets';
 import { interpret } from '@/lib/insights';
@@ -305,6 +306,11 @@ export default function ActivityClient({
 
           {!activity.reauth && (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+              {tiles.includes('bodyAge') && (
+                <div className="lg:col-span-2 2xl:col-span-3">
+                  <BodyAgeCard />
+                </div>
+              )}
               {statKeys.map((k) => {
                 const c = STAT_CHARTS[k];
                 const res = c.from === 'days' ? null : activity.extras?.[k];
@@ -365,7 +371,7 @@ export default function ActivityClient({
                   </Link>
                 </div>
               )}
-              {!statKeys.length && !tiles.includes('consumed') && (
+              {!statKeys.length && !tiles.includes('consumed') && !tiles.includes('bodyAge') && (
                 <p className="text-sm text-slate-500 dark:text-slate-400">No stats selected. Use Edit stats to choose some.</p>
               )}
             </div>

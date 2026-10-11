@@ -312,9 +312,9 @@
    scrolling 80px per heartbeat, faded at both ends. */
 .ecg {
   position: absolute;
-  right: 18px;
-  top: 74px;
-  width: 46%;
+  right: 14px;
+  top: 78px;
+  width: 36%;
   height: 34px;
   z-index: -1;
   pointer-events: none;

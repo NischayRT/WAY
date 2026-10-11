@@ -25,11 +25,12 @@ export default async function OnboardingPage() {
   if (existingProfile) redirect('/home');
 
   return (
-    <main className="mx-auto max-w-md p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Set up your profile</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-          We use this to calculate your daily calorie and macro targets.
+    <main className="mx-auto w-full max-w-xl px-4 pb-16 pt-6 sm:pt-10">
+      <div className="mb-6">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Welcome to WAY Studio</p>
+        <h1 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">Let&apos;s build your plan</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          A few quick questions to set your daily calories and macros. Nothing is saved until you confirm your plan.
         </p>
       </div>
       <OnboardingClient />

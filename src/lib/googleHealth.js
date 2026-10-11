@@ -447,12 +447,64 @@ const rethrowPerm = (fallback) => (e) => {
   return fallback;
 };
 
-/** Resting HR (latest within 7 days) + today's high/low/average + irregular rhythm notifications (7 days). */
+/**
+ * The day's heart-rate readings, for when the roll-up has nothing (e.g.
+ * readings logged by hand in the Google Health app). Capped at a few pages:
+ * a watch can record thousands of samples a day, and the roll-up covers those.
+ */
+async function heartSamplesForDay(accessToken, dateStr) {
+  const points = await listAll(
+    accessToken,
+    'heart-rate',
+    `heartRate.sample_time.civil_time >= "${dateStr}" AND heartRate.sample_time.civil_time < "${shiftDate(dateStr, 1)}"`,
+    2000,
+    3
+  );
+  const readings = points
+    .map((p) => p.heartRate)
+    .filter(Boolean)
+    .map((h) => {
+      const key = Object.keys(h).find((k) => /beats|bpm/i.test(k) && toNum(h[k]) !== null);
+      const bpm = key ? toNum(h[key]) : null;
+      const t = h.sampleTime?.physicalTime || '';
+      return bpm ? { bpm, t } : null;
+    })
+    .filter(Boolean);
+  if (!readings.length) return null;
+  const vals = readings.map((r) => r.bpm);
+  const latest = readings.reduce((a, r) => (r.t > a.t ? r : a));
+  return {
+    min: Math.min(...vals),
+    max: Math.max(...vals),
+    avg: vals.reduce((a, b) => a + b, 0) / vals.length,
+    latest: latest.bpm,
+    latestTime: latest.t || null,
+    count: readings.length,
+  };
+}
+
+/**
+ * Heart tile: today's LOW and HIGH (headline), average and latest reading,
+ * resting heart rate (latest within 7 days), and irregular rhythm
+ * notifications (7 days).
+ *
+ * Today's numbers come from the daily roll-up; if that is empty or fails,
+ * from the day's individual readings, so manually logged heart rate shows
+ * too. Failures are logged rather than silently treated as "no data".
+ */
 async function heartTile(accessToken, dateStr) {
   const from = shiftDate(dateStr, -6);
   const [rhr, day, irn] = await Promise.all([
-    listDaily(accessToken, 'daily-resting-heart-rate', 'dailyRestingHeartRate', from, dateStr).catch(rethrowPerm([])),
-    rollupOneDay(accessToken, 'heart-rate', dateStr).catch(rethrowPerm(null)),
+    listDaily(accessToken, 'daily-resting-heart-rate', 'dailyRestingHeartRate', from, dateStr).catch((e) => {
+      if (e.permissionDenied) throw e;
+      console.warn('[google-health heart] resting:', e.message);
+      return [];
+    }),
+    rollupOneDay(accessToken, 'heart-rate', dateStr).catch((e) => {
+      if (e.permissionDenied) throw e;
+      console.warn('[google-health heart] roll-up:', e.message);
+      return null;
+    }),
     settle(() =>
       listPoints(
         accessToken,
@@ -462,21 +514,47 @@ async function heartTile(accessToken, dateStr) {
       )
     ),
   ]);
-  const r = latest(rhr);
-  const st = statsOf(day);
+
+  let st = statsOf(day);
+  let latest = null;
+  let latestTime = null;
+  let source = 'rollup';
+  if (st.min == null && st.max == null) {
+    const samples = await heartSamplesForDay(accessToken, dateStr).catch((e) => {
+      if (e.permissionDenied) throw e;
+      console.warn('[google-health heart] samples:', e.message);
+      return null;
+    });
+    if (samples) {
+      st = samples;
+      latest = samples.latest;
+      latestTime = samples.latestTime;
+      source = 'samples';
+    }
+  }
+
+  const r = latestRest(rhr);
   const notes = (irn.data || [])
     .map((p) => dateStrOf(p.irregularRhythmNotification?.interval?.civilStartTime?.date))
     .filter(Boolean)
     .sort()
     .reverse();
   return {
-    restingBpm: r && toNum(r.p.beatsPerMinute) ? Math.round(toNum(r.p.beatsPerMinute)) : null,
-    restingDate: r?.date ?? null,
     todayMin: st.min != null ? Math.round(st.min) : null,
     todayMax: st.max != null ? Math.round(st.max) : null,
     todayAvg: st.avg != null ? Math.round(st.avg) : null,
+    latestBpm: latest != null ? Math.round(latest) : null,
+    latestTime,
+    source,
+    restingBpm: r?.bpm ?? null,
+    restingDate: r?.date ?? null,
     irregular: irn.needsPermission ? { needsPermission: true } : { count: notes.length, latestDate: notes[0] ?? null },
   };
+}
+
+function latestRest(points) {
+  const r = latest(points);
+  return r && toNum(r.p.beatsPerMinute) ? { bpm: Math.round(toNum(r.p.beatsPerMinute)), date: r.date } : null;
 }
 
 async function oxygenFitnessTile(accessToken, dateStr) {
@@ -629,6 +707,29 @@ const HISTORY_FETCHERS = {
       listAll(token, 'daily-resting-heart-rate', dailyFilter('dailyRestingHeartRate', from, to), 1000),
       span <= HEART_RANGE_MAX_DAYS ? dailyRollupObjects(token, 'heart-rate', from, to, 14).catch(rethrowPerm(new Map())) : new Map(),
     ]);
+    // No roll-up data (e.g. only hand-logged readings): build the day's
+    // low/high from the individual readings instead.
+    if (!day.size && span <= HEART_RANGE_MAX_DAYS) {
+      const pts = await listAll(
+        token,
+        'heart-rate',
+        `heartRate.sample_time.civil_time >= "${from}" AND heartRate.sample_time.civil_time < "${shiftDate(to, 1)}"`,
+        5000,
+        4
+      ).catch(rethrowPerm([]));
+      const perDay = new Map();
+      for (const p of pts) {
+        const h = p.heartRate;
+        const d = dateStrOf(h?.sampleTime?.civilTime?.date);
+        const key = h && Object.keys(h).find((k) => /beats|bpm/i.test(k) && toNum(h[k]) !== null);
+        if (!d || !key) continue;
+        const v = toNum(h[key]);
+        const cur = perDay.get(d) || { min: v, max: v };
+        perDay.set(d, { min: Math.min(cur.min, v), max: Math.max(cur.max, v) });
+      }
+      for (const [d, mm] of perDay) day.set(d, { beatsPerMinuteMin: mm.min, beatsPerMinuteMax: mm.max });
+    }
+
     const resting = new Map();
     for (const p of rhr) {
       const v = p.dailyRestingHeartRate;

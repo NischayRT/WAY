@@ -193,7 +193,7 @@ export default function WeekDateStrip({
               - <=375px: calendar first, then only the selected day. */}
           <div
             ref={trackRef}
-            className="relative flex w-fit max-w-full items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-none min-w-0 rounded-full border border-slate-200/90 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 p-1 sm:p-1.5 max-[375px]:w-full"
+            className="relative flex w-fit max-w-full items-center gap-0.5 sm:gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 rounded-full border border-slate-200/90 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/80 p-1 sm:p-1.5 max-[375px]:w-full"
           >
             {/* Calendar - small screens: before the day */}
             <CalendarButton

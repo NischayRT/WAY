@@ -173,17 +173,18 @@ export default function ActivityClient({
 
   return (
     <>
-      {/* Range picker: drives every chart on the page. */}
-      <div className={`${ui.card} space-y-3`}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-900 dark:text-white">
-            <CalendarRange size={13} /> Range
+      {/* Range picker (always one line) + Edit stats. The button sits outside
+          the range card: beside it from 768px, on its own row below that. */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:gap-3">
+      <div className={`${ui.card} min-w-0 flex-1 space-y-3`}>
+        <div className="flex flex-nowrap items-center justify-between gap-2">
+          <div className="flex shrink-0 items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-900 dark:text-white">
+            <CalendarRange size={13} /> <span className="max-[359px]:sr-only">Range</span>
           </div>
-          <div className="flex min-w-0 items-center gap-2">
           <div
             role="tablist"
             aria-label="Date range"
-            className="flex flex-wrap items-center gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 p-1"
+            className="flex min-w-0 flex-nowrap items-center gap-0.5 overflow-x-auto rounded-xl bg-slate-100 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:bg-slate-800 sm:gap-1"
           >
             {[...PRESETS, { key: 'custom', label: 'Custom' }].map((p) => (
               <button
@@ -192,7 +193,7 @@ export default function ActivityClient({
                 role="tab"
                 aria-selected={presetKey === p.key}
                 onClick={() => setPresetKey(p.key)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                className={`shrink-0 whitespace-nowrap rounded-lg px-2 py-1.5 text-xs font-semibold transition sm:px-3 ${
                   presetKey === p.key
                     ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -202,9 +203,6 @@ export default function ActivityClient({
               </button>
             ))}
           </div>
-          
-          </div>
-          <EditTilesButton tiles={tiles} onSave={saveTiles} label="Edit stats" compact />
         </div>
 
         {presetKey === 'custom' && (
@@ -233,6 +231,8 @@ export default function ActivityClient({
           </div>
         )}
         {rangeError && <p className="text-xs font-medium text-rose-600 dark:text-rose-400">{rangeError}</p>}
+      </div>
+      <EditTilesButton tiles={tiles} onSave={saveTiles} label="Edit stats" className="self-end md:mt-4 md:self-start" />
       </div>
 
       {/* Featured: weight and heart, side by side */}

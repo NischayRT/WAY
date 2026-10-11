@@ -20,8 +20,14 @@ export function calculateTimelineAndFeasibility({
   const weightDelta = targetWeightKg - currentWeightKg;
   const absDelta = Math.abs(weightDelta);
 
-  // Suggested safe pace updated to 0.85 kg/week for cutting
-  const safePacePerWeek = weightDelta < 0 ? 0.85 : 0.40;
+  // Recommended pace, matching the onboarding planner's "Steady" option
+  // (lib/planner.js): lose 0.5% of body weight a week (max 1 kg), gain
+  // 0.25% a week (max 0.35 kg for men, 0.25 kg for women). The old fixed
+  // 0.85 kg/week cut and 0.4 kg/week gain were too fast for most people.
+  const safePacePerWeek =
+    weightDelta < 0
+      ? Math.min(currentWeightKg * 0.005, 1.0)
+      : Math.min(currentWeightKg * 0.0025, sex === 'female' ? 0.25 : 0.35);
   const recommendedWeeks = Math.max(1, Math.round(absDelta / safePacePerWeek));
   const recommendedDate = new Date();
   recommendedDate.setDate(recommendedDate.getDate() + recommendedWeeks * 7);

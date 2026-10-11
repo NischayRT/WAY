@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Pencil, X, ArrowUp, ArrowDown, RotateCcw, Footprints, Navigation, Flame, HeartPulse, Droplets, Building2, Moon, Activity, Target } from 'lucide-react';
 import {
   StepsWidget,
@@ -28,7 +29,7 @@ export const TILE_CATALOG = [
   { key: 'steps', label: 'Steps', Icon: Footprints, hint: 'Steps and your daily step goal' },
   { key: 'distance', label: 'Distance', Icon: Navigation, hint: 'Distance walked or run' },
   { key: 'energy', label: 'Energy burned', Icon: Flame, hint: 'Total burned, active calories vs goal' },
-  { key: 'heart', label: 'Heart rate', Icon: HeartPulse, hint: 'Resting, today’s high/low, irregular rhythm alerts' },
+  { key: 'heart', label: 'Heart rate', Icon: HeartPulse, hint: 'Today’s low and high, latest, resting, irregular rhythm alerts' },
   { key: 'oxygen', label: 'SpO₂ & VO₂ max', Icon: Droplets, hint: 'Overnight blood oxygen and cardio fitness' },
   { key: 'floors', label: 'Floors climbed', Icon: Building2, hint: 'Floors climbed vs a 10-floor goal' },
   { key: 'sleep', label: 'Sleep', Icon: Moon, hint: 'Last night’s sleep and stages (asks for sleep access)' },
@@ -219,10 +220,18 @@ export default function TileBoard({
 export function TilePicker({ current, onClose, onSave }) {
   const [draft, setDraft] = useState(current);
 
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    setMounted(true);
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // Stop the page behind from scrolling while the picker is open.
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
   }, [onClose]);
 
   const toggle = (key) =>
@@ -240,17 +249,28 @@ export function TilePicker({ current, onClose, onSave }) {
   // Selected tiles first (in their order), then the rest.
   const ordered = [...draft.map((k) => TILE_CATALOG.find((t) => t.key === k)), ...TILE_CATALOG.filter((t) => !draft.includes(t.key))].filter(Boolean);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:items-center" onClick={onClose}>
+  if (!mounted) return null;
+
+  // Rendered into <body> above everything (z-100): the bottom navigation is
+  // z-50 and comes later in the page, so a z-50 picker inside the page was
+  // drawn underneath it and its Save button was hidden.
+  // The panel is capped to the visible screen height; only the list scrolls,
+  // so the title and the Save / Cancel row are always on screen.
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm"
+      style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))', paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      onClick={onClose}
+    >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="tile-picker-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        className="flex max-h-full w-full max-w-md flex-col rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
       >
         <div className="flex items-center justify-between gap-2">
-          <h2 id="tile-picker-title" className="text-base font-bold text-slate-900 dark:text-white">Home tiles</h2>
+          <h2 id="tile-picker-title" className="text-base font-bold text-slate-900 dark:text-white">Choose your tiles</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white">
             <X size={16} />
           </button>
@@ -259,7 +279,7 @@ export function TilePicker({ current, onClose, onSave }) {
           Choose up to {MAX_TILES} tiles and their order. {draft.length}/{MAX_TILES} selected.
         </p>
 
-        <ul className="mt-3 max-h-[60vh] space-y-1.5 overflow-y-auto pr-1">
+        <ul className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain pr-1">
           {ordered.map((t) => {
             const on = draft.includes(t.key);
             const idx = draft.indexOf(t.key);
@@ -294,7 +314,7 @@ export function TilePicker({ current, onClose, onSave }) {
           })}
         </ul>
 
-        <div className="mt-4 flex items-center justify-between gap-2">
+        <div className="mt-3 flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
           <button type="button" onClick={() => setDraft(DEFAULT_TILES)} className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white">
             <RotateCcw size={12} /> Reset to default
           </button>
@@ -312,6 +332,7 @@ export function TilePicker({ current, onClose, onSave }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

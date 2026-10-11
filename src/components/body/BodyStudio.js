@@ -202,9 +202,15 @@ export default function BodyStudio({ profile }) {
   // rest), so the saved targets add up to the calories shown.
   const goalMacros = useMemo(() => {
     const goal = targetWeight < currentWeightKg ? 'lose_weight' : 'gain_muscle';
-    const proteinG = proteinTargetG({ weightKg: currentWeightKg, heightCm, goal });
+    const proteinG = proteinTargetG({
+      weightKg: currentWeightKg,
+      heightCm,
+      goal,
+      activityLevel: profile?.activity_level,
+      calories: feasibility.calculatedDailyCalories,
+    });
     return { goal, proteinG, ...splitCarbsFat(feasibility.calculatedDailyCalories, proteinG) };
-  }, [targetWeight, currentWeightKg, heightCm, feasibility.calculatedDailyCalories]);
+  }, [targetWeight, currentWeightKg, heightCm, feasibility.calculatedDailyCalories, profile?.activity_level]);
 
   // Current measurements save state
   const [savingCurrent, setSavingCurrent] = useState(false);

@@ -402,24 +402,37 @@ function InfoCard({ theme, Icon, iconClass = '', title, loading, result, permiss
   );
 }
 
+const clock = (iso) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+};
+
 /**
- * Heart rate: resting heart rate (headline, beating icon + ECG at that
- * rate), today's low and high, and irregular-rhythm notifications from the
- * last 7 days as a warning that expands on hover (or tap) into detail.
+ * Heart rate: today's LOW and HIGH as the headline; latest reading (when the
+ * readings came from individual samples) and resting heart rate below; and
+ * irregular-rhythm notifications from the last 7 days as a warning that
+ * expands on hover / focus / tap. The icon beats and the ECG trace scrolls
+ * at the latest (else average, else resting) heart rate.
  */
 export function HeartWidget({ result, loading, today, connectHref }) {
   const d = result?.data;
-  const bpm = d?.restingBpm ?? null;
+  const lo = d?.todayMin ?? null;
+  const hi = d?.todayMax ?? null;
+  const pace = d?.latestBpm ?? d?.todayAvg ?? d?.restingBpm ?? null;
   const irr = d?.irregular;
   const hasIrr = irr && !irr.needsPermission && irr.count > 0;
-  const beat = bpm ? `${(60 / bpm).toFixed(3)}s` : '1s';
-  const empty = d && !bpm && d.todayMax == null ? 'No heart data in the last 7 days. Wear your watch or tracker, including overnight.' : null;
+  const beat = pace ? `${(60 / pace).toFixed(3)}s` : '1s';
+  const empty =
+    d && lo == null && hi == null && !d.restingBpm
+      ? 'No heart rate for this day. Readings from your watch, or logged in Google Health, show here.'
+      : null;
 
   return (
     <InfoCard
       theme="rose"
       Icon={HeartPulse}
-      iconClass={bpm ? fx.heartbeat : ''}
+      iconClass={pace ? fx.heartbeat : ''}
       title="Heart Rate"
       loading={loading}
       result={result}
@@ -428,28 +441,48 @@ export function HeartWidget({ result, loading, today, connectHref }) {
       emptyText={empty}
       styleVars={{ '--beat': beat }}
     >
-      {bpm && <span aria-hidden="true" className={fx.ecg} />}
-      <p className="font-numeric mt-4 text-[1.7rem] font-bold leading-none tracking-tight text-slate-900 dark:text-white">
-        {bpm ?? '–'}
-        <span className="ml-1 text-sm font-semibold text-slate-500 dark:text-sky-200/60">bpm</span>
-      </p>
+      {pace && <span aria-hidden="true" className={fx.ecg} />}
+
+      {/* Headline: today's low and high */}
+      <div className="mt-4 flex items-end gap-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-300">Low</p>
+          <p className="font-numeric text-[1.7rem] font-bold leading-none tracking-tight text-slate-900 dark:text-white">{lo ?? '–'}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-300">High</p>
+          <p className="font-numeric text-[1.7rem] font-bold leading-none tracking-tight text-slate-900 dark:text-white">{hi ?? '–'}</p>
+        </div>
+        <span className="pb-0.5 text-sm font-semibold text-slate-500 dark:text-sky-200/60">bpm</span>
+      </div>
       <p className="mt-1.5 text-sm text-slate-500 dark:text-sky-200/60">
-        Resting{d?.restingDate ? ` · ${shortDay(d.restingDate, today)}` : ''}
+        {lo != null || hi != null ? 'Today’s heart rate range' : 'No readings yet today'}
+        {d?.todayAvg ? ` · avg ${d.todayAvg}` : ''}
       </p>
 
       <div className="mt-auto pt-3">
-        <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 dark:text-slate-400" title={d?.todayAvg ? `Average today ${d.todayAvg} bpm` : undefined}>
-          <span className="flex items-center justify-between gap-1 rounded-lg bg-slate-50 px-2 py-1.5 dark:bg-white/5">
-            Low <b className="font-numeric text-sm text-sky-600 dark:text-sky-300">{d?.todayMin ?? '–'}</b>
+        <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <span
+            className="flex items-center justify-between gap-1 rounded-lg bg-slate-50 px-2 py-1.5 dark:bg-white/5"
+            title={d?.latestTime ? `Latest reading at ${clock(d.latestTime)}` : undefined}
+          >
+            Latest
+            <b className="font-numeric text-sm text-slate-900 dark:text-white">
+              {d?.latestBpm ?? '–'}
+              {d?.latestTime && <span className="ml-1 text-[10px] font-normal text-slate-400">{clock(d.latestTime)}</span>}
+            </b>
           </span>
-          <span className="flex items-center justify-between gap-1 rounded-lg bg-slate-50 px-2 py-1.5 dark:bg-white/5">
-            High <b className="font-numeric text-sm text-rose-600 dark:text-rose-300">{d?.todayMax ?? '–'}</b>
+          <span
+            className="flex items-center justify-between gap-1 rounded-lg bg-slate-50 px-2 py-1.5 dark:bg-white/5"
+            title={d?.restingDate ? `Resting heart rate · ${shortDay(d.restingDate, today)}` : 'Resting heart rate'}
+          >
+            Resting <b className="font-numeric text-sm text-rose-600 dark:text-rose-300">{d?.restingBpm ?? '–'}</b>
           </span>
         </div>
 
         {/* Irregular rhythm: a warning that expands into detail on hover / focus / tap */}
         {hasIrr ? (
-          <details className={`${fx.irregular} group/irr mt-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200`}>
+          <details className={`${fx.irregular} mt-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200`}>
             <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2 py-1.5 text-[11px] font-bold">
               <AlertTriangle size={13} className="shrink-0" /> Irregular rhythm
               <span className="ml-auto font-normal opacity-75">{shortDay(irr.latestDate, today)}</span>

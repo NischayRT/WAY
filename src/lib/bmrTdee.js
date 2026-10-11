@@ -37,17 +37,27 @@ export const CALORIE_FLOOR = { male: 1500, female: 1200 };
  *    per-kg targets apply to women and men.
  */
 const GOAL_CONFIG = {
-  lose_weight: { deficitPct: 0.2, minDeficit: 300, maxDeficit: 750, proteinPerKg: 1.8 },
-  gain_muscle: { surplus: { male: 300, female: 200 }, proteinPerKg: 2.0 },
-  lean_mass: { surplus: { male: 150, female: 100 }, proteinPerKg: 2.0 },
-  improve_cardio: { surplus: { male: 0, female: 0 }, proteinPerKg: 1.6 },
-  maintain: { surplus: { male: 0, female: 0 }, proteinPerKg: 1.6 },
+  lose_weight: { deficitPct: 0.2, minDeficit: 300, maxDeficit: 750, proteinPerKg: 1.6 },
+  gain_muscle: { surplus: { male: 250, female: 150 }, proteinPerKg: 1.6 },
+  lean_mass: { surplus: { male: 150, female: 100 }, proteinPerKg: 1.6 },
+  improve_cardio: { surplus: { male: 0, female: 0 }, proteinPerKg: 1.2 },
+  maintain: { surplus: { male: 0, female: 0 }, proteinPerKg: 1.2 },
 };
+
+// Protein is recalibrated (it used to be 1.8-2.0 g/kg for losing and gaining
+// regardless of activity, more than most people need and hard to reach on
+// Indian, often vegetarian, diets). Base by goal (above), +0.2 g/kg for
+// people who train most days, never above 2.0 g/kg, never below the ICMR
+// adult RDA of 0.83 g/kg, and never more than 35% of calories.
+const TRAINS_MOST_DAYS = new Set(['moderate', 'active', 'very_active']);
+const PROTEIN_MAX_PER_KG = 2.0;
+const PROTEIN_MIN_PER_KG = 0.83;
+const PROTEIN_MAX_SHARE = 0.35;
 
 // Fat: 30% of calories by default, never below 20% (the bottom of the
 // 20–35% acceptable range). Going lower is a particular problem for women,
 // where very-low-fat, low-energy diets are linked to menstrual disruption.
-const FAT_SHARE_DEFAULT = 0.3;
+const FAT_SHARE_DEFAULT = 0.28;
 const FAT_SHARE_MIN = 0.2;
 // 130 g/day carbohydrate is the RDA (the brain's glucose needs). If a plan
 // would go below it, fat is reduced (down to the 20% floor) to make room.
@@ -93,10 +103,18 @@ export function referenceWeightKg(weightKg, heightCm) {
   return Math.min(w, 25 * h * h);
 }
 
-/** Daily protein target in grams for a goal. */
-export function proteinTargetG({ weightKg, heightCm, goal = 'maintain' }) {
-  const perKg = (GOAL_CONFIG[goal] || GOAL_CONFIG.maintain).proteinPerKg;
-  return Math.round(referenceWeightKg(weightKg, heightCm) * perKg);
+/** Protein per kg of reference weight for a goal and activity level. */
+export function proteinPerKgFor(goal = 'maintain', activityLevel = 'light') {
+  const base = (GOAL_CONFIG[goal] || GOAL_CONFIG.maintain).proteinPerKg;
+  const bump = TRAINS_MOST_DAYS.has(activityLevel) ? 0.2 : 0;
+  return Math.min(PROTEIN_MAX_PER_KG, Math.max(PROTEIN_MIN_PER_KG, base + bump));
+}
+
+/** Daily protein target in grams for a goal (optionally capped by a calorie target). */
+export function proteinTargetG({ weightKg, heightCm, goal = 'maintain', activityLevel = 'light', calories = null }) {
+  let g = referenceWeightKg(weightKg, heightCm) * proteinPerKgFor(goal, activityLevel);
+  if (calories > 0) g = Math.min(g, (calories * PROTEIN_MAX_SHARE) / 4);
+  return Math.round(g);
 }
 
 /**
@@ -128,7 +146,7 @@ export function splitCarbsFat(targetCalories, proteinG) {
  * @param {keyof GOAL_CONFIG} goal
  * @param {{sex?: 'male'|'female', heightCm?: number}} [opts]
  */
-export function calculateMacroTargets(tdee, weightKg, goal, { sex, heightCm } = {}) {
+export function calculateMacroTargets(tdee, weightKg, goal, { sex, heightCm, activityLevel } = {}) {
   const config = GOAL_CONFIG[goal];
   if (!config) {
     throw new Error(`Unknown goal: ${goal}`);
@@ -147,7 +165,7 @@ export function calculateMacroTargets(tdee, weightKg, goal, { sex, heightCm } = 
   if (config.deficitPct) target = Math.min(target, tdee);
   const targetCalories = Math.round(target);
 
-  const proteinG = proteinTargetG({ weightKg, heightCm, goal });
+  const proteinG = proteinTargetG({ weightKg, heightCm, goal, activityLevel, calories: targetCalories });
   const { carbsG, fatG } = splitCarbsFat(targetCalories, proteinG);
 
   return {
@@ -168,6 +186,7 @@ export function getDailyTargets(profile) {
   const macros = calculateMacroTargets(tdee, profile.weightKg, profile.goal, {
     sex: profile.sex,
     heightCm: profile.heightCm,
+    activityLevel: profile.activityLevel,
   });
 
   return {

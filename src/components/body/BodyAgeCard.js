@@ -9,7 +9,7 @@ import fx from '@/components/home/HealthTiles.module.css';
 /**
  * Healthspan panel (home tile `compact`, full panel on the Activity page).
  *
- *   Main dial   Body Age (last 30 days, recalculated weekly) in dot-matrix
+ *   Main dial   Body Age (selected range; home: last 7 days) in dot-matrix
  *               digits inside a ring of ticks centred on your real age;
  *               HRV and resting HR in the corners, recovery status below.
  *   Cards       Readiness (today), Pace of Aging, Sleep consistency,
@@ -20,25 +20,54 @@ import fx from '@/components/home/HealthTiles.module.css';
  * expose). One request: /api/body-age.
  */
 
-let cache = null;
-function useHealthspan() {
-  const [state, setState] = useState(cache || { loading: true });
+// One response per range, kept for the session so switching tabs is instant.
+const cache = new Map();
+function useHealthspan(from, to) {
+  const key = from && to ? `${from}|${to}` : 'default';
+  const [state, setState] = useState(() => cache.get(key) || { loading: true });
   useEffect(() => {
-    if (cache) return undefined;
+    const hit = cache.get(key);
+    if (hit) {
+      setState(hit);
+      return undefined;
+    }
     let alive = true;
-    fetch('/api/body-age')
+    setState((s) => ({ ...s, loading: true }));
+    const q = from && to ? `?from=${from}&to=${to}` : '';
+    fetch(`/api/body-age${q}`, { cache: 'no-store' })
       .then((r) => r.json())
       .then((d) => {
-        cache = { loading: false, ...d };
-        if (alive) setState(cache);
+        const next = { loading: false, ...d };
+        // Only a full result is worth keeping; a locked checklist is re-checked
+        // on the next visit (e.g. after allowing sleep or a sync).
+        if (d.eligible) cache.set(key, next);
+        if (alive) setState(next);
       })
       .catch(() => alive && setState({ loading: false, error: true }));
     return () => {
       alive = false;
     };
-  }, []);
+  }, [key, from, to]);
   return state;
 }
+
+/** ?gh_missing=sleep after the Google screen: asked for, not granted. */
+function useMissingGrant() {
+  const [missing, setMissing] = useState([]);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const m = (p.get('gh_missing') || '').split(',').filter(Boolean);
+    if (m.length) {
+      setMissing(m);
+      p.delete('gh_missing');
+      const q = p.toString();
+      window.history.replaceState(null, '', `${window.location.pathname}${q ? `?${q}` : ''}${window.location.hash}`);
+    }
+  }, []);
+  return missing;
+}
+
+const windowLabel = (days) => (days == null ? '' : days === 7 ? 'Last 7 days' : days % 30 === 0 && days <= 180 ? `${days / 30 === 1 ? '30 days' : `${days / 30} months`}` : `${days} days`);
 
 const YELLOW = '#facc15';
 const fmt1 = (n) => (n == null ? '--' : Number(n).toFixed(1));
@@ -140,7 +169,7 @@ function ReadinessCard({ r }) {
   );
 }
 
-function PaceCard({ pace }) {
+function PaceCard({ pace, unlocked = false }) {
   // ring: -1 .. 3, yellow arc to the pace; 1.0 marked
   const p = pace == null ? null : Math.max(-1, Math.min(3, pace));
   const frac = p == null ? 0 : (p + 1) / 4;
@@ -150,7 +179,7 @@ function PaceCard({ pace }) {
     <CardShell title="Pace of Aging" className="bg-gradient-to-br from-[#c084fc] via-[#9333ea] to-[#6b21a8] shadow-lg shadow-purple-900/30">
       <div className="mt-2 flex flex-1 items-center justify-between gap-2">
         <p className="text-[11px] leading-snug text-white/80">
-          {p == null ? 'Unlocks with Body Age' : p <= 0 ? 'Getting younger' : p < 0.9 ? 'Slower than time' : p <= 1.1 ? 'In step with time' : 'Faster than time'}
+          {p == null ? (unlocked ? 'Needs 2 weeks of data' : 'Unlocks with Body Age') : p <= 0 ? 'Getting younger' : p < 0.9 ? 'Slower than time' : p <= 1.1 ? 'In step with time' : 'Faster than time'}
         </p>
         <svg viewBox="0 0 64 64" className="h-16 w-16 shrink-0" aria-hidden="true">
           <circle cx="32" cy="32" r={R} fill="none" stroke="white" strokeOpacity="0.25" strokeWidth="1.5" strokeDasharray="1.5 2.5" />
@@ -175,7 +204,7 @@ function PaceCard({ pace }) {
   );
 }
 
-function SleepCard({ pct }) {
+function SleepCard({ pct, timing }) {
   const onTrack = pct != null && pct >= 70;
   return (
     <CardShell title="Sleep consistency" className="bg-gradient-to-br from-[#312e81] via-[#1e1b4b] to-[#0f0a2e] ring-1 ring-indigo-300/20">
@@ -190,7 +219,11 @@ function SleepCard({ pct }) {
           <span className={`absolute h-4 w-4 rounded-full bg-white shadow transition-all sm:h-5 sm:w-5 ${onTrack ? 'left-5 sm:left-6' : 'left-1'}`} />
         </span>
       </div>
-      <p className="mt-2 text-[10px] text-white/50">{pct == null ? 'Needs a week of sleep' : onTrack ? 'Regular bed and wake times' : 'Target 70%+: steadier sleep times'}</p>
+      <p className="mt-2 text-[10px] leading-snug text-white/50">
+        {pct == null
+          ? 'Needs 5 nights in this range'
+          : `Sleep timing shifts ±${timing?.sdMin ?? '–'} min night to night${timing?.bedtime ? ` · usually ${timing.bedtime}–${timing.wake}` : ''}. ${onTrack ? 'Regular.' : 'Target 70%+ (within ±37 min).'}`}
+      </p>
     </CardShell>
   );
 }
@@ -222,13 +255,14 @@ function RecoveryCard({ rec }) {
 /* ------------------------------------------------------------------ */
 /* Locked checklist                                                    */
 /* ------------------------------------------------------------------ */
-const ACTIONS = {
-  'allow-sleep': { href: '/api/google-health/connect?returnTo=%2Fhome&extra=sleep', text: 'Allow sleep access' },
+const actionsFor = (returnTo) => ({
+  'allow-sleep': { href: `/api/google-health/connect?returnTo=${encodeURIComponent(returnTo)}&extra=sleep`, text: 'Allow sleep access' },
   measurements: { href: '/body', text: 'Add measurements' },
   profile: { href: '/settings', text: 'Complete profile' },
-};
+});
 
-function Checklist({ reqs }) {
+function Checklist({ reqs, returnTo }) {
+  const ACTIONS = actionsFor(returnTo);
   return (
     <ul className="space-y-1.5">
       {reqs.map((r) => (
@@ -238,6 +272,16 @@ function Checklist({ reqs }) {
           {!r.met && r.need > 1 && (
             <span className="font-numeric shrink-0 text-[11px] text-white/40">
               {r.have}/{r.need}
+            </span>
+          )}
+          {!r.met && r.action === 'read-error' && (
+            <span className="shrink-0 text-[11px] font-semibold text-rose-300" title="Google Health returned an error for this data. Try again later.">
+              Couldn&apos;t read
+            </span>
+          )}
+          {!r.met && r.action === 'sleep-blocked' && (
+            <span className="shrink-0 text-[11px] font-semibold text-amber-300" title="Sleep is allowed, but Google still refuses it. See the note below.">
+              Blocked by Google
             </span>
           )}
           {!r.met && r.action && ACTIONS[r.action] && (
@@ -251,11 +295,35 @@ function Checklist({ reqs }) {
   );
 }
 
+function SleepNotGrantedNote() {
+  return (
+    <div className="mt-5 rounded-2xl bg-amber-400/10 p-4 text-[12px] leading-snug text-amber-100 ring-1 ring-amber-300/30">
+      <p className="font-semibold">Google didn&apos;t grant sleep access.</p>
+      <p className="mt-1 text-amber-100/80">
+        On Google&apos;s screen, tick the box for <b>sleep</b> before tapping Continue. If there was no sleep box at all, the sleep permission
+        hasn&apos;t been added to this app in Google Cloud yet (Google Auth Platform → Data access → add <code>googlehealth.sleep.readonly</code>).
+      </p>
+    </div>
+  );
+}
+
+function SleepBlockedNote() {
+  return (
+    <p className="mt-2 rounded-xl bg-amber-400/10 p-2.5 text-[11px] leading-snug text-amber-100/85 ring-1 ring-amber-300/25">
+      Sleep is allowed on your account, but Google still refuses to share it. Make sure <code>googlehealth.sleep.readonly</code> is listed under
+      Google Auth Platform → Data access, then disconnect and reconnect Google Health in Settings.
+    </p>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Main                                                                */
 /* ------------------------------------------------------------------ */
-export default function BodyAgeCard({ compact = false }) {
-  const data = useHealthspan();
+export default function BodyAgeCard({ compact = false, from = null, to = null, returnTo = null }) {
+  const data = useHealthspan(from, to);
+  const missing = useMissingGrant();
+  const back = returnTo || (compact ? '/home' : '/activity');
+  const winDays = data.window?.days ?? null;
   const [open, setOpen] = useState(false);
   const r = data.eligible ? data.result : null;
   const v = data.vitals || {};
@@ -299,12 +367,15 @@ export default function BodyAgeCard({ compact = false }) {
           </Link>
         </div>
         {dial(false)}
+        {missing.includes('sleep') && (
+          <p className="mt-1 text-center text-[10px] font-semibold text-amber-300">Google didn&apos;t grant sleep. Tick the sleep box when asked.</p>
+        )}
         <div className="mt-auto flex items-center justify-between gap-2 pt-1 text-[11px]">
           <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">
             Readiness <b className="font-numeric">{v.readiness?.score ?? '--'}</b>
           </span>
           <span className="rounded-full px-2 py-0.5 font-semibold text-black" style={{ background: YELLOW }}>
-            Pace {r ? `${r.pace.toFixed(1)}×` : '--'}
+            Pace {r?.pace != null ? `${r.pace.toFixed(1)}×` : '--'}
           </span>
         </div>
       </div>
@@ -321,17 +392,19 @@ export default function BodyAgeCard({ compact = false }) {
           <span className="absolute right-1 top-0 text-[11px] text-white/55">{v.rhr ? <>RHR <b className="text-white">{v.rhr.value}</b> bpm</> : ''}</span>
           {dial(true)}
           <span className="absolute bottom-0 left-1 text-[11px] text-white/70">{status}</span>
-          <span className="absolute bottom-0 right-1 text-[11px] text-white/35">30 days · weekly</span>
+          <span className="absolute bottom-0 right-1 text-[11px] text-white/35">{windowLabel(winDays) || '…'}</span>
         </div>
 
         {/* cards: 2 x 2 */}
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
           <ReadinessCard r={v.readiness} />
-          <PaceCard pace={r?.pace ?? null} />
-          <SleepCard pct={v.sleepConsistency ?? null} />
+          <PaceCard pace={r?.pace ?? null} unlocked={!!r} />
+          <SleepCard pct={v.sleepConsistency ?? null} timing={v.sleepTiming} />
           <RecoveryCard rec={v.recovery} />
         </div>
       </div>
+
+      {missing.includes('sleep') && <SleepNotGrantedNote />}
 
       {/* unlock checklist, or the breakdown */}
       {!data.loading && !data.eligible && reqs.length > 0 && (
@@ -339,8 +412,11 @@ export default function BodyAgeCard({ compact = false }) {
           <p className="mb-2 text-xs font-semibold text-white/80">
             Body Age unlocks when all {reqs.length} are met · {met}/{reqs.length}
           </p>
-          <Checklist reqs={reqs} />
-          <p className="mt-2 text-[11px] text-white/40">Readiness, sleep consistency and recovery above work already.</p>
+          <Checklist reqs={reqs} returnTo={back} />
+          {reqs.some((x) => x.action === 'sleep-blocked') && <SleepBlockedNote />}
+          <p className="mt-2 text-[11px] text-white/40">
+            Needs scale with the range: 5 of 7 days for a week, 21 of 30 for a month. Readiness, sleep consistency and recovery above work already.
+          </p>
         </div>
       )}
 
@@ -377,7 +453,7 @@ export default function BodyAgeCard({ compact = false }) {
                 <thead className="text-[10px] uppercase tracking-wider text-white/40">
                   <tr>
                     <th className="py-1 pr-2 font-semibold">Metric</th>
-                    <th className="py-1 pr-2 font-semibold">30 days</th>
+                    <th className="py-1 pr-2 font-semibold">{windowLabel(winDays)}</th>
                     <th className="py-1 pr-2 font-semibold">This week</th>
                     <th className="py-1 pr-2 font-semibold">Target</th>
                     <th className="py-1 text-right font-semibold">Years</th>
@@ -403,7 +479,7 @@ export default function BodyAgeCard({ compact = false }) {
               <p className="mt-3 flex gap-1.5 text-[11px] leading-snug text-white/45">
                 <Info size={12} className="mt-0.5 shrink-0" />
                 Body Age: each metric&apos;s risk versus a healthy target (published studies), converted to years with the Gompertz law (about 10% more
-                risk ≈ 1 year), overlap discounted; last 30 days, recalculated weekly. Readiness is our estimate from HRV, resting heart rate and sleep
+                risk ≈ 1 year), overlap discounted; over the selected range (± is wider for short ranges). Pace compares the last 7 days with the last 30. Readiness is our estimate from HRV, resting heart rate and sleep
                 against your own baseline (Google&apos;s readiness isn&apos;t available to apps); it isn&apos;t used in Body Age. Lifestyle estimates, not
                 medical tests.
               </p>

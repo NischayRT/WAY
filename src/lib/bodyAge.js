@@ -5,6 +5,11 @@
  * which an average person would carry the same all-cause mortality risk as
  * you, given how you sleep, move, and how fit and lean you are.
  *
+ * Window: the range you pick, from 7 days up to 6 months (the home tile uses
+ * the last 7 days). Every input is a daily average or a weekly total, so any
+ * window works with the same formulas; shorter ones are noisier, which the
+ * +/- range accounts for (about +/-2 years for a week, +/-1 for a month).
+ *
  * How it works
  *  1. Each metric is turned into a HAZARD RATIO against a health-optimised
  *     target (meeting the target = 1.0 = 0 years), using dose-response
@@ -23,10 +28,12 @@
  *     self-rated health sit ~5 years either side of their real age.
  *  4. Each metric is capped at +/-3 years; the total stays within 15 years of
  *     real age. A +/- range reflects how strong each piece of evidence is.
- *  5. Pace of Aging compares the last 30 days with the last 180: if the next
- *     six months look like the last month, how fast will Body Age move per
- *     year of real time? 1.0 = in step with real age, < 1 slower, < 0 getting
- *     younger. A single month is noisy, so its difference counts half.
+ *  5. Pace of Aging compares THIS WEEK with the last 30 days (whatever the
+ *     window): if the next
+ *     month looks like this week, how fast will Body Age move per year of
+ *     real time? 1.0 = in step with real age, < 1 slower, < 0 getting younger.
+ *     A single week is noisy, so its difference is weighted down (x0.05): one
+ *     clearly better week moves Pace to about 0-0.5, not straight to -1.
  *
  * It is a lifestyle risk estimate, not a medical test or a measure of
  * cellular ageing.
@@ -36,7 +43,11 @@ export const GOMPERTZ_B = 0.095;
 const METRIC_CAP_YEARS = 3;
 const TOTAL_CAP_YEARS = 15;
 const CROSS_GROUP_SHRINK = 0.65;
-const RECENT_WEIGHT = 0.5;
+const RECENT_WEIGHT = 0.05;
+const PACE_BASE_YEARS = 30 / 365; // Pace compares the last 7 days with the last 30
+// +/- floor for wearable measurement noise: 0.9 y for 30 days, scaling with
+// 1/sqrt(days) (about 1.9 y for one week, 0.4 y for six months).
+const noiseYears = (days) => 0.9 * Math.sqrt(30 / Math.max(7, days));
 
 /** Log-linear interpolation of a hazard curve given as [[x, HR], ...] (x ascending). */
 function curve(points, x) {
@@ -190,22 +201,27 @@ function score(values, t) {
 /**
  * @param {object} p
  *   age, sex
- *   long:   metric values averaged over the last ~180 days
- *   recent: the same over the last 30 days (for Pace of Aging)
+ *   long:   metric values over the last 30 days (the Body Age window)
+ *   recent: the same over the last 7 days (for Pace of Aging)
  * @returns { bodyAge, chronologicalAge, difference, range, pace, contributors[], groups[] }
  */
-export function computeBodyAge({ age, sex, long, recent }) {
+export function computeBodyAge({ age, sex, long, recent, windowDays = 30, paceBase = null }) {
   const t = targetsFor(age, sex);
   const L = score(long, t);
+  // Pace: the last 7 days against the last 30 (independent of the window);
+  // null when there isn't a month-ish baseline yet.
+  let pace = null;
+  if (paceBase) {
+    const B = score(paceBase, t);
+    const R = score({ ...paceBase, ...recent }, t);
+    pace = clamp(1 + ((R.total - B.total) * RECENT_WEIGHT) / PACE_BASE_YEARS, -1, 3);
+  }
   const R = score({ ...long, ...recent }, t);
 
   const delta = clamp(L.total, -TOTAL_CAP_YEARS, TOTAL_CAP_YEARS);
   const bodyAge = Math.max(18, age + delta);
-  // +/-: evidence strength, plus a floor for wearable measurement noise.
-  const range = Math.max(0.5, Math.round((Math.sqrt(L.spread * L.spread + 0.6 * 0.6)) * 2) / 2);
-
-  // Pace: over the next 6 months Body Age moves (0.5 + recent - long) years.
-  const pace = clamp(1 + ((R.total - L.total) * RECENT_WEIGHT) / 0.5, -1, 3);
+  // +/-: evidence strength, plus a floor for wearable noise that shrinks with a longer window.
+  const range = Math.max(0.5, Math.round(Math.sqrt(L.spread * L.spread + noiseYears(windowDays) ** 2) * 2) / 2);
 
   const contributors = Object.entries(L.perMetric)
     .map(([k, m]) => ({
@@ -225,7 +241,8 @@ export function computeBodyAge({ age, sex, long, recent }) {
     bodyAge: Math.round(bodyAge * 10) / 10,
     difference: Math.round((bodyAge - age) * 10) / 10,
     range,
-    pace: Math.round(pace * 10) / 10,
+    pace: pace == null ? null : Math.round(pace * 10) / 10,
+    windowDays,
     contributors,
     groups: L.groups.map((g) => ({ key: g.key, label: g.label, years: Math.round(g.years * 10) / 10 })),
   };
@@ -262,13 +279,28 @@ function targetLabel(k, t) {
 /* Prerequisites: Body Age is shown only when all of these are met.    */
 /* ------------------------------------------------------------------ */
 
-export const REQUIREMENTS = [
-  { key: 'profile', label: 'Age, sex, height and weight in your profile' },
-  { key: 'measurements', label: 'Waist (and hips for women) in Body Studio, for lean mass' },
-  { key: 'steps', label: 'Steps on at least 28 days', min: 28 },
-  { key: 'zones', label: 'Heart-rate zone data on at least 28 days', min: 28 },
-  { key: 'restingHr', label: 'Resting heart rate on at least 28 days', min: 28 },
-  { key: 'sleep', label: 'Sleep tracked on at least 28 nights', min: 28 },
-  { key: 'recent', label: 'Wearing your tracker on at least 14 of the last 30 days', min: 14 },
-  { key: 'vo2', label: 'A VO₂ max (Cardio Fitness Score) in the last 90 days', min: 1 },
-];
+/**
+ * Prerequisites for a window of `days` days (the selected range, 7..180).
+ * Each daily metric needs ~70% coverage of the window: 5 of 7 days, 21 of
+ * 30, 63 of 90. For windows longer than a week the band must also have been
+ * worn on 5 of the last 7 days, so the result reflects the present.
+ */
+export function requirementsFor(days = 7) {
+  const n = Math.max(7, Math.round(days));
+  const min = Math.ceil(n * 0.7);
+  const span = n === 7 ? 'the last 7' : `these ${n}`;
+  const list = [
+    { key: 'profile', label: 'Age, sex, height and weight in your profile' },
+    { key: 'measurements', label: 'Waist (and hips for women) in Body Studio, for lean mass' },
+    { key: 'steps', label: `Steps on ${min} of ${span} days`, min },
+    { key: 'zones', label: `Heart-rate zone data on ${min} of ${span} days`, min },
+    { key: 'restingHr', label: `Resting heart rate on ${min} of ${span} days`, min },
+    { key: 'sleep', label: `Sleep tracked on ${min} of ${span} nights`, min },
+  ];
+  if (n > 7) list.push({ key: 'recent', label: 'Tracker worn on 5 of the last 7 days', min: 5 });
+  list.push({ key: 'vo2', label: 'A VO₂ max (Cardio Fitness Score) in the last 90 days', min: 1 });
+  return list;
+}
+
+/** Default (7-day) checklist, kept for older imports. */
+export const REQUIREMENTS = requirementsFor(7);

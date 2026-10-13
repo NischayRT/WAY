@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
-import { exchangeCodeForTokens, NUTRITION_WRITE_SCOPE, METRICS_WRITE_SCOPE } from '@/lib/googleHealth';
+import { exchangeCodeForTokens, NUTRITION_WRITE_SCOPE, METRICS_WRITE_SCOPE, OPTIONAL_SCOPES } from '@/lib/googleHealth';
 
-// Must match the list in ../connect/route.js (it said '/progress' here but
-// '/activity' there, so returning to Activity silently fell back to Settings).
+// Must match the list in ../connect/route.js. This said '/progress' while
+// connect allowed '/activity', so connecting from the Activity page always
+// landed on Settings instead.
 const ALLOWED_RETURN_TO = ['/settings', '/home', '/activity'];
 const COOKIE_PATH = '/api/google-health';
 
@@ -16,23 +17,30 @@ export async function GET(request) {
   const expectedState = request.cookies.get('gh_oauth_state')?.value;
   const cookieReturnTo = request.cookies.get('gh_return_to')?.value;
   const returnTo = ALLOWED_RETURN_TO.includes(cookieReturnTo) ? cookieReturnTo : '/settings';
+  const requestedExtra = (request.cookies.get('gh_extra')?.value || '')
+    .split(',')
+    .filter((k) => Object.prototype.hasOwnProperty.call(OPTIONAL_SCOPES, k));
 
   // Every exit clears the one-time cookies.
   const redirectTo = (path) => {
     const response = NextResponse.redirect(`${origin}${path}`);
     response.cookies.set('gh_oauth_state', '', { path: COOKIE_PATH, maxAge: 0 });
     response.cookies.set('gh_return_to', '', { path: COOKIE_PATH, maxAge: 0 });
+    response.cookies.set('gh_extra', '', { path: COOKIE_PATH, maxAge: 0 });
     return response;
   };
 
-  // Failures always land on /settings, where the error banner is shown.
-  // Only fixed codes go in the URL. Free text here used to be displayed
-  // verbatim by Settings, so anyone could send a victim a link like
-  // /settings?google_health_error=<fake security warning> rendered inside
-  // the real app.
-  const failure = (code) => redirectTo(`/settings?google_health_error=${code}`);
+  // Failures always land on /settings, because that's where the error
+  // banner is shown — even when the flow started from onboarding.
+  // Only short fixed codes go in the URL. The old version put raw error
+  // text there and Settings printed it, so a crafted link could show any
+  // message inside the app. Details go to the server log instead.
+  const failure = (code, detail) => {
+    if (detail) console.error('[google-health/callback]', code, detail);
+    return redirectTo(`/settings?google_health_error=${code}`);
+  };
 
-  if (oauthError) return failure(oauthError === 'access_denied' ? 'access_denied' : 'oauth_error');
+  if (oauthError) return failure(oauthError === 'access_denied' ? 'access_denied' : 'oauth_error', oauthError);
   if (!code) return failure('missing_code');
   if (!expectedState || returnedState !== expectedState) return failure('state_mismatch');
 
@@ -44,6 +52,7 @@ export async function GET(request) {
   if (!user) return redirectTo('/login');
 
   let writeMissing = false;
+  let extraMissing = [];
   try {
     const tokens = await exchangeCodeForTokens(code);
 
@@ -71,19 +80,21 @@ export async function GET(request) {
     // Granular consent: the user can untick the food / body-measurement boxes.
     const granted = tokens.scope ?? '';
     writeMissing = !(granted.includes(NUTRITION_WRITE_SCOPE) && granted.includes(METRICS_WRITE_SCOPE));
+    // An optional permission (e.g. sleep) that was asked for but not granted:
+    // either its box was left unticked, or the scope isn't added to the
+    // app's Data access list in Google Cloud, so Google never offered it.
+    extraMissing = requestedExtra.filter((k) => !granted.split(/\s+/).includes(OPTIONAL_SCOPES[k]));
+    if (extraMissing.length) console.warn('[google-health/callback] not granted:', extraMissing.join(','), '| granted:', granted);
   } catch (err) {
-    console.error('[google-health/callback]', err?.message ?? err);
-    return failure('token_exchange_failed');
+    return failure('exchange_failed', err?.message);
   }
 
   // Settings shows a success banner via this flag; other destinations
   // (e.g. /home after onboarding) just show the steps badge.
+  const missingParam = extraMissing.length ? `gh_missing=${extraMissing.join(',')}` : '';
   if (returnTo === '/settings') {
-    return redirectTo(
-      writeMissing
-        ? '/settings?google_health_connected=1&google_health_write=missing'
-        : '/settings?google_health_connected=1'
-    );
+    const q = ['google_health_connected=1', writeMissing ? 'google_health_write=missing' : '', missingParam].filter(Boolean).join('&');
+    return redirectTo(`/settings?${q}`);
   }
-  return redirectTo(returnTo);
+  return redirectTo(missingParam ? `${returnTo}?${missingParam}` : returnTo);
 }

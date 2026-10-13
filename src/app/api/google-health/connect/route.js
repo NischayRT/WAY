@@ -42,5 +42,7 @@ export async function GET(request) {
   };
   response.cookies.set('gh_oauth_state', state, cookieOptions);
   response.cookies.set('gh_return_to', returnTo, cookieOptions);
+  // So the callback can tell whether Google actually granted what was asked.
+  response.cookies.set('gh_extra', extra.join(','), cookieOptions);
   return response;
 }

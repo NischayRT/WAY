@@ -144,8 +144,11 @@ export function buildPlan(p) {
     notes.push('Body recomposition: eat at maintenance with higher protein and strength training.');
   }
 
+  // Target and maintenance are both shown to the nearest 10 kcal. Rounding
+  // only the target made "maintain" read as e.g. 2,400 vs 2,401 (−1 kcal).
   calories = Math.round(calories / 10) * 10;
-  const delta = calories - Math.round(tdee);
+  const maintenance = Math.round(tdee / 10) * 10;
+  const delta = calories - maintenance;
   if (direction !== 'maintain') {
     paceKgWeek = Math.abs((delta * 7) / KCAL_PER_KG); // actual pace after caps
     const kg = Math.abs(target ? target - weight : 0);
@@ -172,7 +175,7 @@ export function buildPlan(p) {
   return {
     sex,
     bmr: Math.round(bmr),
-    tdee: Math.round(tdee),
+    tdee: maintenance,
     direction,
     goal,
     pace: pace?.key ?? null,

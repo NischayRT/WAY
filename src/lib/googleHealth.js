@@ -120,6 +120,15 @@ export async function getValidAccessToken(supabase, userId) {
 }
 
 /**
+ * The scopes Google actually granted on the last connect (stored by the
+ * callback), as a Set. Empty if unknown.
+ */
+export async function getGrantedScopes(supabase, userId) {
+  const { data } = await supabase.from('google_health_connections').select('scopes').eq('user_id', userId).maybeSingle();
+  return new Set(String(data?.scopes || '').split(/\s+/).filter(Boolean));
+}
+
+/**
  * Steps, distance (km) and calories burned (kcal) for one calendar day
  * (YYYY-MM-DD, defaults to today in the app timezone).
  *
@@ -302,9 +311,19 @@ const toNum = (v) => {
 
 const dateStrOf = (d) => (d && d.year ? `${d.year}-${pad(d.month)}-${pad(d.day)}` : null);
 
+// Filter identifiers are snake_case ("daily_resting_heart_rate.date"), while
+// the response fields are camelCase ("dailyRestingHeartRate"). Using the
+// camelCase name in a filter returns 400, which is why resting heart rate,
+// HRV and VO2 max came back empty.
+const snake = (s) => s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+function dailyFilter(field, from, to) {
+  const f = snake(field);
+  return `${f}.date >= "${from}" AND ${f}.date < "${shiftDate(to, 1)}"`;
+}
+
 /** Daily summary points for a data type between two dates (inclusive). */
 async function listDaily(accessToken, dataType, field, fromStr, toStr) {
-  const filter = `${field}.date >= "${fromStr}" AND ${field}.date < "${shiftDate(toStr, 1)}"`;
+  const filter = dailyFilter(field, fromStr, toStr);
   const url = `${HEALTH_BASE}/${dataType}/dataPoints?pageSize=50&filter=${encodeURIComponent(filter)}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }, cache: 'no-store' });
   if (res.status === 403) {
@@ -456,7 +475,7 @@ async function heartSamplesForDay(accessToken, dateStr) {
   const points = await listAll(
     accessToken,
     'heart-rate',
-    `heartRate.sample_time.civil_time >= "${dateStr}" AND heartRate.sample_time.civil_time < "${shiftDate(dateStr, 1)}"`,
+    `heart_rate.sample_time.civil_time >= "${dateStr}" AND heart_rate.sample_time.civil_time < "${shiftDate(dateStr, 1)}"`,
     2000,
     3
   );
@@ -509,7 +528,7 @@ async function heartTile(accessToken, dateStr) {
       listPoints(
         accessToken,
         'irregular-rhythm-notification',
-        `irregularRhythmNotification.interval.civil_start_time >= "${from}" AND irregularRhythmNotification.interval.civil_start_time < "${shiftDate(dateStr, 1)}"`,
+        `irregular_rhythm_notification.interval.civil_start_time >= "${from}" AND irregular_rhythm_notification.interval.civil_start_time < "${shiftDate(dateStr, 1)}"`,
         10
       )
     ),
@@ -598,7 +617,7 @@ async function glucoseTile(accessToken, dateStr) {
   const points = await listPoints(
     accessToken,
     'blood-glucose',
-    `bloodGlucose.sample_time.civil_time >= "${dateStr}" AND bloodGlucose.sample_time.civil_time < "${shiftDate(dateStr, 1)}"`,
+    `blood_glucose.sample_time.civil_time >= "${dateStr}" AND blood_glucose.sample_time.civil_time < "${shiftDate(dateStr, 1)}"`,
     200
   );
   const readings = points
@@ -641,13 +660,16 @@ export async function fetchExtraTiles(accessToken, dateStr, keys) {
 /* ------------------------------------------------------------------ */
 
 /** All pages of a list query (capped), for ranges longer than one page. */
-async function listAll(accessToken, dataType, filter, pageSize, maxPages = 20) {
+async function listAll(accessToken, dataType, filter, pageSize, maxPages = 20, endpoint = 'dataPoints') {
   const out = [];
   let token = '';
   for (let i = 0; i < maxPages; i += 1) {
-    const q = new URLSearchParams({ pageSize: String(pageSize), filter });
-    if (token) q.set('pageToken', token);
-    const res = await fetch(`${HEALTH_BASE}/${dataType}/dataPoints?${q.toString()}`, {
+    // encodeURIComponent, not URLSearchParams: URLSearchParams writes spaces
+    // as '+', which the Health API doesn't read as a space, so every filter
+    // ("x >= ... AND ...") was rejected and these lists came back empty.
+    let q = `pageSize=${pageSize}&filter=${encodeURIComponent(filter)}`;
+    if (token) q += `&pageToken=${encodeURIComponent(token)}`;
+    const res = await fetch(`${HEALTH_BASE}/${dataType}/${endpoint}?${q}`, {
       headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
       cache: 'no-store',
     });
@@ -656,7 +678,10 @@ async function listAll(accessToken, dataType, filter, pageSize, maxPages = 20) {
       err.permissionDenied = true;
       throw err;
     }
-    if (!res.ok) throw new Error(`${dataType} list ${res.status}`);
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`${dataType} list ${res.status} ${body.slice(0, 300)}`);
+    }
     const data = await res.json().catch(() => ({}));
     out.push(...(data.dataPoints || []));
     token = data.nextPageToken;
@@ -665,7 +690,62 @@ async function listAll(accessToken, dataType, filter, pageSize, maxPages = 20) {
   return out;
 }
 
-const dailyFilter = (field, from, to) => `${field}.date >= "${from}" AND ${field}.date < "${shiftDate(to, 1)}"`;
+
+
+/**
+ * Sleep sessions that ended between from and to (inclusive), trying, in order:
+ *   1. reconcile (all sources merged; Google's recommended read for sleep),
+ *   2. a plain list over the range,
+ *   3. one list per day (exactly what the home Sleep tile does, which works),
+ * stopping at the first that returns anything. A permission error is thrown
+ * at once; other errors fall through to the next method.
+ */
+async function fetchSleepRange(accessToken, from, to) {
+  const filterFor = (a, b) => `sleep.interval.civil_end_time >= "${a}" AND sleep.interval.civil_end_time < "${shiftDate(b, 1)}"`;
+  const errors = [];
+  const attempt = async (label, fn) => {
+    try {
+      const pts = await fn();
+      if (pts.length) return pts;
+      errors.push(`${label}: 0 points`);
+    } catch (e) {
+      if (e.permissionDenied) throw e;
+      errors.push(`${label}: ${e.message}`);
+    }
+    return null;
+  };
+  const reconciled = await attempt('reconcile', () => listAll(accessToken, 'sleep', filterFor(from, to), 25, 20, 'dataPoints:reconcile'));
+  if (reconciled) return reconciled;
+  const listed = await attempt('list', () => listAll(accessToken, 'sleep', filterFor(from, to), 25, 20));
+  if (listed) return listed;
+  const days = [];
+  for (let d = from; d <= to && days.length < 62; d = shiftDate(d, 1)) days.push(d);
+  const perDay = await attempt('per-day', async () => {
+    const out = [];
+    for (let i = 0; i < days.length; i += 7) {
+      const batch = await Promise.all(days.slice(i, i + 7).map((d) => listPoints(accessToken, 'sleep', filterFor(d, d), 25).catch((e) => {
+        if (e.permissionDenied) throw e;
+        return [];
+      })));
+      for (const b of batch) out.push(...b);
+    }
+    return out;
+  });
+  if (perDay) return perDay;
+  console.warn(`[google-health sleep] nothing for ${from}..${to}:`, errors.join(' | '));
+  return [];
+}
+
+/** One sleep session as { d (date it ended), mins asleep, start, end (local minutes), main }. */
+function sleepNight(sl) {
+  const iv = sl?.interval || {};
+  const start = civilMinutes(iv.civilStartTime) ?? localMinutes(iv.startTime, iv.startUtcOffset);
+  const end = civilMinutes(iv.civilEndTime) ?? localMinutes(iv.endTime, iv.endUtcOffset ?? iv.startUtcOffset);
+  const d = dateStrOf(iv.civilEndTime?.date) ?? (end != null ? new Date(end * 60000).toISOString().slice(0, 10) : null);
+  const asleep = sl?.summary?.minutesAsleep;
+  const mins = asleep != null ? toNum(asleep) : start != null && end != null ? end - start : null;
+  return { d, mins, start, end, main: !!sl?.metadata?.mainSleep };
+}
 
 /** Per-day roll-up value OBJECTS (not just one number), chunked by maxDays. */
 async function dailyRollupObjects(accessToken, dataType, fromStr, toStr, maxDays) {
@@ -713,7 +793,7 @@ const HISTORY_FETCHERS = {
       const pts = await listAll(
         token,
         'heart-rate',
-        `heartRate.sample_time.civil_time >= "${from}" AND heartRate.sample_time.civil_time < "${shiftDate(to, 1)}"`,
+        `heart_rate.sample_time.civil_time >= "${from}" AND heart_rate.sample_time.civil_time < "${shiftDate(to, 1)}"`,
         5000,
         4
       ).catch(rethrowPerm([]));
@@ -764,22 +844,14 @@ const HISTORY_FETCHERS = {
     return { floors: new Map([...m].map(([d, o]) => [d, Math.round(statsOf(o).sum ?? 0)])) };
   },
   async sleep(token, from, to) {
-    const pts = await listAll(
-      token,
-      'sleep',
-      `sleep.interval.civil_end_time >= "${from}" AND sleep.interval.civil_end_time < "${shiftDate(to, 1)}"`,
-      25,
-      20
-    );
+    const pts = await fetchSleepRange(token, from, to);
     // One value per night, keyed by the date the sleep ENDED; the main sleep wins.
     const byDay = new Map();
     for (const p of pts) {
-      const sl = p.sleep;
-      const d = dateStrOf(sl?.interval?.civilEndTime?.date);
-      const mins = toNum(sl?.summary?.minutesAsleep);
-      if (!d || mins === null) continue;
-      const prev = byDay.get(d);
-      if (!prev || sl.metadata?.mainSleep || mins > prev.mins) byDay.set(d, { mins, main: !!sl.metadata?.mainSleep });
+      const n = sleepNight(p.sleep);
+      if (!n.d || !n.mins) continue;
+      const prev = byDay.get(n.d);
+      if (!prev || n.main || n.mins > prev.mins) byDay.set(n.d, { mins: n.mins, main: n.main });
     }
     return { sleepHours: new Map([...byDay].map(([d, x]) => [d, Math.round((x.mins / 60) * 10) / 10])) };
   },
@@ -787,7 +859,7 @@ const HISTORY_FETCHERS = {
     const pts = await listAll(
       token,
       'blood-glucose',
-      `bloodGlucose.sample_time.civil_time >= "${from}" AND bloodGlucose.sample_time.civil_time < "${shiftDate(to, 1)}"`,
+      `blood_glucose.sample_time.civil_time >= "${from}" AND blood_glucose.sample_time.civil_time < "${shiftDate(to, 1)}"`,
       1000,
       5
     );
@@ -844,11 +916,13 @@ export async function fetchExtraHistory(accessToken, fromStr, toStr, keys) {
 /* Body Age inputs (lib/bodyAge.js)                                    */
 /* ------------------------------------------------------------------ */
 
-// 30-day Body Age window, recalculated weekly: fetch 30 + 3 weeks so the
-// last four weekly snapshots can be drawn as a trend.
-const BODY_AGE_WINDOW = 30;
+// Body Age window = the range the user picked (Activity page) or the last
+// 7 days (home tile), 7..180 days. Extra days are fetched behind it for the
+// 30-day readiness baseline, Pace of Aging and the weekly trend.
+export const BODY_AGE_MIN_DAYS = 7;
+export const BODY_AGE_MAX_DAYS = 180;
 const BODY_AGE_WEEKS = 4;
-const BODY_AGE_FETCH_DAYS = BODY_AGE_WINDOW + (BODY_AGE_WEEKS - 1) * 7;
+const PACE_BASE_DAYS = 30;
 const VO2_LOOKBACK_DAYS = 90;
 const STRENGTH_TYPES = /STRENGTH|WEIGHT|RESISTANCE|CROSSFIT|CALISTHENIC|CIRCUIT|KETTLEBELL|PILATES|BODYWEIGHT/i;
 
@@ -875,27 +949,42 @@ const civilMinutes = (c) => {
   return day + (c.time?.hours ?? 0) * 60 + (c.time?.minutes ?? 0);
 };
 
+/** Physical time + offset ("19800s") as local minutes on the same scale as civilMinutes. */
+const localMinutes = (iso, offset) => {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return null;
+  const off = toNum(String(offset || '0').replace('s', '')) || 0;
+  return d.getTime() / 60000 + off / 60;
+};
+
 const minutesOfIso = (iso) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? null : d.getTime() / 60000;
 };
 
 /**
- * Everything Body Age needs: metric values for the last 30 days (Body Age),
- * the last 7 (Pace of Aging) and four weekly 30-day snapshots (trend), plus
- * day counts for the prerequisites. Each source fails on its own: a missing
- * permission is reported, not thrown.
+ * Everything Body Age needs for a window of `windowDays` days ending on `to`:
+ * metric values over the window (Body Age), the last 7 days vs the last 30
+ * (Pace of Aging), four weekly snapshots (trend) and day counts for the
+ * prerequisites. Each source fails on its own: a missing permission is
+ * reported, not thrown.
  */
-export async function fetchBodyAgeInputs(accessToken, todayStr = null) {
-  const to = todayStr || todayLocalDate();
-  const from = shiftDate(to, -(BODY_AGE_FETCH_DAYS - 1));
-  const recentFrom = shiftDate(to, -(BODY_AGE_WINDOW - 1));
+export async function fetchBodyAgeInputs(accessToken, { to: toStr = null, windowDays = 7 } = {}) {
+  const to = toStr || todayLocalDate();
+  const win = Math.max(BODY_AGE_MIN_DAYS, Math.min(BODY_AGE_MAX_DAYS, Math.round(windowDays) || BODY_AGE_MIN_DAYS));
+  const winFrom = shiftDate(to, -(win - 1));
+  // Snapshots go back 3 more weeks; readiness / pace need 30 days.
+  const from = shiftDate(to, -(Math.max(win, PACE_BASE_DAYS) - 1 + (BODY_AGE_WEEKS - 1) * 7));
   const weekFrom = shiftDate(to, -6);
   const perm = {};
+  const failed = {};
   const guard = (key, p) =>
     p.catch((e) => {
       if (e.permissionDenied) perm[key] = true;
-      else console.warn(`[body-age] ${key}:`, e.message);
+      else {
+        failed[key] = true;
+        console.warn(`[body-age] ${key}:`, e.message);
+      }
       return null;
     });
 
@@ -904,7 +993,7 @@ export async function fetchBodyAgeInputs(accessToken, todayStr = null) {
     guard('zones', rollupObjectsParallel(accessToken, 'active-zone-minutes', from, to, 14)),
     guard('restingHr', listAll(accessToken, 'daily-resting-heart-rate', dailyFilter('dailyRestingHeartRate', from, to), 1000)),
     guard('vo2', listAll(accessToken, 'daily-vo2-max', dailyFilter('dailyVo2Max', shiftDate(to, -(VO2_LOOKBACK_DAYS + 21)), to), 1000)),
-    guard('sleep', listAll(accessToken, 'sleep', `sleep.interval.civil_end_time >= "${from}" AND sleep.interval.civil_end_time < "${shiftDate(to, 1)}"`, 25, 10)),
+    guard('sleep', fetchSleepRange(accessToken, from, to)),
     guard('exercise', listAll(accessToken, 'exercise', `exercise.interval.civil_start_time >= "${from}" AND exercise.interval.civil_start_time < "${shiftDate(to, 1)}"`, 25, 16)),
     // Nightly HRV, for Readiness (lib/readiness.js); not used in Body Age.
     guard('hrv', listAll(accessToken, 'daily-heart-rate-variability', dailyFilter('dailyHeartRateVariability', from, to), 1000)),
@@ -942,15 +1031,15 @@ export async function fetchBodyAgeInputs(accessToken, todayStr = null) {
   const nights = new Map();
   for (const p of sleep || []) {
     const sl = p.sleep;
-    const d = dateStrOf(sl?.interval?.civilEndTime?.date);
-    const mins = toNum(sl?.summary?.minutesAsleep);
-    const start = civilMinutes(sl?.interval?.civilStartTime);
-    const end = civilMinutes(sl?.interval?.civilEndTime);
-    if (!d || !mins || start == null || end == null) continue;
+    const { d, mins, start, end } = sleepNight(sl);
+    if (!d || !mins) continue;
     const prev = nights.get(d);
-    if (!prev || sl.metadata?.mainSleep || mins > prev.mins) nights.set(d, { d, mins, mid: (start + end) / 2 });
+    if (!prev || sl.metadata?.mainSleep || mins > prev.mins) nights.set(d, { d, mins, start, end, mid: start != null && end != null ? (start + end) / 2 : null });
   }
   const nightRows = [...nights.values()];
+  if ((sleep || []).length && !nightRows.length) {
+    console.warn('[body-age] sleep: points returned but none parsed; first point:', JSON.stringify(sleep[0]).slice(0, 600));
+  }
   // Sleep midpoint as local clock minutes, unwrapped around midnight (noon..noon+24h).
   const clockMid = (r) => {
     let m = ((r.mid % 1440) + 1440) % 1440;
@@ -996,7 +1085,7 @@ export async function fetchBodyAgeInputs(accessToken, todayStr = null) {
       strengthMinWeek: sDays.length ? (strength.filter((r) => inWin(r.d)).reduce((a, r) => a + r.min, 0) / wornSpan) * 7 : null,
       restingHr: avg(rhrRows.filter((r) => inWin(r.d)).map((r) => r.v)),
       sleepHours: n.length ? avg(n.map((r) => r.mins / 60)) : null,
-      sleepMidpointSdMin: n.length >= minNightsForSd ? sd(n.map(clockMid)) : null,
+      sleepMidpointSdMin: n.filter((r) => r.mid != null).length >= minNightsForSd ? sd(n.filter((r) => r.mid != null).map(clockMid)) : null,
       vo2: v.length ? avg(v.slice(0, 3).map((r) => r.v)) : null,
     };
   };
@@ -1014,27 +1103,59 @@ export async function fetchBodyAgeInputs(accessToken, todayStr = null) {
   for (const r of rhrRows) put(r.d, 'rhr', r.v);
   for (const n of nightRows) put(n.d, 'sleepMin', n.mins);
 
-  const inLast30 = between(recentFrom, to);
+  const inWindow = between(winFrom, to);
+  const paceBase = windowValues(to, PACE_BASE_DAYS);
+  const paceBaseDays = stepDays.filter(([d]) => d >= shiftDate(to, -(PACE_BASE_DAYS - 1)) && d <= to).length;
   return {
+    windowDays: win,
+    from: winFrom,
+    to,
     daily: [...daily.values()],
-    sleepMidpointSd30: windowValues(to, BODY_AGE_WINDOW).sleepMidpointSdMin,
-    long: windowValues(to, BODY_AGE_WINDOW),
+    sleepMidpointSd30: windowValues(to, PACE_BASE_DAYS).sleepMidpointSdMin,
+    // Sleep timing over the selected window: how much the middle of the night
+    // moves (Sleep consistency) plus typical bed and wake times.
+    sleepTiming: (() => {
+      const rows = nightRows.filter((r) => inWindow(r.d) && r.mid != null);
+      if (rows.length < Math.min(5, Math.ceil(win * 0.7))) return { nights: rows.length, sdMin: null };
+      const clock = (m, pivot) => {
+        let x = ((m % 1440) + 1440) % 1440;
+        if (x < pivot) x += 1440;
+        return x;
+      };
+      const hhmm = (m) => {
+        const x = Math.round(((m % 1440) + 1440) % 1440);
+        return `${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`;
+      };
+      return {
+        nights: rows.length,
+        sdMin: Math.round(sd(rows.map(clockMid))),
+        bedtime: hhmm(avg(rows.map((r) => clock(r.start, 720)))), // noon pivot: 23:30 and 00:30 average to midnight
+        wake: hhmm(avg(rows.map((r) => clock(r.end, 0)))),
+      };
+    })(),
+    long: windowValues(to, win, Math.min(7, Math.ceil(win * 0.7))),
     recent: windowValues(to, 7, 4),
+    // Pace compares the last 7 days with the last 30, whatever the range;
+    // null until there are two weeks to compare against.
+    paceBase: paceBaseDays >= 14 ? paceBase : null,
     // Body Age at the end of each of the last 4 weeks (oldest first).
     snapshots: Array.from({ length: BODY_AGE_WEEKS }, (_, i) => {
       const end = shiftDate(to, -7 * (BODY_AGE_WEEKS - 1 - i));
-      return { end, values: windowValues(end, BODY_AGE_WINDOW) };
+      return { end, values: windowValues(end, win, Math.min(7, Math.ceil(win * 0.7))) };
     }),
     counts: {
-      steps: stepDays.filter(([d]) => inLast30(d)).length,
-      zones: zoneDays.filter((r) => inLast30(r.d)).length,
-      restingHr: rhrRows.filter((r) => inLast30(r.d)).length,
-      sleep: nightRows.filter((r) => inLast30(r.d)).length,
-      recent: stepDays.filter(([d]) => d >= weekFrom).length,
-      vo2: vo2Rows.filter((r) => r.d >= shiftDate(to, -(VO2_LOOKBACK_DAYS - 1))).length,
-      wornDays: stepDays.filter(([d]) => inLast30(d)).length,
+      steps: stepDays.filter(([d]) => inWindow(d)).length,
+      zones: zoneDays.filter((r) => inWindow(r.d)).length,
+      restingHr: rhrRows.filter((r) => inWindow(r.d)).length,
+      sleep: nightRows.filter((r) => inWindow(r.d)).length,
+      recent: stepDays.filter(([d]) => d >= weekFrom && d <= to).length,
+      vo2: vo2Rows.filter((r) => r.d <= to && r.d >= shiftDate(to, -(VO2_LOOKBACK_DAYS - 1))).length,
+      wornDays: stepDays.filter(([d]) => inWindow(d)).length,
     },
-    latestVo2Date: vo2Rows[0]?.d ?? null,
+    latestVo2Date: vo2Rows.find((r) => r.d <= to)?.d ?? null,
     needsPermission: perm,
+    failed,
+    // Raw point counts per source, to tell "no data" from "not parsed".
+    sourceCounts: { sleep: sleep?.length ?? null, restingHr: rhr?.length ?? null, hrv: hrv?.length ?? null, vo2: vo2?.length ?? null },
   };
 }

@@ -1,12 +1,27 @@
-import BottomNav from '@/components/layout/BottomNav';
+import WayNav from '@/components/way/WayNav';
+import { createServerSupabaseClient } from '@/lib/supabaseServer';
 
-export default function DashboardLayout({ children }) {
+// The redesigned dashboard is dark only. The `dark` class here also keeps any
+// older component that still uses `dark:` variants in step with it.
+export default async function DashboardLayout({ children }) {
+  let initial = 'W';
+  try {
+    const supabase = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+      initial = (profile?.full_name || user.email || 'W').trim().charAt(0).toUpperCase() || 'W';
+    }
+  } catch {
+    // Signed out or Supabase unreachable: the page itself handles the redirect.
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50/40 dark:bg-[#090d16] md:pl-16 transition-colors duration-300">
-      <div className="w-full">
-        {children}
-      </div>
-      <BottomNav />
+    <div className="dark min-h-screen bg-way-page text-way-ink [color-scheme:dark] md:pl-[76px]">
+      {children}
+      <WayNav initial={initial} />
     </div>
   );
 }

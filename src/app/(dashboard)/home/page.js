@@ -1,13 +1,14 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { computeMealBreakdown } from '@/lib/mealBreakdown';
-import { computeDailyTotalsByDate, getDayVisualStatus } from '@/lib/weekStatus';
+import { computeDailyTotalsByDate } from '@/lib/weekStatus';
 import { todayLocalDate, addDays } from '@/lib/dateUtils';
 import { resolveDateTargets } from '@/lib/weightTimeline';
-import { ui } from '@/lib/ui';
-import HomeClient from '@/components/home/HomeClient';
+import TodayClient from '@/components/today/TodayClient';
 
 export const dynamic = 'force-dynamic';
+
+const LOG_SELECT = 'id, quantity_g, meal_type, logged_at, foods (name, calories_kcal, protein_g, carbs_g, fat_g)';
 
 export default async function HomePage({ searchParams }) {
   const params = await searchParams;
@@ -19,8 +20,8 @@ export default async function HomePage({ searchParams }) {
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  // Single parallel pass fetching profile, week logs, and all user weight logs
-  const [{ data: profile }, { data: weightLogsData }, { data: ghConnection }] = await Promise.all([
+  const weekStart = addDays(today, -6);
+  const [{ data: profile }, { data: weightLogsData }, { data: ghConnection }, { data: weekLogs }] = await Promise.all([
     supabase
       .from('profiles')
       .select(
@@ -28,120 +29,64 @@ export default async function HomePage({ searchParams }) {
       )
       .eq('id', user.id)
       .single(),
-    supabase
-      .from('weight_logs')
-      .select('logged_at, weight_kg')
-      .eq('user_id', user.id)
-      .order('logged_at', { ascending: false }),
+    supabase.from('weight_logs').select('logged_at, weight_kg').eq('user_id', user.id).order('logged_at', { ascending: false }),
     supabase.from('google_health_connections').select('user_id').eq('user_id', user.id).maybeSingle(),
+    supabase.from('food_logs').select(LOG_SELECT).eq('user_id', user.id).gte('logged_at', weekStart).lte('logged_at', today),
   ]);
 
   if (!profile) redirect('/onboarding');
 
   const weightLogs = weightLogsData ?? [];
-  const currentYear = new Date().getFullYear();
-  const userAge = Number(profile.age) || 25;
-  const birthYear = currentYear - userAge;
-  const minDate = `${birthYear}-01-01`;
+  const minDate = addDays(today, -365 * 2);
 
   let requestedDate = params?.date || today;
-  if (requestedDate < minDate) {
-    requestedDate = minDate;
-  } else if (requestedDate > today) {
-    requestedDate = today;
-  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate) || requestedDate > today) requestedDate = today;
+  if (requestedDate < minDate) requestedDate = minDate;
 
-  const weekStart = addDays(today, -6);
-
-  const { data: weekLogs } = await supabase
-    .from('food_logs')
-    .select('id, quantity_g, meal_type, logged_at, foods (name, calories_kcal, protein_g, carbs_g, fat_g)')
-    .eq('user_id', user.id)
-    .gte('logged_at', weekStart)
-    .lte('logged_at', today);
-
-  // Targets for initial view calculated using nearest weight
-  const initialTargets = resolveDateTargets({
-    profile,
-    targetDateStr: requestedDate,
-    weightLogs,
-  });
-
-  const dailyTotalsByDate = computeDailyTotalsByDate(weekLogs ?? []);
-
+  const totalsByDate = computeDailyTotalsByDate(weekLogs ?? []);
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStart, i);
-    const isToday = date === today;
-    const isBeforeMinDate = date < minDate;
-    const consumed = dailyTotalsByDate.get(date) ?? { calories: 0, protein: 0 };
-    const hasLogs = dailyTotalsByDate.has(date);
-
-    // Compute status against the nearest weight target of that day
-    const dayTargets = resolveDateTargets({
-      profile,
-      targetDateStr: date,
-      weightLogs,
-    });
-
-    const { bgClass, borderClass } = getDayVisualStatus({
-      hasLogs,
-      consumed,
-      targets: dayTargets,
-    });
-
+    const d = new Date(`${date}T00:00:00`);
+    const totals = totalsByDate.get(date) ?? { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    const dayTargets = resolveDateTargets({ profile, targetDateStr: date, weightLogs });
+    const short = d.toLocaleDateString('en-IN', { weekday: 'short' });
     return {
       date,
-      isToday,
-      isBeforeMinDate,
-      dayLabel: new Date(`${date}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short' }),
-      dateLabel: new Date(`${date}T00:00:00`).getDate(),
-      bgClass,
-      borderClass,
+      isToday: date === today,
+      hasLogs: totalsByDate.has(date),
+      short,
+      letter: short.charAt(0),
+      num: d.getDate(),
+      calories: Math.round(totals.calories),
+      protein: Math.round(totals.protein),
+      carbs: Math.round(totals.carbs),
+      fat: Math.round(totals.fat),
+      target: dayTargets.targetCalories,
     };
   });
 
   const weekBreakdowns = {};
   for (const day of days) {
-    const logsForDay = (weekLogs ?? []).filter((l) => l.logged_at === day.date);
-    weekBreakdowns[day.date] = computeMealBreakdown(logsForDay);
+    weekBreakdowns[day.date] = computeMealBreakdown((weekLogs ?? []).filter((l) => l.logged_at === day.date));
   }
 
-  const requestedInWeek = requestedDate >= weekStart && requestedDate <= today;
   let outOfRange = null;
-
-  if (!requestedInWeek) {
-    const { data: outOfRangeLogs } = await supabase
-      .from('food_logs')
-      .select('id, quantity_g, meal_type, logged_at, foods (name, calories_kcal, protein_g, carbs_g, fat_g)')
-      .eq('user_id', user.id)
-      .eq('logged_at', requestedDate);
-
-    outOfRange = {
-      date: requestedDate,
-      breakdown: computeMealBreakdown(outOfRangeLogs ?? []),
-    };
+  if (requestedDate < weekStart) {
+    const { data: dayLogs } = await supabase.from('food_logs').select(LOG_SELECT).eq('user_id', user.id).eq('logged_at', requestedDate);
+    outOfRange = { date: requestedDate, breakdown: computeMealBreakdown(dayLogs ?? []) };
   }
-
-  const todayWeighedIn = weightLogs.some((w) => w.logged_at === today);
 
   return (
-    <main className={ui.pageWrapWide}>
-      <HomeClient
-        profile={profile}
-        weightLogs={weightLogs}
-        currentWeightKg={initialTargets.effectiveWeight}
-        todayWeighedIn={todayWeighedIn}
-        days={days}
-        today={today}
-        minDate={minDate}
-        weekStart={weekStart}
-        weekBreakdowns={weekBreakdowns}
-        initialSelectedDate={requestedDate}
-        initialTargets={initialTargets}
-        goal={profile.goal}
-        outOfRange={outOfRange}
-        googleHealth={{ connected: !!ghConnection }}
-      />
-    </main>
+    <TodayClient
+      profile={profile}
+      weightLogs={weightLogs}
+      days={days}
+      today={today}
+      minDate={minDate}
+      weekBreakdowns={weekBreakdowns}
+      initialSelectedDate={requestedDate}
+      outOfRange={outOfRange}
+      googleHealth={{ connected: !!ghConnection }}
+    />
   );
 }

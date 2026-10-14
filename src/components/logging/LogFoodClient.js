@@ -17,12 +17,12 @@ import {
   Check,
   History,
   ChefHat,
-  ArrowRight,
   Utensils,
   Sunrise,
   Sun,
   Cookie,
   Moon,
+  CookingPot,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabaseClient';
 import { getCachedFoods, peekCachedFoods } from '@/lib/cache/foodCache';
@@ -32,6 +32,7 @@ import { snackMealType, groupForMealType } from '@/lib/daily';
 import { portionOf, portionLabel, portionNutrition } from '@/lib/portions';
 import { PAGE, Card, Eyebrow, Segmented, Dot, fmt, useToast, useLocalPref, cx } from '@/components/way/ui';
 import { useJson } from '@/components/way/useJson';
+import IngredientPicker from './IngredientPicker';
 
 const MEALS = [
   { key: 'breakfast', label: 'Breakfast', Icon: Sunrise },
@@ -119,6 +120,8 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
   const [foodsError, setFoodsError] = useState(null);
   const [q, setQ] = useState(initialQuery);
   const [tab, setTab] = useState('suggested');
+  const [have, setHave] = useState([]); // ingredients for "Cook from"
+  const [dishRes, setDishRes] = useState({ key: '', matches: [] });
   const [meal, setMeal] = useState(() => (initialMeal ? groupForMealType(initialMeal) : mealByClock()));
   const [date, setDate] = useState(initialDate || today);
   const [tray, setTray] = useState([]); // [{ food, n }]
@@ -210,6 +213,25 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
     };
   }, [tray.length]);
 
+  // Dishes that use the chosen ingredients.
+  const haveKey = have.map((h) => h.id).join(',');
+  useEffect(() => {
+    if (!haveKey) return undefined;
+    let live = true;
+    fetch('/api/dish-builder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ingredientIds: haveKey.split(',').map(Number) }),
+    })
+      .then((res) => res.json())
+      .then((data) => live && setDishRes({ key: haveKey, matches: data.matches ?? [] }))
+      .catch(() => live && setDishRes({ key: haveKey, matches: [] }));
+    return () => {
+      live = false;
+    };
+  }, [haveKey]);
+  const dishLoading = !!haveKey && dishRes.key !== haveKey;
+
   const rec = useJson('/api/recommendations');
   const byId = useMemo(() => new Map(foods.map((f) => [f.id, f])), [foods]);
   const suggested = useMemo(
@@ -250,6 +272,7 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
     suggested: suggested.map((f) => ({ food: f })),
     recent: recentFoods,
     mine: mine.map((f) => ({ food: f })),
+    cook: haveKey && dishRes.key === haveKey ? dishRes.matches.map((m) => ({ food: byId.get(m.food.id) || m.food, match: m })) : [],
   };
   const items = ql ? results.map((f) => ({ food: f })) : lists[tab];
 
@@ -307,7 +330,14 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
           ? `You still need ${fmt(pGap)} g protein today. These close the gap without blowing your calories.`
           : 'Protein is covered today. These are lighter picks that keep you on target.',
     recent: recentFoods.length ? 'What you logged lately, newest first.' : 'Nothing logged in the last three weeks.',
-    mine: mine.length ? 'Dishes you built from your own ingredients.' : 'No recipes yet. Build one from its ingredients below.',
+    mine: mine.length ? 'Dishes you built from your own ingredients.' : 'No recipes yet. Build one with Custom recipe.',
+    cook: !haveKey
+      ? 'Tell us what’s in your kitchen and we’ll suggest dishes.'
+      : dishLoading
+        ? 'Finding dishes…'
+        : lists.cook.length
+          ? `${lists.cook.length} dish${lists.cook.length === 1 ? '' : 'es'} use what you have.`
+          : 'No dishes use these yet. Try adding more ingredients.',
   };
   const blurb = ql ? (items.length ? `${items.length}${items.length >= MAX_RESULTS ? '+' : ''} match${items.length === 1 ? '' : 'es'} for “${q.trim()}”` : '') : blurbs[tab];
   const empty = !!ql && items.length === 0 && foods.length > 0;
@@ -344,6 +374,7 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
     ['suggested', 'Suggested', lists.suggested.length],
     ['recent', 'Recent', lists.recent.length],
     ['mine', 'My recipes', lists.mine.length],
+    ['cook', 'From ingredients', have.length || null],
   ];
 
   const whenLabel = (r) => {
@@ -411,25 +442,6 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
         <ChevronRight size={15} />
       </button>
     </div>
-  );
-
-  const recipeLink = (
-    <Link
-      href={recipeHref}
-      className="flex items-center gap-3 rounded-2xl border border-dashed border-way-line2 px-3.5 py-3 text-way-ink transition-colors hover:bg-way-card md:gap-3.5 md:rounded-[18px] md:px-[18px] md:py-4"
-    >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-amber-400/12 text-way-kcal md:h-10 md:w-10 md:rounded-xl">
-        <ChefHat size={17} />
-      </span>
-      <span className="flex flex-1 flex-col gap-0.5 md:gap-[3px]">
-        <span className="text-sm font-semibold">{recipeCta}</span>
-        <span className="text-[11px] text-way-dim md:text-xs">
-          <span className="md:hidden">Add ingredients, weigh the pot, done.</span>
-          <span className="hidden md:inline">Cooked it at home? Add the ingredients and weigh the pot once.</span>
-        </span>
-      </span>
-      <ArrowRight size={15} className="text-way-dim" />
-    </Link>
   );
 
   return (
@@ -501,9 +513,9 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
             ) : null}
           </div>
 
-          <div className="flex flex-col gap-3 md:min-h-[38px] md:flex-row md:items-center md:justify-between md:gap-4">
+          <div className="flex flex-col gap-2.5 md:gap-3">
             {!ql ? (
-              <div className="flex gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 {tabs.map(([key, label, count]) => (
                   <button
                     key={key}
@@ -515,14 +527,24 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                       tab === key ? 'border-way-line3 bg-way-track text-way-ink' : 'border-way-line text-way-mute hover:text-way-ink'
                     )}
                   >
+                    {key === 'cook' ? <CookingPot size={14} /> : null}
                     {label}
-                    <span className="font-mono text-[10px] font-semibold opacity-60 md:text-[11px]">{count}</span>
+                    {count != null ? <span className="font-mono text-[10px] font-semibold opacity-60 md:text-[11px]">{count}</span> : null}
                   </button>
                 ))}
+                <Link
+                  href="/log-food/recipe"
+                  className="flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-way-ink bg-way-ink px-3.5 text-[13px] font-semibold text-way-page transition-colors hover:bg-white md:min-h-[38px] md:gap-[7px] md:px-4"
+                >
+                  <Plus size={14} />
+                  Custom recipe
+                </Link>
               </div>
             ) : null}
-            <span className="flex-1 px-0.5 text-xs leading-normal text-way-mute [text-wrap:pretty] md:px-0 md:text-right md:text-[13px]">{blurb}</span>
+            <span className="px-0.5 text-xs leading-normal text-way-mute [text-wrap:pretty] md:text-[13px]">{blurb}</span>
           </div>
+
+          {!ql && tab === 'cook' ? <IngredientPicker supabase={supabase} chosen={have} onChange={setHave} /> : null}
 
           <Card className="flex flex-col overflow-hidden rounded-[20px] md:rounded-[22px]">
             <div className="hidden grid-cols-[minmax(0,1fr)_64px_64px_64px_84px_168px] items-center gap-3 border-b border-way-line px-5 py-3 font-mono text-[10px] font-semibold tracking-[0.06em] text-way-dim md:grid">
@@ -535,12 +557,15 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
             </div>
             {foodsError ? <p className="px-5 py-6 text-[13px] text-rose-300">{foodsError}</p> : null}
             {!foods.length && !foodsError ? <p className="px-5 py-6 text-[13px] text-way-dim">Loading foods…</p> : null}
-            {items.map(({ food, r }, i) => {
+            {items.map(({ food, r, match }, i) => {
               const cnt = nOf(food.id);
               const shown = portionNutrition(food, cnt || 1);
               const one = portionNutrition(food, 1);
               const reason = !ql && tab === 'suggested' ? `+${fmt(one.protein)} g protein for ${fmt(one.calories)} kcal` : '';
               const when = !ql && tab === 'recent' ? whenLabel(r) : '';
+              const uses = match
+                ? `Uses ${match.matched} of ${match.total} ingredients${match.missing.length ? ` · needs ${match.missing.slice(0, 3).join(', ')}${match.missing.length > 3 ? '…' : ''}` : ' · you have everything'}`
+                : '';
               const isMine = !!food.created_by && food.created_by === userId;
               const control = cnt ? (
                 <Stepper wide qty={qty(food, cnt)} onDec={() => setN(food, cnt - 0.5)} onInc={() => setN(food, cnt + 0.5)} />
@@ -596,6 +621,9 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                       {when ? <span className="text-xs text-way-dim">{when}</span> : null}
                     </div>
                     {reason ? <span className="text-[11px] text-way-protein md:hidden">{reason}</span> : null}
+                    {uses ? (
+                      <span className={cx('truncate text-[11px] md:text-xs', match.missing.length ? 'text-way-kcal' : 'text-way-protein')}>{uses}</span>
+                    ) : null}
                   </div>
                   {[shown.protein, shown.carbs, shown.fat].map((v, j) => (
                     <span key={j} className="hidden text-right font-mono text-[13px] font-medium text-way-ink2 md:block">
@@ -609,7 +637,17 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
               );
             })}
             {!ql && !items.length && foods.length ? (
-              <p className="px-5 py-6 text-center text-[13px] text-way-dim">{tab === 'suggested' && rec.loading ? 'Loading suggestions…' : 'Nothing here yet.'}</p>
+              <p className="px-5 py-6 text-center text-[13px] text-way-dim">
+                {tab === 'suggested' && rec.loading
+                  ? 'Loading suggestions…'
+                  : tab === 'cook'
+                    ? !haveKey
+                      ? 'Add a few ingredients above to see dishes.'
+                      : dishLoading
+                        ? 'Finding dishes…'
+                        : 'No dishes use these yet.'
+                    : 'Nothing here yet.'}
+              </p>
             ) : null}
             {empty ? (
               <div className="flex flex-col items-center gap-1.5 px-4 py-[22px] text-center md:gap-2 md:px-5 md:py-10">
@@ -638,10 +676,9 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
               ]}
             />
           </div>
-          <div className="lg:hidden">{recipeLink}</div>
         </section>
 
-        {/* Desktop: this meal, your day after it, and the recipe link */}
+        {/* Desktop: this meal and your day after it */}
         <aside className="sticky top-6 hidden flex-col gap-4 lg:flex">
           <Card className="flex flex-col gap-4 border-way-line2 p-[22px]">
             <div className="flex items-start justify-between gap-2.5">
@@ -724,7 +761,6 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
               </div>
             ))}
           </Card>
-          {recipeLink}
         </aside>
       </div>
 

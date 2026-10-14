@@ -27,7 +27,7 @@ export async function POST(request) {
   // Every recipe line for every dish visible to this user (RLS on
   // `foods` handles the visibility filtering automatically).
   const { data: recipeLines } = await supabase.from('dish_ingredients').select(
-    'food_id, ingredient_id, foods (id, name, region, calories_kcal, protein_g, carbs_g, fat_g, created_by, author_name), ingredients (name)'
+    'food_id, ingredient_id, foods (id, name, region, calories_kcal, protein_g, carbs_g, fat_g, created_by, author_name, source, serving_size_g), ingredients (name)'
   );
 
   if (!recipeLines) {

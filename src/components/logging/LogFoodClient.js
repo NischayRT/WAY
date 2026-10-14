@@ -212,7 +212,10 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
 
   const rec = useJson('/api/recommendations');
   const byId = useMemo(() => new Map(foods.map((f) => [f.id, f])), [foods]);
-  const suggested = useMemo(() => (rec.data?.recommendations || []).map((r) => r.food).filter(Boolean), [rec.data]);
+  const suggested = useMemo(
+    () => (rec.data?.recommendations || []).map((r) => r.food && (byId.get(r.food.id) || r.food)).filter(Boolean),
+    [rec.data, byId]
+  );
   const recentFoods = useMemo(
     () => recent.map((r) => ({ food: byId.get(r.food_id), r })).filter((x) => x.food),
     [recent, byId]

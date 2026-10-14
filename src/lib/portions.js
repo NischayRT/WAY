@@ -2,8 +2,9 @@
  * lib/portions.js
  * Real-world portions (bowl, roti, katori, scoop…) for foods, so people log
  * "2 rotis" instead of "70 g". The foods table stores nutrition per 100 g
- * only, so the portion is inferred from the dish name; a custom recipe that
- * saved its serving size uses that instead.
+ * and a serving_size_g that defaults to 100 for everything, so the portion
+ * is inferred from the dish name; a recipe built in the Recipe Builder
+ * (source 'user_calculated') uses the serving size it was saved with.
  */
 
 // First match wins, so more specific names come before general ones.
@@ -40,8 +41,8 @@ const PLURAL = { glass: 'glasses', katori: 'katoris', puri: 'puris', naan: 'naan
 
 /** { unit, g } for one portion of a food. */
 export function portionOf(food) {
-  const serving = Number(food?.serving_g);
-  if (serving > 0) return { unit: 'serving', g: Math.round(serving) };
+  const serving = Number(food?.serving_size_g);
+  if (food?.source === 'user_calculated' && serving > 0) return { unit: 'serving', g: Math.round(serving) };
   const name = String(food?.name || '').toLowerCase();
   for (const [re, unit, g] of RULES) if (re.test(name)) return { unit, g };
   return { unit: 'serving', g: 100 };

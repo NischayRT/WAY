@@ -179,12 +179,11 @@ export default function RecipeBuilderClient({ authorName, starters, initialName 
       created_by: userId,
       author_name: authorName || null,
     };
-    // serving_g arrives with supabase/add-friends-and-portions.sql; before that
-    // migration runs, save without it rather than failing.
-    let ins = await supabase.from('foods').insert({ ...row, serving_g: Math.round(servingG) }).select('id').single();
-    if (ins.error && /serving_g/.test(ins.error.message || '')) {
-      ins = await supabase.from('foods').insert(row).select('id').single();
-    }
+    const ins = await supabase
+      .from('foods')
+      .insert({ ...row, serving_size_g: Math.round(servingG) })
+      .select('id')
+      .single();
     if (ins.error) {
       setSaving(false);
       setError(ins.error.message);

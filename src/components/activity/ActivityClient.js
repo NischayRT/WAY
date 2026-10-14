@@ -78,9 +78,10 @@ function StatCard({ c, k, gapD, gapM, xLabels, span }) {
   const Icon = TILE_ICONS[c.key];
   return (
     <Card
+      id={`stat-${c.key}`}
       rise
       delay={c.delay}
-      className="flex flex-col gap-3 px-[18px] py-4 [grid-column:auto] lg:gap-[18px] lg:p-6 lg:[grid-column:span_var(--span)/span_var(--span)]"
+      className="flex scroll-mt-6 flex-col gap-3 px-[18px] py-4 [grid-column:auto] lg:gap-[18px] lg:p-6 lg:[grid-column:span_var(--span)/span_var(--span)]"
       style={{ '--span': span }}
     >
       <div className="flex items-start justify-between gap-2.5 lg:gap-4">
@@ -462,6 +463,130 @@ export default function ActivityClient({ userId, profile, entries, goals, google
     </Btn>
   );
 
+  // Body composition
+  const compCard = (
+    <Card id="body-composition" rise delay={80} className="flex scroll-mt-6 flex-col gap-3.5 p-[18px] lg:col-span-4 lg:gap-[22px] lg:p-7">
+      <div className="flex items-center justify-between">
+        <Eyebrow>Body composition</Eyebrow>
+        <span className="font-mono text-[11px] font-medium text-way-dim">
+          {comp ? `${comp.h} cm${comp.age ? ` · ${comp.age} y` : ''}` : ''}
+        </span>
+      </div>
+      {comp ? (
+        <>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between">
+              <div className="flex items-baseline gap-1.5 lg:gap-2">
+                <span className="font-mono text-2xl font-semibold lg:font-brand lg:text-[56px] lg:font-normal lg:leading-none">{comp.bmi}</span>
+                <span className="text-xs text-way-dim lg:text-[13px]">BMI</span>
+              </div>
+              <span className="text-xs font-semibold lg:text-[13px]" style={{ color: comp.bandColor }}>
+                {comp.band}
+              </span>
+            </div>
+            <div className="relative flex h-1.5 gap-0.5 lg:h-2 lg:gap-[3px]">
+              {[
+                [2.5, '#60a5fa66'],
+                [6.5, '#34d39999'],
+                [5, '#fbbf2499'],
+                [5, '#fb718599'],
+              ].map(([flex, c]) => (
+                <div key={c} className="rounded-[3px] lg:rounded" style={{ flex, background: c }} />
+              ))}
+              <div
+                className="absolute -top-1 h-3.5 w-[3px] rounded-sm bg-slate-50 shadow-[0_0_0_3px_#0f1420] transition-[left] duration-1000 ease-[cubic-bezier(.2,.8,.2,1)] lg:-top-[5px] lg:h-[18px]"
+                style={{ left: `${comp.marker * k}%` }}
+              />
+            </div>
+            <div className="hidden justify-between font-mono text-[10px] font-medium text-way-faint lg:flex">
+              <span>16</span>
+              <span>18.5</span>
+              <span>25</span>
+              <span>30</span>
+              <span>35</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 lg:grid-cols-2 lg:gap-x-4 lg:gap-y-[18px] lg:border-t lg:border-way-line lg:pt-5">
+            {[
+              [`${comp.fat.toFixed(1)}%`, 'Body fat (est.)'],
+              [`${comp.lean.toFixed(1)} kg`, 'Lean mass'],
+              [`${comp.range} kg`, 'Healthy range'],
+              [comp.vs, 'Vs healthy range'],
+            ].map(([v, label], i) => (
+              <div key={label} className={cx('flex flex-col gap-0.5 lg:gap-[3px]', i === 3 && 'hidden lg:flex')}>
+                <span className="font-mono text-[15px] font-semibold lg:text-xl">{v}</span>
+                <span className="text-[10px] text-way-dim lg:text-xs">{label}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-auto hidden text-xs text-way-dim [text-wrap:pretty] lg:block">
+            {comp.measured ? 'Body fat is estimated from your measurements (US Navy method).' : 'Body fat is estimated until you add measurements.'}{' '}
+            <Link href="/settings?tab=body" className="text-way-protein">
+              Update them in Body
+            </Link>
+            .
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-way-mute">Add your height and weight in Settings to see this.</p>
+      )}
+    </Card>
+  );
+
+  // Body age trend
+  const bodyAgeCard = (
+    <Card id="body-age" rise delay={80} className="flex scroll-mt-6 flex-col gap-3 p-[18px] lg:col-span-4 lg:gap-[18px] lg:p-7">
+      <div className="flex items-center justify-between">
+        <Eyebrow>Body age trend</Eyebrow>
+        <span className="font-mono text-[11px] font-medium text-way-dim">{RANGES.find((r) => r[1] === range)[0]}</span>
+      </div>
+      {!googleHealthConnected ? (
+        <div className="flex flex-1 flex-col justify-center gap-3.5">
+          <span className="hidden font-brand text-[56px] leading-none text-way-faint lg:block">—</span>
+          <span className="text-[13px] text-way-mute lg:text-sm">Log in to Google Health to track your Body Age over time.</span>
+          <Btn as="a" href={connectHref()} variant="primary" className="self-start rounded-[10px] lg:self-stretch lg:rounded-xl">
+            Log in to Google Health
+          </Btn>
+        </div>
+      ) : !baView ? (
+        <div className="h-24 animate-pulse rounded-xl bg-way-track/60" />
+      ) : baView.locked ? (
+        <>
+          <span className="font-brand text-[38px] leading-none text-way-faint lg:text-[56px]">—</span>
+          <span className="text-[13px] text-way-mute [text-wrap:pretty]">{baView.msg}</span>
+        </>
+      ) : (
+        <>
+          <div className="flex items-baseline justify-between">
+            <div className="flex items-baseline gap-1.5 lg:gap-2">
+              <span className="font-brand text-[38px] leading-none text-way-gold lg:text-[56px]">{baView.now}</span>
+              <span className="font-mono text-[11px] font-medium text-way-dim lg:text-xs">real {baView.real}</span>
+            </div>
+            <span className="font-mono text-xs font-semibold lg:text-[13px]" style={{ color: baView.deltaColor }}>
+              {baView.delta}
+            </span>
+          </div>
+          <svg viewBox="0 0 300 60" preserveAspectRatio="none" className="block h-14 w-full lg:h-[90px]">
+            <polyline points={baView.line} style={{ fill: 'none', stroke: '#facc15', strokeWidth: 2.2, vectorEffect: 'non-scaling-stroke', strokeLinejoin: 'round' }} />
+          </svg>
+        </>
+      )}
+      {googleHealthConnected && baView ? (
+        <div className="mt-auto hidden grid-cols-3 border-t border-way-line pt-4 lg:grid">
+          {baView.statsRow.map((st) => (
+            <div key={st.label} className="flex flex-col items-center gap-[3px]">
+              <span className="font-mono text-[17px] font-semibold">{st.v}</span>
+              <span className="text-[11px] text-way-dim">{st.label}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </Card>
+  );
+
+  // Once Body Age is unlocked it takes the top spot; composition moves down.
+  const swap = googleHealthConnected && !!ba.data?.eligible;
+
   return (
     <main className={PAGE}>
       <PageHeader
@@ -478,7 +603,7 @@ export default function ActivityClient({ userId, profile, entries, goals, google
 
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 lg:gap-5">
         {/* Weight */}
-        <Card rise className="flex flex-col gap-3.5 p-[18px] lg:col-span-8 lg:gap-5 lg:p-7">
+        <Card id="weight" rise className="flex scroll-mt-6 flex-col gap-3.5 p-[18px] lg:col-span-8 lg:gap-5 lg:p-7">
           <div className="flex items-center justify-between gap-2.5 lg:items-start lg:gap-5">
             <div className="flex flex-col gap-[3px] lg:gap-1.5">
               <Eyebrow>Weight</Eyebrow>
@@ -560,73 +685,7 @@ export default function ActivityClient({ userId, profile, entries, goals, google
           )}
         </Card>
 
-        {/* Body composition */}
-        <Card rise delay={80} className="flex flex-col gap-3.5 p-[18px] lg:col-span-4 lg:gap-[22px] lg:p-7">
-          <div className="flex items-center justify-between">
-            <Eyebrow>Body composition</Eyebrow>
-            <span className="font-mono text-[11px] font-medium text-way-dim">
-              {comp ? `${comp.h} cm${comp.age ? ` · ${comp.age} y` : ''}` : ''}
-            </span>
-          </div>
-          {comp ? (
-            <>
-              <div className="flex flex-col gap-3">
-                <div className="flex items-baseline justify-between">
-                  <div className="flex items-baseline gap-1.5 lg:gap-2">
-                    <span className="font-mono text-2xl font-semibold lg:font-brand lg:text-[56px] lg:font-normal lg:leading-none">{comp.bmi}</span>
-                    <span className="text-xs text-way-dim lg:text-[13px]">BMI</span>
-                  </div>
-                  <span className="text-xs font-semibold lg:text-[13px]" style={{ color: comp.bandColor }}>
-                    {comp.band}
-                  </span>
-                </div>
-                <div className="relative flex h-1.5 gap-0.5 lg:h-2 lg:gap-[3px]">
-                  {[
-                    [2.5, '#60a5fa66'],
-                    [6.5, '#34d39999'],
-                    [5, '#fbbf2499'],
-                    [5, '#fb718599'],
-                  ].map(([flex, c]) => (
-                    <div key={c} className="rounded-[3px] lg:rounded" style={{ flex, background: c }} />
-                  ))}
-                  <div
-                    className="absolute -top-1 h-3.5 w-[3px] rounded-sm bg-slate-50 shadow-[0_0_0_3px_#0f1420] transition-[left] duration-1000 ease-[cubic-bezier(.2,.8,.2,1)] lg:-top-[5px] lg:h-[18px]"
-                    style={{ left: `${comp.marker * k}%` }}
-                  />
-                </div>
-                <div className="hidden justify-between font-mono text-[10px] font-medium text-way-faint lg:flex">
-                  <span>16</span>
-                  <span>18.5</span>
-                  <span>25</span>
-                  <span>30</span>
-                  <span>35</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 lg:grid-cols-2 lg:gap-x-4 lg:gap-y-[18px] lg:border-t lg:border-way-line lg:pt-5">
-                {[
-                  [`${comp.fat.toFixed(1)}%`, 'Body fat (est.)'],
-                  [`${comp.lean.toFixed(1)} kg`, 'Lean mass'],
-                  [`${comp.range} kg`, 'Healthy range'],
-                  [comp.vs, 'Vs healthy range'],
-                ].map(([v, label], i) => (
-                  <div key={label} className={cx('flex flex-col gap-0.5 lg:gap-[3px]', i === 3 && 'hidden lg:flex')}>
-                    <span className="font-mono text-[15px] font-semibold lg:text-xl">{v}</span>
-                    <span className="text-[10px] text-way-dim lg:text-xs">{label}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-auto hidden text-xs text-way-dim [text-wrap:pretty] lg:block">
-                {comp.measured ? 'Body fat is estimated from your measurements (US Navy method).' : 'Body fat is estimated until you add measurements.'}{' '}
-                <Link href="/settings?tab=body" className="text-way-protein">
-                  Update them in Body
-                </Link>
-                .
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-way-mute">Add your height and weight in Settings to see this.</p>
-          )}
-        </Card>
+        {swap ? bodyAgeCard : compCard}
 
         {/* Your stats */}
         {googleHealthConnected && !reauth ? (
@@ -718,54 +777,7 @@ export default function ActivityClient({ userId, profile, entries, goals, google
           )}
         </Card>
 
-        {/* Body age trend */}
-        <Card className="flex flex-col gap-3 p-[18px] lg:col-span-4 lg:gap-[18px] lg:p-7">
-          <div className="flex items-center justify-between">
-            <Eyebrow>Body age trend</Eyebrow>
-            <span className="font-mono text-[11px] font-medium text-way-dim">{RANGES.find((r) => r[1] === range)[0]}</span>
-          </div>
-          {!googleHealthConnected ? (
-            <div className="flex flex-1 flex-col justify-center gap-3.5">
-              <span className="hidden font-brand text-[56px] leading-none text-way-faint lg:block">—</span>
-              <span className="text-[13px] text-way-mute lg:text-sm">Log in to Google Health to track your Body Age over time.</span>
-              <Btn as="a" href={connectHref()} variant="primary" className="self-start rounded-[10px] lg:self-stretch lg:rounded-xl">
-                Log in to Google Health
-              </Btn>
-            </div>
-          ) : !baView ? (
-            <div className="h-24 animate-pulse rounded-xl bg-way-track/60" />
-          ) : baView.locked ? (
-            <>
-              <span className="font-brand text-[38px] leading-none text-way-faint lg:text-[56px]">—</span>
-              <span className="text-[13px] text-way-mute [text-wrap:pretty]">{baView.msg}</span>
-            </>
-          ) : (
-            <>
-              <div className="flex items-baseline justify-between">
-                <div className="flex items-baseline gap-1.5 lg:gap-2">
-                  <span className="font-brand text-[38px] leading-none text-way-gold lg:text-[56px]">{baView.now}</span>
-                  <span className="font-mono text-[11px] font-medium text-way-dim lg:text-xs">real {baView.real}</span>
-                </div>
-                <span className="font-mono text-xs font-semibold lg:text-[13px]" style={{ color: baView.deltaColor }}>
-                  {baView.delta}
-                </span>
-              </div>
-              <svg viewBox="0 0 300 60" preserveAspectRatio="none" className="block h-14 w-full lg:h-[90px]">
-                <polyline points={baView.line} style={{ fill: 'none', stroke: '#facc15', strokeWidth: 2.2, vectorEffect: 'non-scaling-stroke', strokeLinejoin: 'round' }} />
-              </svg>
-            </>
-          )}
-          {googleHealthConnected && baView ? (
-            <div className="mt-auto hidden grid-cols-3 border-t border-way-line pt-4 lg:grid">
-              {baView.statsRow.map((st) => (
-                <div key={st.label} className="flex flex-col items-center gap-[3px]">
-                  <span className="font-mono text-[17px] font-semibold">{st.v}</span>
-                  <span className="text-[11px] text-way-dim">{st.label}</span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </Card>
+        {swap ? compCard : bodyAgeCard}
       </div>
 
       <EditTilesDialog

@@ -15,6 +15,8 @@ import BodyAgeCard from './BodyAgeCard';
 import MealsSection from './MealsSection';
 import WeekCard, { buildWeek } from './WeekCard';
 import WeightCard from './WeightCard';
+import StreakCard from './StreakCard';
+import RankCard from './RankCard';
 
 const EXTRA_KEYS = ['heart', 'oxygen', 'floors', 'sleep', 'glucose'];
 const EMPTY = { categories: [], overallTotals: { calories: 0, protein: 0, carbs: 0, fat: 0 } };
@@ -69,6 +71,7 @@ export default function TodayClient({
   initialSelectedDate,
   outOfRange,
   googleHealth = { connected: false },
+  streak,
 }) {
   const router = useRouter();
   const [isNavigating, startTransition] = useTransition();
@@ -263,9 +266,14 @@ export default function TodayClient({
 
       <div className={cx('grid grid-cols-1 gap-3.5 transition-opacity lg:grid-cols-12 lg:gap-5', isNavigating && 'opacity-60')}>
         <div className="lg:col-span-8">
-          <ScoreCard d={d} k={k} connectHref={connectHref()} />
+          <ScoreCard d={d} k={k} connectHref={connectHref()} showScore={!!googleHealth.connected} />
         </div>
         <BodyAgeCard connected={!!googleHealth.connected} realAge={profile?.age} className="lg:col-span-4" />
+
+        <div className="flex flex-col gap-3.5 lg:col-span-12 lg:flex-row lg:gap-5">
+          <StreakCard streak={streak} k={k} className="lg:flex-1" />
+          <RankCard userId={profile?.id} today={today} className="lg:flex-1" />
+        </div>
 
         {googleHealth.connected ? (
           <>
@@ -286,13 +294,17 @@ export default function TodayClient({
                   className="min-w-0 [grid-column:span_var(--sm)/span_var(--sm)] lg:[grid-column:span_var(--lg)/span_var(--lg)]"
                   style={{ '--sm': tiles.length % 2 === 1 && i === tiles.length - 1 ? 2 : 1, '--lg': tileSpan(i, tiles.length) }}
                 >
-                  <HealthTile
-                    tileKey={t.key}
-                    model={t.model}
-                    k={k}
-                    delay={120 + i * 60}
-                    connectHref={connectHref(t.key === 'sleep' ? 'sleep' : null)}
-                  />
+                  {t.model.state ? (
+                    <HealthTile tileKey={t.key} model={t.model} k={k} delay={120 + i * 60} connectHref={connectHref(t.key === 'sleep' ? 'sleep' : null)} />
+                  ) : (
+                    <Link
+                      href={`/activity#stat-${t.key}`}
+                      title="Open in Activity"
+                      className="block h-full rounded-[18px] transition-transform duration-200 hover:-translate-y-0.5 md:rounded-[20px] [&>div]:h-full"
+                    >
+                      <HealthTile tileKey={t.key} model={t.model} k={k} delay={120 + i * 60} />
+                    </Link>
+                  )}
                 </div>
               ))}
             </div>

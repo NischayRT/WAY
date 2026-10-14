@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
 import { Card, Eyebrow, Btn, cx } from '@/components/way/ui';
 import { useJson } from '@/components/way/useJson';
 
@@ -131,7 +133,14 @@ export default function BodyAgeCard({ connected, realAge, className = '', delay 
   return (
     <Card rise delay={delay} className={cx('flex flex-col gap-4 p-[18px] lg:gap-[18px] lg:p-7', className)}>
       <div className="flex items-center justify-between">
-        <Eyebrow>Body age</Eyebrow>
+        {connected ? (
+          <Link href="/activity#body-age" className="group flex items-center gap-1">
+            <Eyebrow>Body age</Eyebrow>
+            <ChevronRight size={13} className="text-way-faint transition-colors group-hover:text-way-ink2" />
+          </Link>
+        ) : (
+          <Eyebrow>Body age</Eyebrow>
+        )}
         <span className="font-mono text-[11px] font-medium text-way-dim">{windowLabel}</span>
       </div>
 

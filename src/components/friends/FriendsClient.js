@@ -307,12 +307,12 @@ function ConfirmDialog({ cf, onClose }) {
   );
 }
 
-export default function FriendsClient({ userId, today, profile }) {
+export default function FriendsClient({ userId, today, profile, initialTab = 'arena' }) {
   const router = useRouter();
   const d = useFriendsData(userId, today);
   const k = useMounted() ? 1 : 0;
   const [toast, showToast] = useToast();
-  const [tab, setTab] = useState('arena');
+  const [tab, setTab] = useState(TABS.some((t) => t.key === initialTab) ? initialTab : 'arena');
   const [metric, setMetric] = useState('steps');
   const [period, setPeriod] = useState('week');
   const [md, setMd] = useState(null);

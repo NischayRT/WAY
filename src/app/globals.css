@@ -91,6 +91,31 @@ html.dark {
   }
 }
 
+/* Streak flames: higher tiers flicker, the top tiers also shimmer. */
+@keyframes way-flicker {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  30% { transform: scale(1.06) rotate(-3deg); }
+  60% { transform: scale(0.97) rotate(2deg); }
+}
+.way-flicker {
+  animation: way-flicker 1.8s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+@keyframes way-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.way-shimmer {
+  background-size: 200% 100%;
+  animation: way-shimmer 4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .way-flicker,
+  .way-shimmer {
+    animation: none;
+  }
+}
+
 .no-scrollbar {
   scrollbar-width: none;
 }

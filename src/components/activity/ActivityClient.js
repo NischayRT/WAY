@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Pencil, Scale, Activity, TrendingUp, Lock } from 'lucide-react';
 import { addDays } from '@/lib/dateUtils';
 import { buildBodyModel } from '@/lib/bodyPreview';
+import { calculateBMR, calculateTDEE, ACTIVITY_MULTIPLIERS } from '@/lib/bmrTdee';
 import { TILE_DEFS, FLOORS_GOAL } from '@/lib/daily';
 import { PAGE, PageHeader, Card, Eyebrow, Segmented, Btn, fmt, f1, useMounted, polyPoints, cx } from '@/components/way/ui';
 import { EditTilesDialog, useTileSelection, TILE_ICONS } from '@/components/way/tiles';
@@ -277,7 +278,20 @@ export default function ActivityClient({ userId, profile, entries, goals, google
     const loKg = 18.5 * (h / 100) ** 2;
     const hiKg = 24.9 * (h / 100) ** 2;
     const vs = w > hiKg ? `${(w - hiKg).toFixed(1)} kg over` : w < loKg ? `${(loKg - w).toFixed(1)} kg under` : 'Inside';
+    // Energy: Mifflin-St Jeor from the profile; with measurements, Katch-McArdle
+    // from lean mass (more accurate for lean or heavy builds).
+    const measured = !!profile?.waist_cm;
+    const mifflin = profile?.age ? calculateBMR({ weightKg: w, heightCm: h, age: Number(profile.age), sex: profile?.sex }) : null;
+    const bmr = measured && model.stats?.bmr ? model.stats.bmr : mifflin;
+    const level = ACTIVITY_MULTIPLIERS[profile?.activity_level] ? profile.activity_level : 'light';
+    const tdee = bmr ? calculateTDEE(bmr, level) : null;
     return {
+      bmr,
+      bmrMethod: measured && model.stats?.bmr ? 'from lean mass' : 'from height, weight, age',
+      tdee,
+      level: level.replace(/_/g, ' '),
+      ffmi: model.stats?.ffmi ?? null,
+      whtr: measured && model.stats?.waistToHeightRatio ? model.stats.waistToHeightRatio : null,
       h: Math.round(h),
       age: profile?.age,
       bmi: bmi.toFixed(1),
@@ -288,7 +302,7 @@ export default function ActivityClient({ userId, profile, entries, goals, google
       lean,
       range: `${Math.round(loKg)}–${Math.round(hiKg)}`,
       vs,
-      measured: !!profile?.waist_cm,
+      measured,
     };
   }, [profile, latest]);
 
@@ -299,6 +313,13 @@ export default function ActivityClient({ userId, profile, entries, goals, google
   const byDate = useMemo(() => new Map((hist.data?.days || []).map((d) => [d.date, d])), [hist.data]);
   const series = (key, name) => new Map((hist.data?.extras?.[key]?.data?.series?.[name] || []).map((p) => [p.date, p.value]));
   const connectHref = (scope) => `/api/google-health/connect?returnTo=%2Factivity${scope ? `&extra=${scope}` : ''}`;
+
+  // Your measured burn: BMR plus the active calories Google Health recorded.
+  const activeAvg = useMemo(() => {
+    const vals = dates.map((d) => byDate.get(d)?.activeCalories).filter((v) => v != null && v > 0);
+    return vals.length >= 3 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  }, [dates, byDate]);
+  const measuredTdee = comp?.bmr && activeAvg != null ? comp.bmr + activeAvg : null;
 
   const stats = tiles
     .filter((key) => STATS[key])
@@ -463,9 +484,12 @@ export default function ActivityClient({ userId, profile, entries, goals, google
     </Btn>
   );
 
+  // Body Age shows only once every stat it needs is there, right under the weight chart.
+  const bodyAgeReady = googleHealthConnected && !!ba.data?.eligible;
+
   // Body composition
   const compCard = (
-    <Card id="body-composition" rise delay={80} className="flex scroll-mt-6 flex-col gap-3.5 p-[18px] lg:col-span-4 lg:gap-[22px] lg:p-7">
+    <Card id="body-composition" rise delay={80} className={cx('flex scroll-mt-6 flex-col gap-3.5 p-[18px] lg:col-span-4 lg:gap-[22px] lg:p-7', bodyAgeReady && 'lg:row-span-2')}>
       <div className="flex items-center justify-between">
         <Eyebrow>Body composition</Eyebrow>
         <span className="font-mono text-[11px] font-medium text-way-dim">
@@ -519,6 +543,42 @@ export default function ActivityClient({ userId, profile, entries, goals, google
               </div>
             ))}
           </div>
+          {comp.bmr ? (
+            <div className="flex flex-col gap-2.5 border-t border-way-line pt-3.5 lg:pt-5">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-xs text-way-mute">
+                  BMR <span className="text-way-dim">· {comp.bmrMethod}</span>
+                </span>
+                <span className="font-mono text-[15px] font-semibold">
+                  {fmt(comp.bmr)} <span className="text-[11px] text-way-dim">kcal</span>
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-xs text-way-mute">
+                  TDEE <span className="text-way-dim">· {comp.level} activity</span>
+                </span>
+                <span className="font-mono text-[15px] font-semibold">
+                  {fmt(comp.tdee)} <span className="text-[11px] text-way-dim">kcal</span>
+                </span>
+              </div>
+              {measuredTdee ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-xs text-way-mute">
+                    Measured burn <span className="text-way-dim">· BMR + Google Health</span>
+                  </span>
+                  <span className="font-mono text-[15px] font-semibold text-way-protein">
+                    {fmt(measuredTdee)} <span className="text-[11px] text-way-dim">kcal</span>
+                  </span>
+                </div>
+              ) : null}
+              {comp.ffmi || comp.whtr ? (
+                <div className="flex gap-4 font-mono text-[11px] text-way-dim">
+                  {comp.ffmi ? <span>FFMI {comp.ffmi}</span> : null}
+                  {comp.whtr ? <span>Waist/height {comp.whtr}</span> : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <p className="mt-auto hidden text-xs text-way-dim [text-wrap:pretty] lg:block">
             {comp.measured ? 'Body fat is estimated from your measurements (US Navy method).' : 'Body fat is estimated until you add measurements.'}{' '}
             <Link href="/settings?tab=body" className="text-way-protein">
@@ -535,7 +595,7 @@ export default function ActivityClient({ userId, profile, entries, goals, google
 
   // Body age trend
   const bodyAgeCard = (
-    <Card id="body-age" rise delay={80} className="flex scroll-mt-6 flex-col gap-3 p-[18px] lg:col-span-4 lg:gap-[18px] lg:p-7">
+    <Card id="body-age" rise delay={80} className="flex scroll-mt-6 flex-col gap-3 p-[18px] lg:col-span-8 lg:gap-[18px] lg:p-7">
       <div className="flex items-center justify-between">
         <Eyebrow>Body age trend</Eyebrow>
         <span className="font-mono text-[11px] font-medium text-way-dim">{RANGES.find((r) => r[1] === range)[0]}</span>
@@ -584,8 +644,6 @@ export default function ActivityClient({ userId, profile, entries, goals, google
     </Card>
   );
 
-  // Once Body Age is unlocked it takes the top spot; composition moves down.
-  const swap = googleHealthConnected && !!ba.data?.eligible;
 
   return (
     <main className={PAGE}>
@@ -685,7 +743,8 @@ export default function ActivityClient({ userId, profile, entries, goals, google
           )}
         </Card>
 
-        {swap ? bodyAgeCard : compCard}
+        {compCard}
+        {bodyAgeReady ? bodyAgeCard : null}
 
         {/* Your stats */}
         {googleHealthConnected && !reauth ? (
@@ -777,7 +836,6 @@ export default function ActivityClient({ userId, profile, entries, goals, google
           )}
         </Card>
 
-        {swap ? compCard : bodyAgeCard}
       </div>
 
       <EditTilesDialog

@@ -6,7 +6,7 @@ import { streakTier } from '@/lib/streak';
 import { Card, Eyebrow, cx } from '@/components/way/ui';
 
 /**
- * Food-logging streak. The look grows with the streak: a grey ember, a small
+ * Login streak (days you opened WAY); opens the streak page. The look grows with the streak: a grey ember, a small
  * spark, then a glowing flame, a flickering fire, a blaze with a gradient
  * border, an inferno with a shimmer, and a gold crown at 100+ days.
  */
@@ -21,9 +21,9 @@ export default function StreakCard({ streak, k, className = '' }) {
 
   const line =
     n === 0
-      ? 'Log food today to start a streak.'
+      ? 'Open WAY every day to build a streak.'
       : pending
-        ? 'Log something today to keep it alive.'
+        ? 'Check in today to keep it alive.'
         : next
           ? `${toNext} more day${toNext === 1 ? '' : 's'} to ${next.name}.`
           : 'Top tier. Every day adds to the legend.';
@@ -38,7 +38,7 @@ export default function StreakCard({ streak, k, className = '' }) {
   const Icon = lvl >= 6 ? Crown : Flame;
 
   return (
-    <Card rise delay={60} as={Link} href="/nutrition" className={cx('group relative flex items-center gap-4 overflow-hidden p-4 transition-colors lg:p-5', className)} style={border}>
+    <Card rise delay={60} as={Link} href="/streak" className={cx('group relative flex items-center gap-4 overflow-hidden p-4 transition-colors lg:p-5', className)} style={border}>
       {t.glow ? (
         <div
           className="pointer-events-none absolute -left-10 -top-16 h-44 w-44 rounded-full"
@@ -69,7 +69,7 @@ export default function StreakCard({ streak, k, className = '' }) {
 
       <div className="relative flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex items-center gap-2">
-          <Eyebrow>Log streak</Eyebrow>
+          <Eyebrow>Login streak</Eyebrow>
           {n > 0 ? (
             <span
               className={cx('rounded-full px-2 py-px font-heading text-[10px] font-bold uppercase tracking-[0.12em]', lvl >= 5 && 'way-shimmer')}

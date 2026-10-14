@@ -4,7 +4,7 @@ import { computeMealBreakdown } from '@/lib/mealBreakdown';
 import { computeDailyTotalsByDate } from '@/lib/weekStatus';
 import { todayLocalDate, addDays } from '@/lib/dateUtils';
 import { resolveDateTargets } from '@/lib/weightTimeline';
-import { loadStreak } from '@/lib/streak';
+import { loadLoginStreak, recordVisit } from '@/lib/streak';
 import TodayClient from '@/components/today/TodayClient';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +22,7 @@ export default async function HomePage({ searchParams }) {
   if (!user) redirect('/login');
 
   const weekStart = addDays(today, -6);
+  await recordVisit(supabase, user.id, today);
   const [{ data: profile }, { data: weightLogsData }, { data: ghConnection }, { data: weekLogs }, streak] = await Promise.all([
     supabase
       .from('profiles')
@@ -33,7 +34,7 @@ export default async function HomePage({ searchParams }) {
     supabase.from('weight_logs').select('logged_at, weight_kg').eq('user_id', user.id).order('logged_at', { ascending: false }),
     supabase.from('google_health_connections').select('user_id').eq('user_id', user.id).maybeSingle(),
     supabase.from('food_logs').select(LOG_SELECT).eq('user_id', user.id).gte('logged_at', weekStart).lte('logged_at', today),
-    loadStreak(supabase, user.id, today),
+    loadLoginStreak(supabase, user.id, today),
   ]);
 
   if (!profile) redirect('/onboarding');

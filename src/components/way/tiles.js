@@ -205,18 +205,108 @@ const STYLES = {
  * One health tile with its fulfilment level: in progress, goal reached
  * (green), or past the goal (gold). The bar runs to 120% with a tick at 100%.
  */
+// Tiles whose target is a healthy range: being in range is their "beyond".
+const RANGE_TILES = ['sleep', 'oxygen', 'glucose'];
+
+/** The looping, tile-specific flourish shown once a tile goes past its goal. */
+function TileFx({ tileKey, color }) {
+  // Sits to the right of the number, clear of the badge and the bar.
+  const wrap = 'pointer-events-none absolute right-3 top-[34%] h-9 w-20 opacity-90 md:right-5 md:h-11 md:w-24';
+  switch (tileKey) {
+    case 'steps':
+      return (
+        <div className={wrap} aria-hidden="true">
+          {[0, 1, 2, 3].map((i) => (
+            <Footprints
+              key={i}
+              size={14}
+              className="way-step absolute"
+              style={{ left: `${i * 26}%`, bottom: i % 2 ? 4 : 14, color, '--d': `${i * 0.35}s`, transform: `rotate(${i % 2 ? 8 : -8}deg)` }}
+            />
+          ))}
+        </div>
+      );
+    case 'distance':
+      return (
+        <svg className={wrap} viewBox="0 0 112 56" aria-hidden="true">
+          <path id="way-route" d="M4 46 C 30 46, 30 12, 56 14 S 86 44, 108 10" fill="none" stroke={color} strokeOpacity=".5" strokeWidth="2" strokeDasharray="5 5" className="way-dash" />
+          <circle r="4" fill={color} className="way-run" style={{ offsetPath: 'path("M4 46 C 30 46, 30 12, 56 14 S 86 44, 108 10")' }} />
+        </svg>
+      );
+    case 'energy':
+      return (
+        <div className={wrap} aria-hidden="true">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Flame key={i} size={12 + (i % 3) * 3} className="way-float-up absolute bottom-0" style={{ left: `${10 + i * 18}%`, color: i % 2 ? '#fb923c' : color, '--d': `${i * 0.4}s`, '--t': `${1.6 + (i % 3) * 0.4}s` }} />
+          ))}
+        </div>
+      );
+    case 'floors':
+      return (
+        <svg className={wrap} viewBox="0 0 112 56" aria-hidden="true">
+          <path d="M40 52 H52 V42 H62 V32 H72 V22 H82 V12 H96" fill="none" stroke={color} strokeOpacity=".55" strokeWidth="2" />
+          <circle cx="46" cy="47" r="3.5" fill={color} className="way-hop" />
+        </svg>
+      );
+    case 'sleep':
+      return (
+        <div className={wrap} aria-hidden="true">
+          {['z', 'z', 'Z'].map((z, i) => (
+            <span key={i} className="way-float-up absolute bottom-1 font-heading font-bold" style={{ left: `${45 + i * 14}%`, fontSize: 11 + i * 4, color, '--d': `${i * 0.6}s`, '--t': '2.4s' }}>
+              {z}
+            </span>
+          ))}
+        </div>
+      );
+    case 'oxygen':
+      return (
+        <div className={wrap} aria-hidden="true">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <span key={i} className="way-float-up absolute bottom-0 rounded-full border" style={{ left: `${20 + i * 15}%`, width: 5 + (i % 3) * 3, height: 5 + (i % 3) * 3, borderColor: color, '--d': `${i * 0.45}s`, '--t': '2.2s' }} />
+          ))}
+        </div>
+      );
+    case 'glucose':
+      return (
+        <svg className={wrap} viewBox="0 0 112 56" aria-hidden="true">
+          <path d="M4 34 H34 L42 18 L52 46 L60 28 H108" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="way-beat" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
 export function HealthTile({ tileKey, model, k = 1, delay = 0, connectHref }) {
   const def = TILE_DEFS.find((t) => t.key === tileKey);
   const Icon = TILE_ICONS[tileKey];
   const s = STYLES[model.status] || STYLES.info;
   const hasBadge = model.status === 'reached' || model.status === 'exceeded';
   const fill = model.pct == null ? 0 : (Math.max(0, Math.min(model.pct, 120)) / 120) * 100 * k;
+  // Reached: one sweep of light. Past the goal (or in range for range tiles): glow + the tile's own loop.
+  const beyond = !model.state && (model.status === 'exceeded' || (RANGE_TILES.includes(tileKey) && model.status === 'reached'));
+  const reached = !model.state && model.status === 'reached' && !beyond;
 
   return (
     <div
-      className="way-rise flex min-w-0 flex-col gap-2.5 rounded-[18px] border p-3.5 transition-[border-color,background] duration-[400ms] md:gap-3 md:rounded-[20px] md:px-[22px] md:py-5"
+      className="way-rise relative flex min-w-0 flex-col gap-2.5 overflow-hidden rounded-[18px] [&>:not([data-fx])]:relative border p-3.5 transition-[border-color,background] duration-[400ms] md:gap-3 md:rounded-[20px] md:px-[22px] md:py-5"
       style={{ borderColor: s.border, background: s.bg, '--d': `${delay}ms` }}
     >
+      {reached || beyond ? (
+        <div
+          data-fx
+          className={cx('pointer-events-none absolute inset-y-0 left-0 w-1/3', beyond ? 'way-shine-loop' : 'way-shine')}
+          style={{ background: `linear-gradient(90deg, transparent, ${beyond && model.status === 'exceeded' ? 'rgba(250,204,21,.16)' : 'rgba(52,211,153,.14)'}, transparent)` }}
+        />
+      ) : null}
+      {beyond ? (
+        <>
+          {model.status === 'exceeded' ? <div data-fx className="way-glow pointer-events-none absolute inset-0 rounded-[inherit]" /> : null}
+          <div data-fx className="pointer-events-none absolute inset-0">
+            <TileFx tileKey={tileKey} color={model.status === 'exceeded' ? '#facc15' : def.color} />
+          </div>
+        </>
+      ) : null}
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-way-mute md:gap-2 md:text-[13px]">
           <Icon size={14} className="shrink-0" style={{ color: def.color }} />
@@ -224,8 +314,8 @@ export function HealthTile({ tileKey, model, k = 1, delay = 0, connectHref }) {
         </div>
         {hasBadge ? (
           <span
-            className="flex shrink-0 items-center gap-1 rounded-full font-mono text-[10px] font-semibold md:px-2 md:py-[3px]"
-            style={{ color: s.badgeColor, background: s.badgeBg }}
+            className="way-pop flex shrink-0 items-center gap-1 rounded-full font-mono text-[10px] font-semibold md:px-2 md:py-[3px]"
+            style={{ color: s.badgeColor, background: s.badgeBg, '--d': `${delay + 500}ms` }}
             title={model.badge}
           >
             <s.Badge size={12} />

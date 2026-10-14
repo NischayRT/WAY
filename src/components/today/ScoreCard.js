@@ -54,7 +54,7 @@ export default function ScoreCard({ d, k, connectHref, showScore = true }) {
   // Calories by meal + macros
   const nutrition = (
     <div className="flex flex-col gap-[18px] lg:justify-between lg:gap-[26px]">
-      <Link href="/nutrition" className="group -m-2 flex flex-col gap-2.5 rounded-2xl p-2 transition-colors hover:bg-way-hover/60 lg:gap-3.5">
+      <Link href="/nutrition#calories" className="group -m-2 flex flex-col gap-2.5 rounded-2xl p-2 transition-colors hover:bg-way-hover/60 lg:gap-3.5">
         <div className={cx('items-baseline justify-between', showScore ? 'hidden lg:flex' : 'flex')}>
           <span className="flex items-center gap-1.5">
             <Eyebrow>{showScore ? 'Calories by meal' : 'Calories & nutrition'}</Eyebrow>
@@ -93,7 +93,7 @@ export default function ScoreCard({ d, k, connectHref, showScore = true }) {
         </div>
       </Link>
       <div className="hidden h-px bg-way-line lg:block" />
-      <Link href="/nutrition" className="-m-2 grid grid-cols-3 gap-3.5 rounded-2xl p-2 transition-colors hover:bg-way-hover/60 lg:gap-6">
+      <Link href="/nutrition#macros" className="-m-2 grid grid-cols-3 gap-3.5 rounded-2xl p-2 transition-colors hover:bg-way-hover/60 lg:gap-6">
         {d.macros.map((m) => (
           <div key={m.label} className="flex flex-col gap-1.5 lg:gap-2">
             <div className="flex items-center gap-1.5 text-[11px] text-way-mute lg:gap-[7px] lg:text-xs">

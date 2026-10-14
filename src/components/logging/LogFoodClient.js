@@ -603,7 +603,7 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                     <div className="flex min-w-0 items-center gap-1.5 md:gap-2">
                       <span className="truncate text-sm font-medium md:text-[15px]">{food.name}</span>
                       {isMine ? (
-                        <span className="shrink-0 rounded-[5px] border border-emerald-400/35 px-1 py-px font-mono text-[9px] font-semibold text-way-protein">
+                        <span className="shrink-0 rounded-[5px] border border-emerald-400/35 px-1 py-px font-mono text-[10px] font-semibold text-way-protein">
                           <span className="md:hidden">MINE</span>
                           <span className="hidden md:inline">MY RECIPE</span>
                         </span>

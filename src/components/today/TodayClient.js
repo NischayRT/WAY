@@ -92,6 +92,8 @@ export default function TodayClient({
 
   // Steps, distance and active calories for the day on screen.
   const steps = useJson(googleHealth.connected ? `/api/google-health/steps?date=${selectedDate}` : null);
+  const bodyAge = useJson(googleHealth.connected ? '/api/body-age' : null);
+  const bodyAgeReady = !!(bodyAge.data?.eligible && bodyAge.data?.result);
   const health = useMemo(() => {
     const s = steps.data;
     return {
@@ -265,14 +267,17 @@ export default function TodayClient({
       <WeekStrip days={week} selectedDate={selectedDate} onSelect={handleSelectDate} variant="mobile" />
 
       <div className={cx('grid grid-cols-1 gap-3.5 transition-opacity lg:grid-cols-12 lg:gap-5', isNavigating && 'opacity-60')}>
-        <div className="lg:col-span-8">
+        {/* Competing with friends: a short-lived rank banner. */}
+        <RankCard userId={profile?.id} today={today} className="lg:col-span-12" />
+
+        {/* No Google Health: calories and macros only. With it: the Daily Score,
+            and Body Age beside it once every stat it needs is available. */}
+        <div className={bodyAgeReady ? 'lg:col-span-8' : 'lg:col-span-12'}>
           <ScoreCard d={d} k={k} connectHref={connectHref()} showScore={!!googleHealth.connected} />
         </div>
-        <BodyAgeCard connected={!!googleHealth.connected} realAge={profile?.age} className="lg:col-span-4" />
-
-        <div className="flex flex-col gap-3.5 lg:col-span-12 lg:flex-row lg:gap-5">
-          <StreakCard streak={streak} k={k} className="lg:flex-1" />
-          <RankCard userId={profile?.id} today={today} className="lg:flex-1" />
+        {bodyAgeReady ? <BodyAgeCard data={bodyAge.data} className="lg:col-span-4" /> : null}
+        <div className="lg:hidden">
+          <StreakCard streak={streak} k={k} />
         </div>
 
         {googleHealth.connected ? (
@@ -316,6 +321,9 @@ export default function TodayClient({
         </div>
 
         <div className="flex flex-col gap-3.5 lg:col-span-4 lg:gap-5 lg:pt-[52px]">
+          <div className="hidden lg:block">
+            <StreakCard streak={streak} k={k} />
+          </div>
           <div className="order-2 lg:order-1">
             <WeightCard
               profile={profile}

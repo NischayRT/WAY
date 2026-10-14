@@ -45,7 +45,10 @@ export function avatarOf(person, isMe) {
   const [bg, fg] = AVATARS[h % AVATARS.length];
   return { bg, fg };
 }
-export const displayName = (p) => (p?.full_name && p.full_name.trim()) || (p?.username ? `@${p.username}` : 'Someone');
+/** Your private nickname for them first, then their first name, then @username. */
+export const displayName = (p) => (p?.alias && p.alias.trim()) || (p?.full_name && p.full_name.trim()) || (p?.username ? `@${p.username}` : 'Someone');
+export const FRIEND_LIMIT = 3;
+export const FAMILY_LIMIT = 3;
 export const initialOf = (p) => (displayName(p).replace('@', '').charAt(0) || '?').toUpperCase();
 
 /* ---------- XP and levels ---------- */

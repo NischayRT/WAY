@@ -1,8 +1,8 @@
 /**
  * lib/streak.js
- * Food-logging streak: consecutive days with at least one food log, ending
- * today (or yesterday, so an unlogged morning doesn't break it), plus the
- * tier that decides how the streak card looks.
+ * Streaks: consecutive days (of opening WAY, or of logging food), ending
+ * today (or yesterday, so a quiet morning doesn't break it), plus the tier
+ * that decides how streak cards and the streak page look.
  */
 
 import { addDays } from './dateUtils';
@@ -25,7 +25,7 @@ export function streakTier(n) {
   return { ...t, level: STREAK_TIERS.indexOf(t), nextTier };
 }
 
-/** days: Set of YYYY-MM-DD with food logged. */
+/** days: Set of YYYY-MM-DD that count (a food log, or a visit). */
 export function computeStreak(days, today) {
   const loggedToday = days.has(today);
   let d = loggedToday ? today : addDays(today, -1);
@@ -45,21 +45,48 @@ const WINDOW = 45; // days per request, small enough to stay under the row cap
 
 /**
  * Reads only the days needed: 45-day windows backwards until the streak
- * breaks (at most ~1 year).
+ * breaks (at most ~1 year). Returns null if the table can't be read.
  */
-export async function loadStreak(supabase, userId, today) {
+async function loadDays(supabase, userId, today, table, column) {
   const days = new Set();
   let to = today;
   for (let i = 0; i < 9; i += 1) {
     const from = addDays(to, -(WINDOW - 1));
-    const { data, error } = await supabase.from('food_logs').select('logged_at').eq('user_id', userId).gte('logged_at', from).lte('logged_at', to);
-    if (error) break;
-    for (const r of data || []) days.add(r.logged_at);
+    const { data, error } = await supabase.from(table).select(column).eq('user_id', userId).gte(column, from).lte(column, to);
+    if (error) return i === 0 ? null : days;
+    for (const r of data || []) days.add(r[column]);
     const s = computeStreak(days, today);
     const breakDay = addDays(s.loggedToday ? today : addDays(today, -1), -s.current);
     // Stop once the run ends inside the data read so far.
     if (!days.has(from) || breakDay >= from) break;
     to = addDays(from, -1);
   }
-  return computeStreak(days, today);
+  return days;
+}
+
+/** Food-logging streak. */
+export async function loadStreak(supabase, userId, today) {
+  return computeStreak((await loadDays(supabase, userId, today, 'food_logs', 'logged_at')) || new Set(), today);
+}
+
+/** Records today's visit (once a day) for the login streak. Never throws. */
+export async function recordVisit(supabase, userId, today) {
+  try {
+    await supabase.from('daily_visits').upsert({ user_id: userId, day: today }, { onConflict: 'user_id,day', ignoreDuplicates: true });
+  } catch {
+    /* table not created yet */
+  }
+}
+
+/**
+ * Login streak: days you opened WAY. Before supabase/add-friends.sql adds
+ * daily_visits, food-log days stand in so the streak still means something.
+ */
+export async function loadLoginStreak(supabase, userId, today) {
+  const visits = await loadDays(supabase, userId, today, 'daily_visits', 'day');
+  const source = visits ? 'visits' : 'food';
+  const days = visits || (await loadDays(supabase, userId, today, 'food_logs', 'logged_at')) || new Set();
+  // The last 6 weeks, for the streak page's calendar.
+  const recent = Array.from({ length: 42 }, (_, i) => addDays(today, i - 41)).filter((d) => days.has(d));
+  return { ...computeStreak(days, today), source, recent };
 }

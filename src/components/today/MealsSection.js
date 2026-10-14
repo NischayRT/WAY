@@ -132,7 +132,7 @@ export default function MealsSection({ meals, k, selectedDate, today, minDate })
   return (
     <section className="flex flex-col gap-3.5" aria-label="Meals">
       <div className="flex items-center justify-between px-0.5 pt-1.5 lg:p-0">
-        <Link href="/nutrition" className="group flex items-center gap-1">
+        <Link href="/nutrition#day" className="group flex items-center gap-1">
           <Eyebrow>Meals</Eyebrow>
           <ChevronRight size={13} className="text-way-faint transition-colors group-hover:text-way-ink2" />
         </Link>

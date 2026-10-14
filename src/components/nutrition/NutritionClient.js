@@ -264,7 +264,7 @@ export default function NutritionClient({ days: allDays, targets }) {
 
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 lg:gap-5">
         {/* Calories */}
-        <Card rise className="flex flex-col gap-4 p-[18px] lg:col-span-8 lg:gap-[22px] lg:p-7">
+        <Card id="calories" rise className="flex scroll-mt-6 flex-col gap-4 p-[18px] lg:col-span-8 lg:gap-[22px] lg:p-7">
           <div className="flex items-center justify-between lg:items-start lg:gap-6">
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-[7px] lg:gap-2">
@@ -294,7 +294,7 @@ export default function NutritionClient({ days: allDays, targets }) {
               <div key={t.label} className="flex flex-col gap-[3px]">
                 <span className="text-[11px] text-way-mute">{t.label}</span>
                 <div className="flex items-baseline gap-[3px]">
-                  <span className="font-mono text-[19px] font-semibold leading-none" style={{ color: t.color }}>
+                  <span className="font-mono text-lg font-semibold leading-none" style={{ color: t.color }}>
                     {t.v}
                   </span>
                   <span className="font-mono text-[10px] font-medium text-way-dim">{t.unit}</span>
@@ -372,7 +372,7 @@ export default function NutritionClient({ days: allDays, targets }) {
         </Card>
 
         {/* Day panel */}
-        <Card rise delay={80} className="flex flex-col gap-3.5 border-way-line2 p-[18px] lg:col-span-4 lg:gap-[22px] lg:p-7">
+        <Card id="day" rise delay={80} className="flex scroll-mt-6 flex-col gap-3.5 border-way-line2 p-[18px] lg:col-span-4 lg:gap-[22px] lg:p-7">
           <div className="flex items-center justify-between gap-2.5">
             <button type="button" onClick={prev} disabled={sel === 0} aria-label="Previous day" className={cx(navBtn, 'lg:hidden')}>
               <ChevronLeft size={15} />
@@ -485,7 +485,7 @@ export default function NutritionClient({ days: allDays, targets }) {
 
         {/* Protein, carbs and fat */}
         {macros.map((m) => (
-          <Card key={m.key} rise delay={m.delay} className="flex flex-col gap-3 px-[18px] py-4 lg:col-span-4 lg:gap-[18px] lg:p-6">
+          <Card key={m.key} id={m.key === macros[0].key ? 'macros' : `macro-${m.key}`} rise delay={m.delay} className="flex scroll-mt-6 flex-col gap-3 px-[18px] py-4 lg:col-span-4 lg:gap-[18px] lg:p-6">
             <div className="flex items-start justify-between gap-2.5 lg:gap-3">
               <div className="flex flex-col gap-1 lg:gap-2">
                 <div className="flex items-center gap-[7px] lg:gap-2">

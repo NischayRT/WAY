@@ -2,20 +2,22 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Trophy, ChevronRight, Crown } from 'lucide-react';
+import { Trophy, ChevronRight, Crown, X } from 'lucide-react';
 import { createClient } from '@/lib/supabaseClient';
 import { addDays } from '@/lib/dateUtils';
 import { FIELDS, COMPETE_KEYS, buildBoard, indexStats, fmtVal, displayName } from '@/lib/friends';
-import { Card, Eyebrow, cx } from '@/components/way/ui';
+import { cx } from '@/components/way/ui';
 import { Avatar } from '@/components/friends/parts';
 
 /**
- * Your place on this week's Friends leaderboard. Renders nothing unless you
- * compete with at least one person (or before supabase/add-friends.sql runs).
+ * A short-lived banner with your place on this week's Friends leaderboard.
+ * Slides in, counts down for 9 seconds (hover pauses) and tucks away; tap it
+ * to open the Arena. Renders nothing unless you compete with someone.
  */
 export default function RankCard({ userId, today, className = '' }) {
   const supabase = useMemo(() => createClient(), []);
   const [data, setData] = useState(null);
+  const [gone, setGone] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -62,36 +64,40 @@ export default function RankCard({ userId, today, className = '' }) {
         : 'Waiting for your friends to sync.';
 
   return (
-    <Card
-      rise
-      delay={100}
-      as={Link}
-      href="/friends?tab=arena"
-      className={cx('group relative flex items-center gap-4 overflow-hidden p-4 transition-colors hover:bg-way-hover lg:p-5', first && 'border-[rgba(250,204,21,.35)]', className)}
+    <div
+      className={cx('grid transition-[grid-template-rows,opacity,margin] duration-500 ease-out', gone ? 'pointer-events-none -mb-3.5 grid-rows-[0fr] opacity-0 lg:-mb-5' : 'grid-rows-[1fr] opacity-100', className)}
+      role="status"
     >
-      <div className="pointer-events-none absolute -right-10 -top-16 h-44 w-44 rounded-full bg-[radial-gradient(circle,rgba(250,204,21,.12),transparent_70%)]" />
-      <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_50%_70%,rgba(250,204,21,.2),#0f1420_75%)] lg:h-16 lg:w-16">
-        {first ? <Crown size={26} className="text-way-gold" /> : <Trophy size={24} className="text-way-gold" />}
-      </div>
-      <div className="relative flex min-w-0 flex-1 flex-col gap-1.5">
-        <div className="flex items-center gap-2">
-          <Eyebrow>Leaderboard</Eyebrow>
-          <span className="font-mono text-[10px] font-medium text-way-dim">
-            {f.label} · 7 days
-          </span>
+      <div className="min-h-0 overflow-hidden">
+        <div className="way-drop group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-[rgba(250,204,21,.3)] bg-[linear-gradient(90deg,rgba(250,204,21,.10),rgba(15,20,32,1)_55%)] py-2.5 pl-3 pr-2 lg:gap-4 lg:py-3 lg:pl-4">
+          <Link href="/friends?tab=arena" className="flex min-w-0 flex-1 items-center gap-3 lg:gap-4">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-400/15">
+              {first ? <Crown size={18} className="text-way-gold" /> : <Trophy size={17} className="text-way-gold" />}
+            </span>
+            <span className="font-brand text-[28px] leading-none text-way-gold">{mine ? `#${i + 1}` : '—'}</span>
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-[13px] font-semibold">
+                of {total} in {f.label.toLowerCase()} this week
+              </span>
+              <span className="truncate text-xs text-way-mute">{line}</span>
+            </span>
+            <span className="ml-auto hidden -space-x-2 sm:flex">
+              {ranked.slice(0, 4).map((r) => (
+                <Avatar key={r.id} person={person(r.id)} isMe={r.id === userId} size={24} ring="0 0 0 2px #0f1420" />
+              ))}
+            </span>
+            <ChevronRight size={16} className="shrink-0 text-way-faint transition-colors group-hover:text-way-ink2" />
+          </Link>
+          <button type="button" onClick={() => setGone(true)} aria-label="Dismiss" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-way-dim hover:bg-way-hover hover:text-way-ink">
+            <X size={15} />
+          </button>
+          {/* Countdown: hovering pauses it; when it runs out the banner tucks away. */}
+          <span
+            className="way-countdown absolute bottom-0 left-0 h-[2px] bg-way-gold/70 group-hover:[animation-play-state:paused]"
+            onAnimationEnd={() => setGone(true)}
+          />
         </div>
-        <div className="flex items-baseline gap-1.5">
-          <span className="font-brand text-[40px] leading-none text-way-gold lg:text-5xl">{mine ? `#${i + 1}` : '—'}</span>
-          <span className="font-mono text-xs font-medium text-way-dim">of {total}</span>
-        </div>
-        <span className="truncate text-xs text-way-mute">{line}</span>
       </div>
-      <div className="relative hidden -space-x-2 sm:flex">
-        {ranked.slice(0, 4).map((r) => (
-          <Avatar key={r.id} person={person(r.id)} isMe={r.id === userId} size={28} ring="0 0 0 2px #0f1420" />
-        ))}
-      </div>
-      <ChevronRight size={16} className="relative shrink-0 text-way-faint transition-colors group-hover:text-way-ink2" />
-    </Card>
+    </div>
   );
 }

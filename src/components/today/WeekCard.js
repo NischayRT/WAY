@@ -9,7 +9,7 @@ export default function WeekCard({ wk, k, selectedDate, onSelect }) {
   return (
     <Card className="flex flex-col gap-3.5 p-[18px] lg:gap-4 lg:rounded-[20px] lg:p-[22px]">
       <div className="flex items-start justify-between">
-        <Link href="/nutrition" className="group flex flex-col gap-1 lg:gap-1.5">
+        <Link href="/nutrition#calories" className="group flex flex-col gap-1 lg:gap-1.5">
           <span className="flex items-center gap-1">
             <Eyebrow>Last 7 days</Eyebrow>
             <ChevronRight size={13} className="text-way-faint transition-colors group-hover:text-way-ink2 lg:hidden" />
@@ -20,7 +20,7 @@ export default function WeekCard({ wk, k, selectedDate, onSelect }) {
           </div>
         </Link>
         <span className="max-w-[150px] text-right text-[11px] text-way-mute lg:hidden">{wk.onTarget}</span>
-        <Link href="/nutrition" className="hidden items-center gap-0.5 text-xs text-way-mute hover:text-way-ink lg:flex">
+        <Link href="/nutrition#calories" className="hidden items-center gap-0.5 text-xs text-way-mute hover:text-way-ink lg:flex">
           Nutrition
           <ChevronRight size={13} />
         </Link>

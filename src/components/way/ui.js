@@ -9,11 +9,9 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
-export const cx = (...parts) => parts.filter(Boolean).join(' ');
+import { cx } from './tokens';
 
-/** Page body: 16px gutters on phones, room for the bottom bar; 40px gutters on desktop. */
-export const PAGE =
-  'mx-auto flex w-full max-w-[1360px] flex-col gap-3.5 px-4 pt-6 pb-[calc(104px+env(safe-area-inset-bottom))] md:gap-5 md:px-10 md:pt-8 md:pb-10';
+export { cx, PAGE } from './tokens';
 
 /** Indian digit grouping, rounded: 12,450. */
 export const fmt = (n) => Math.round(Number(n) || 0).toLocaleString('en-IN');

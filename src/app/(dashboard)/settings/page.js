@@ -1,25 +1,31 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
-import { ui } from '@/lib/ui';
-import AppHeader from '@/components/layout/AppHeader';
+import { todayLocalDate } from '@/lib/dateUtils';
 import SettingsClient from '@/components/settings/SettingsClient';
 
-// This page must never be served from a cached render: it carries a
-// specific user's profile row down as props, and a stale render from a
-// different account would show the wrong details. Writes themselves no
-// longer depend on this — forms resolve the user id from the live session
-// at save time rather than trusting a prop.
+// Never served from a cached render: it carries one user's profile down as props.
 export const dynamic = 'force-dynamic';
 
-export default async function SettingsPage() {
+const SECTIONS = ['profile', 'body', 'apps', 'account'];
+
+// Only known codes map to text, so a crafted link can't put arbitrary text on screen.
+const GH_ERRORS = {
+  access_denied: 'Google Health access was not granted.',
+  state_mismatch: 'The connection request expired. Please try again.',
+  missing_code: 'Google did not complete the connection. Please try again.',
+  no_refresh_token: 'Google did not return a refresh token. Disconnect and reconnect.',
+  token_exchange_failed: 'Google rejected the connection. Please try again.',
+};
+
+export default async function SettingsPage({ searchParams }) {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   if (!user) redirect('/login');
 
-  const [{ data: profile }, { data: googleHealthConnection }] = await Promise.all([
+  const params = await searchParams;
+  const [{ data: profile }, { data: gh }, { data: firstWeight }, { data: lastWeight }] = await Promise.all([
     supabase
       .from('profiles')
       .select(
@@ -27,34 +33,40 @@ export default async function SettingsPage() {
       )
       .eq('id', user.id)
       .single(),
-    supabase
-      .from('google_health_connections')
-      .select('user_id, scopes, sync_enabled')
-      .eq('user_id', user.id)
-      .maybeSingle(),
+    supabase.from('google_health_connections').select('user_id, scopes, sync_enabled').eq('user_id', user.id).maybeSingle(),
+    supabase.from('weight_logs').select('weight_kg').eq('user_id', user.id).order('logged_at', { ascending: true }).limit(1).maybeSingle(),
+    supabase.from('weight_logs').select('weight_kg').eq('user_id', user.id).order('logged_at', { ascending: false }).limit(1).maybeSingle(),
   ]);
-
   if (!profile) redirect('/onboarding');
 
+  let banner = null;
+  if (params?.google_health_connected) {
+    banner =
+      params.google_health_write === 'missing'
+        ? { type: 'error', message: 'Connected, but the food and body measurement permissions weren’t ticked on Google’s screen, so meals and weight won’t sync. Tap “Reconnect & allow” and tick every box.' }
+        : { type: 'success', message: 'Google Health connected.' };
+  } else if (params?.google_health_error) {
+    banner = { type: 'error', message: `Could not connect Google Health. ${GH_ERRORS[params.google_health_error] ?? 'Please try again.'}` };
+  }
+
+  const scopes = gh?.scopes ?? '';
+  const initialSection = banner ? 'apps' : SECTIONS.includes(params?.tab) ? params.tab : 'profile';
+
   return (
-    <main className={`${ui.pageWrapWide} lg:px-8`}>
-      <div>
-        <AppHeader title="Settings" backHref="/home" backLabel="Back to today" />
-        <p className="mt-1 text-sm text-slate-500 dark:text-sky-400">
-          Update your details or change your goal — your daily targets recalculate
-          automatically.
-        </p>
-      </div>
-      <SettingsClient
-        initialProfile={profile}
-        googleHealthConnected={!!googleHealthConnection}
-        googleHealthSync={{
-          enabled: googleHealthConnection?.sync_enabled !== false,
-          canWrite:
-            (googleHealthConnection?.scopes ?? '').includes('nutrition.writeonly') &&
-            (googleHealthConnection?.scopes ?? '').includes('health_metrics_and_measurements.writeonly'),
-        }}
-      />
-    </main>
+    <SettingsClient
+      profile={profile}
+      email={user.email ?? ''}
+      initialSection={initialSection}
+      initialBodyTab={params?.sub === 'goal' ? 'goal' : 'measure'}
+      googleHealth={{
+        connected: !!gh,
+        canWrite: scopes.includes('nutrition.writeonly') && scopes.includes('health_metrics_and_measurements.writeonly'),
+        syncEnabled: gh?.sync_enabled !== false,
+      }}
+      currentWeightKg={lastWeight?.weight_kg ?? profile.weight_kg}
+      startKg={firstWeight?.weight_kg ?? null}
+      today={todayLocalDate()}
+      banner={banner}
+    />
   );
 }

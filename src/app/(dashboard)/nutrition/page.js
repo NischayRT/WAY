@@ -3,8 +3,6 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { resolveDailyTargets } from '@/lib/bmrTdee';
 import { computeDailyTotalsByDate } from '@/lib/weekStatus';
 import { todayLocalDate, addDays } from '@/lib/dateUtils';
-import { ui } from '@/lib/ui';
-import AppHeader from '@/components/layout/AppHeader';
 import NutritionClient from '@/components/nutrition/NutritionClient';
 
 export const dynamic = 'force-dynamic';
@@ -26,9 +24,7 @@ export default async function NutritionPage() {
   const [{ data: profile }, { data: logs }] = await Promise.all([
     supabase
       .from('profiles')
-      .select(
-        'height_cm, weight_kg, age, sex, activity_level, goal, override_calories, override_protein_g, override_carbs_g, override_fat_g'
-      )
+      .select('height_cm, weight_kg, age, sex, activity_level, goal, override_calories, override_protein_g, override_carbs_g, override_fat_g')
       .eq('id', user.id)
       .single(),
     supabase
@@ -47,12 +43,8 @@ export default async function NutritionPage() {
   const days = Array.from({ length: WINDOW_DAYS }, (_, i) => {
     const date = addDays(windowStart, i);
     const totals = dailyTotalsByDate.get(date) ?? { calories: 0, protein: 0, carbs: 0, fat: 0 };
-    const d = new Date(`${date}T00:00:00`);
-
     return {
       date,
-      dayLabel: d.toLocaleDateString('en-IN', { weekday: 'short' }),
-      dateLabel: d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
       calories: Math.round(totals.calories),
       protein: Math.round(totals.protein),
       carbs: Math.round(totals.carbs),
@@ -60,10 +52,5 @@ export default async function NutritionPage() {
     };
   });
 
-  return (
-    <main className={ui.pageWrapWide}>
-      <AppHeader title="Nutrition" backHref="/home" backLabel="Back to today" />
-      <NutritionClient days={days} targets={targets} />
-    </main>
-  );
+  return <NutritionClient days={days} targets={targets} />;
 }

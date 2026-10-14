@@ -45,6 +45,67 @@ html.dark {
   --font-mono: var(--font-plex-mono), monospace;
   --font-brand: var(--font-instrument-serif), Georgia, serif;
   --font-heading: var(--font-pt-narrow), "Arial Narrow", sans-serif;
+
+  /* WAY redesign: one dark, editorial palette for every dashboard screen.
+     Surfaces from back to front, then text from loudest to quietest, then
+     the macro accents (calories amber, protein emerald, carbs blue, fat violet). */
+  --color-way-page: #090d16;
+  --color-way-rail: #0b101a;
+  --color-way-card: #0f1420;
+  --color-way-hover: #141b29;
+  --color-way-track: #1a2130;
+  --color-way-line: #1c2433;
+  --color-way-line2: #253044;
+  --color-way-line3: #334155;
+  --color-way-ink: #f1f5f9;
+  --color-way-ink2: #cbd5e1;
+  --color-way-mute: #94a3b8;
+  --color-way-dim: #64748b;
+  --color-way-faint: #475569;
+  --color-way-kcal: #fbbf24;
+  --color-way-protein: #34d399;
+  --color-way-carbs: #60a5fa;
+  --color-way-fat: #a78bfa;
+  --color-way-over: #fb7185;
+  --color-way-gold: #facc15;
+}
+
+/* Fade-and-rise used when a card first appears. `--d` staggers cards. */
+@keyframes way-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.way-rise {
+  animation: way-rise 0.6s ease both;
+  animation-delay: var(--d, 0ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .way-rise {
+    animation: none;
+  }
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Number inputs in the redesign hide the spinner; values are typed or stepped with +/- buttons. */
+.way-num {
+  -moz-appearance: textfield;
+}
+.way-num::-webkit-outer-spin-button,
+.way-num::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 body {

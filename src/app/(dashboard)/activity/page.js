@@ -1,8 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { redirect } from 'next/navigation';
-import { ui } from '@/lib/ui';
 import { todayLocalDate } from '@/lib/dateUtils';
-import AppHeader from '@/components/layout/AppHeader';
 import ActivityClient from '@/components/activity/ActivityClient';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +19,9 @@ export default async function ActivityPage() {
   const [{ data: profile }, { data: recentDesc }, { data: connection }] = await Promise.all([
     supabase
       .from('profiles')
-      .select('height_cm, goal, step_goal, distance_goal_km, burn_goal_kcal')
+      .select(
+        'height_cm, weight_kg, age, sex, goal, step_goal, distance_goal_km, burn_goal_kcal, waist_cm, hip_cm, chest_cm, bicep_cm, dream_target_weight_kg, dream_target_date'
+      )
       .eq('id', user.id)
       .single(),
     supabase
@@ -33,25 +33,20 @@ export default async function ActivityPage() {
     supabase.from('google_health_connections').select('user_id').eq('user_id', user.id).maybeSingle(),
   ]);
 
-  const entries = [...(recentDesc ?? [])].reverse();
+  if (!profile) redirect('/onboarding');
 
   return (
-    <main className={ui.pageWrapWide}>
-      <AppHeader title="Activity" backHref="/home" backLabel="Back to today" />
-
-      <ActivityClient
-        userId={user.id}
-        entries={entries}
-        heightCm={profile?.height_cm ?? null}
-        goal={profile?.goal ?? 'maintain'}
-        goals={{
-          steps: profile?.step_goal ?? null,
-          distanceKm: profile?.distance_goal_km ? Number(profile.distance_goal_km) : null,
-          burnKcal: profile?.burn_goal_kcal ?? null,
-        }}
-        googleHealthConnected={!!connection}
-        today={todayLocalDate()}
-      />
-    </main>
+    <ActivityClient
+      userId={user.id}
+      profile={profile}
+      entries={[...(recentDesc ?? [])].reverse()}
+      goals={{
+        steps: profile.step_goal ?? null,
+        distanceKm: profile.distance_goal_km ? Number(profile.distance_goal_km) : null,
+        burnKcal: profile.burn_goal_kcal ?? null,
+      }}
+      googleHealthConnected={!!connection}
+      today={todayLocalDate()}
+    />
   );
 }

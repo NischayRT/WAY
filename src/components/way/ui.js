@@ -34,6 +34,39 @@ export function useIsClient() {
   return useSyncExternalStore(noopSubscribe, () => true, () => false);
 }
 
+const PREF_EVENT = 'way-pref-change';
+const prefSubscribe = (cb) => {
+  window.addEventListener('storage', cb);
+  window.addEventListener(PREF_EVENT, cb);
+  return () => {
+    window.removeEventListener('storage', cb);
+    window.removeEventListener(PREF_EVENT, cb);
+  };
+};
+/** A small string preference kept in this browser (e.g. portions vs grams). */
+export function useLocalPref(key, fallback) {
+  const value = useSyncExternalStore(
+    prefSubscribe,
+    () => {
+      try {
+        return localStorage.getItem(key) ?? fallback;
+      } catch {
+        return fallback;
+      }
+    },
+    () => fallback
+  );
+  const set = (next) => {
+    try {
+      localStorage.setItem(key, next);
+    } catch {
+      /* private mode */
+    }
+    window.dispatchEvent(new Event(PREF_EVENT));
+  };
+  return [value, set];
+}
+
 /** The animation "k" factor: 0 on the first paint, 1 right after, so bars grow in. */
 export function useMounted(delay = 60) {
   const [mounted, setMounted] = useState(false);

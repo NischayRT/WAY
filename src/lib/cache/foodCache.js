@@ -50,7 +50,9 @@ function isFresh(entry) {
 async function loadFoods(supabase) {
   const { data, error } = await supabase
     .from('foods')
-    .select('id, name, region, calories_kcal, protein_g, carbs_g, fat_g, created_by, author_name')
+    // '*' rather than a column list so serving_g (supabase/add-friends-and-portions.sql)
+    // is picked up once that migration has run, without breaking before it has.
+    .select('*')
     .order('id', { ascending: false });
   if (error) throw error;
   return data ?? [];

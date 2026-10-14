@@ -550,6 +550,126 @@ returns void language sql security definer set search_path = public as $$
   delete from blocks where blocker_id = auth.uid() and blocked_id = p_user
 $$;
 
+-- 12. LIMITS, REVISIONS AND PRIVATE NICKNAMES ----------------------------------
+-- At most 3 friends (people you compete with) and 3 family (people you share
+-- with, either way). Pending invites count, so nobody can be flooded.
+create or replace function public.circle_count(p_user uuid, p_kind text, p_except uuid default null)
+returns integer language sql stable security definer set search_path = public as $$
+  select count(distinct case when owner_id = p_user then other_id else owner_id end)::integer
+    from connections
+   where kind = p_kind and status in ('pending', 'active')
+     and p_user in (owner_id, other_id)
+     and (kind = 'compete' or ends_at is null or ends_at > now())
+     and (p_except is null or p_except not in (owner_id, other_id))
+$$;
+revoke execute on function public.circle_count(uuid, text, uuid) from public, anon, authenticated;
+
+create or replace function public.check_circle(p_me uuid, p_them uuid, p_kind text)
+returns void language plpgsql stable security definer set search_path = public as $$
+declare word text := case when p_kind = 'compete' then 'friends' else 'family members' end;
+begin
+  if public.circle_count(p_me, p_kind, p_them) >= 3 then
+    raise exception 'You already have 3 %. Remove one to add someone new.', word;
+  end if;
+  if public.circle_count(p_them, p_kind, p_me) >= 3 then
+    raise exception 'They already have 3 %.', word;
+  end if;
+end $$;
+revoke execute on function public.check_circle(uuid, uuid, text) from public, anon, authenticated;
+
+-- 'revised' = answered with new terms (a new request goes back the other way).
+alter table connections drop constraint if exists connections_status_check;
+alter table connections add constraint connections_status_check
+  check (status in ('pending', 'active', 'declined', 'cancelled', 'ended', 'revised'));
+alter table connections add column if not exists revised_from bigint references connections(id) on delete set null;
+alter table duels drop constraint if exists duels_status_check;
+alter table duels add constraint duels_status_check
+  check (status in ('pending', 'active', 'declined', 'cancelled', 'revised'));
+alter table duels add column if not exists revised_from bigint references duels(id) on delete set null;
+
+-- Limits on new invites and on accepting.
+create or replace function public.connections_circle_guard()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := coalesce(auth.uid(), new.initiated_by);
+  them uuid := case when coalesce(auth.uid(), new.initiated_by) = new.owner_id then new.other_id else new.owner_id end;
+begin
+  if (tg_op = 'INSERT' and new.status = 'pending')
+     or (tg_op = 'UPDATE' and new.status = 'active' and old.status = 'pending') then
+    perform public.check_circle(me, them, new.kind);
+  end if;
+  return new;
+end $$;
+drop trigger if exists connections_circle_guard on connections;
+create trigger connections_circle_guard before insert or update of status on connections
+  for each row execute function public.connections_circle_guard();
+
+-- Answer a request with different terms. The original is marked 'revised' and
+-- a new request goes back to whoever sent it.
+--   compete: other stats to compare.  share: other items (and, if you are the
+--   one sharing, how long).
+create or replace function public.revise_connection(p_id bigint, p_fields text[], p_days integer default null)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  me uuid := auth.uid();
+  c connections%rowtype;
+  f text[];
+  new_id bigint;
+begin
+  select * into c from connections where id = p_id for update;
+  if not found or c.status <> 'pending' then raise exception 'This request is no longer waiting.'; end if;
+  if me is null or me = c.initiated_by or me not in (c.owner_id, c.other_id) then raise exception 'Not yours to answer.'; end if;
+  f := array(select distinct x from unnest(coalesce(p_fields, '{}')) x
+              where x = any (case when c.kind = 'compete' then public.compete_fields() else public.stat_fields() end));
+  if array_length(f, 1) is null then raise exception 'Pick at least one thing.'; end if;
+  update connections set status = 'revised', responded_at = now() where id = p_id;
+  insert into connections (kind, owner_id, other_id, initiated_by, fields, ends_at, label, revised_from)
+  values (c.kind, c.owner_id, c.other_id, me, f,
+          case when c.kind = 'share' and me = c.owner_id and p_days is not null and p_days > 0
+               then now() + make_interval(days => least(p_days, 365)) end,
+          c.label, c.id)
+  returning id into new_id;
+  return new_id;
+end $$;
+
+create or replace function public.revise_duel(p_id bigint, p_metric text, p_days integer)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare me uuid := auth.uid(); d duels%rowtype; new_id bigint;
+begin
+  select * into d from duels where id = p_id for update;
+  if not found or d.opponent_id <> me or d.status <> 'pending' then raise exception 'This challenge is no longer waiting.'; end if;
+  if not (p_metric = any (public.compete_fields())) then raise exception 'Pick a stat to duel on.'; end if;
+  update duels set status = 'revised', responded_at = now() where id = p_id;
+  insert into duels (challenger_id, opponent_id, metric, starts_on, ends_on, revised_from)
+  values (me, d.challenger_id, p_metric, current_date + 1, current_date + least(greatest(coalesce(p_days, 7), 1), 30), d.id)
+  returning id into new_id;
+  return new_id;
+end $$;
+
+-- Your own nicknames for people. Only you can see or change them.
+create table if not exists contact_aliases (
+  owner_id uuid not null default auth.uid() references profiles(id) on delete cascade,
+  other_id uuid not null references profiles(id) on delete cascade,
+  alias text not null check (char_length(alias) between 1 and 24),
+  updated_at timestamptz not null default now(),
+  primary key (owner_id, other_id)
+);
+alter table contact_aliases enable row level security;
+drop policy if exists "Own nicknames" on contact_aliases;
+create policy "Own nicknames" on contact_aliases for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+-- 13. DAILY VISITS (login streak) ---------------------------------------------
+create table if not exists daily_visits (
+  user_id uuid not null default auth.uid() references profiles(id) on delete cascade,
+  day date not null,
+  primary key (user_id, day)
+);
+alter table daily_visits enable row level security;
+drop policy if exists "Own visits" on daily_visits;
+create policy "Own visits" on daily_visits for all
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
 -- Signed-in users only.
 do $$
 declare fn text;
@@ -559,7 +679,8 @@ begin
     'end_connection(bigint)', 'update_share(bigint, text[], integer, boolean)', 'send_duel(text, text, integer)',
     'respond_duel(bigint, boolean)', 'cancel_duel(bigint)', 'friend_people()', 'friend_stats(date, date)', 'duel_board()',
     'cheer_counts(text[])', 'toggle_cheer(uuid, text)', 'send_nudge(uuid, text, bigint)', 'record_share_views()',
-    'claim_quest(text)', 'block_user(uuid)', 'unblock_user(uuid)'
+    'claim_quest(text)', 'block_user(uuid)', 'unblock_user(uuid)',
+    'revise_connection(bigint, text[], integer)', 'revise_duel(bigint, text, integer)'
   ] loop
     execute format('revoke execute on function public.%s from public, anon', fn);
     execute format('grant execute on function public.%s to authenticated', fn);

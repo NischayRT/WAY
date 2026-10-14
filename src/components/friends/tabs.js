@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Crown,
   Timer,
   Swords,
   Smile,
@@ -9,7 +8,6 @@ import {
   Check,
   HeartHandshake,
   ChevronRight,
-  PartyPopper,
   Copy,
   Pencil,
   ShieldCheck,
@@ -22,28 +20,12 @@ import {
   HouseHeart,
   Stethoscope,
   Dumbbell,
-  UserPlus,
   Ban,
   Lock,
 } from 'lucide-react';
-import { FIELDS, COMPETE_KEYS, PERIODS, fmtVal, displayName, relDay } from '@/lib/friends';
-import { Card, Eyebrow, Btn, Segmented, Dot, cx } from '@/components/way/ui';
-import { Avatar, FieldChip, FIELD_ICONS, ICONS } from './parts';
-
-const MEDAL = ['#facc15', '#cbd5e1', '#d97706'];
-const EASE = 'transition-[width] duration-[900ms] ease-[cubic-bezier(.2,.8,.2,1)]';
-
-function Section({ title, right, children, className = '' }) {
-  return (
-    <div className={cx('flex flex-col gap-3', className)}>
-      <div className="flex items-baseline justify-between gap-3 px-0.5">
-        <Eyebrow>{title}</Eyebrow>
-        {right ? <span className="font-mono text-[11px] font-medium text-way-dim">{right}</span> : null}
-      </div>
-      {children}
-    </div>
-  );
-}
+import { FIELDS, fmtVal, displayName, relDay } from '@/lib/friends';
+import { Card, Eyebrow, Btn, Dot, cx } from '@/components/way/ui';
+import { Avatar, FieldChip, FIELD_ICONS } from './parts';
 
 function Empty({ icon: Icon, title, text, action }) {
   return (
@@ -53,357 +35,6 @@ function Empty({ icon: Icon, title, text, action }) {
       {text ? <span className="max-w-[360px] text-xs text-way-dim [text-wrap:pretty]">{text}</span> : null}
       {action}
     </Card>
-  );
-}
-
-/* ================================ ARENA ================================ */
-
-export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, onClaim, onAdd }) {
-  const f = FIELDS[metric];
-  const { ranked, missing } = m.board(metric, period);
-  const max = ranked[0]?.v || 1;
-  const moveOf = (r) => (r.move > 0 ? { s: `▲ ${r.move}`, c: '#34d399' } : r.move < 0 ? { s: `▼ ${-r.move}`, c: '#fb7185' } : { s: '', c: '#64748b' });
-  const podium = [1, 0, 2].map((i) => ranked[i] || null);
-  const rest = [...ranked.slice(3), ...missing.map((id) => ({ id, v: null }))];
-  const myIdx = ranked.findIndex((r) => r.id === m.me.id);
-  const mine = ranked[myIdx];
-  const ahead = myIdx > 0 ? ranked[myIdx - 1] : null;
-  const daysLeft = period === 'week' ? 7 : period === 'month' ? 30 : 1;
-  const pLabel = { today: 'today', week: '7 days', month: '30 days' }[period];
-  const my = !mine
-    ? { rank: '—', headline: 'No numbers yet', sub: 'Your numbers appear once WAY syncs your day.', pass: 0 }
-    : ranked.length === 1
-      ? { rank: '#1', headline: 'Just you so far', sub: 'Add someone to compete with.', pass: 100 }
-      : ahead
-        ? {
-            rank: `#${myIdx + 1}`,
-            headline: `${fmtVal(ahead.v - mine.v, f.dec)} ${f.unit} to pass ${displayName(m.person(ahead.id))}`,
-            sub: f.agg === 'avg' ? `Beat ${fmtVal(ahead.v, 1)} ${f.unit} on average to move up.` : `About ${fmtVal((ahead.v - mine.v) / daysLeft, f.dec)} extra ${f.unit} a day gets you there.`,
-            pass: (mine.v / ahead.v) * 100,
-          }
-        : { rank: '#1', headline: 'You hold the crown', sub: 'Defend it. People are close behind.', pass: 100 };
-
-  const chips = (
-    <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:px-0">
-      {COMPETE_KEYS.map((key) => {
-        const Icon = FIELD_ICONS[key];
-        const on = key === metric;
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setMetric(key)}
-            aria-pressed={on}
-            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-[7px] text-xs font-semibold transition-colors"
-            style={on ? { background: FIELDS[key].color, color: '#090d16', borderColor: FIELDS[key].color } : { color: '#94a3b8', borderColor: '#253044' }}
-          >
-            <Icon size={13} />
-            {FIELDS[key].label}
-          </button>
-        );
-      })}
-    </div>
-  );
-  const periods = (
-    <Segmented
-      mono
-      size="sm"
-      stretch
-      className="rounded-xl p-[3px] md:shrink-0 md:bg-way-rail"
-      value={period}
-      onChange={setPeriod}
-      options={Object.keys(PERIODS).map((p) => ({ value: p, label: { today: 'Today', week: '7D', month: '30D' }[p] }))}
-    />
-  );
-
-  return (
-    <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 lg:gap-5">
-      <div className="flex flex-col gap-3.5 lg:hidden">
-        {chips}
-        {periods}
-      </div>
-
-      {/* Board */}
-      <Card className="relative flex flex-col overflow-hidden lg:col-span-8">
-        <div className="relative z-[1] hidden items-center justify-between gap-4 px-6 pt-[22px] lg:flex">
-          {chips}
-          {periods}
-        </div>
-        <div className="relative px-3 pt-[18px] lg:px-[60px] lg:pt-7">
-          <div className="pointer-events-none absolute left-1/2 top-[-40px] h-[200px] w-[260px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(250,204,21,.14),rgba(250,204,21,0)_70%)] lg:h-[340px] lg:w-[520px]" />
-          <div className="relative grid grid-cols-3 items-end gap-2 lg:gap-[18px]">
-            {podium.map((r, slot) => {
-              const pi = [1, 0, 2][slot];
-              const first = pi === 0;
-              const p = r ? m.person(r.id) : null;
-              const mv = r ? moveOf(r) : null;
-              const hM = (first ? 92 : pi === 1 ? 70 : 52) * k + 12;
-              const hD = (first ? 150 : pi === 1 ? 112 : 84) * k + 20;
-              return (
-                <div key={slot} className="flex min-w-0 flex-col items-center gap-2 lg:gap-2.5">
-                  {first && r ? <Crown size={20} className="text-way-gold lg:h-6 lg:w-6" /> : null}
-                  {r ? (
-                    <>
-                      <Avatar
-                        person={p}
-                        isMe={r.id === m.me.id}
-                        size={first ? 54 : 44}
-                        className="lg:hidden"
-                        ring={`0 0 0 3px #0f1420, 0 0 0 5px ${MEDAL[pi]}`}
-                      />
-                      <Avatar
-                        person={p}
-                        isMe={r.id === m.me.id}
-                        size={first ? 84 : 68}
-                        className="hidden lg:flex"
-                        ring={`0 0 0 4px #0f1420, 0 0 0 6px ${MEDAL[pi]}, 0 0 30px ${first ? 'rgba(250,204,21,.35)' : 'transparent'}`}
-                      >
-                        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-way-line2 bg-way-rail px-1.5 py-px font-mono text-[10px] font-bold text-way-ink2">
-                          LV {m.levelOfPerson(r.id)}
-                        </span>
-                      </Avatar>
-                      <div className="flex min-w-0 max-w-full flex-col items-center gap-px lg:gap-[3px] lg:pt-1.5">
-                        <span className="max-w-full truncate text-xs font-semibold lg:text-[15px]">{r.id === m.me.id ? 'You' : displayName(p)}</span>
-                        <span className="font-mono text-xs font-semibold lg:text-lg" style={{ color: MEDAL[pi] }}>
-                          {fmtVal(r.v, f.dec)}
-                          <span className="hidden text-[11px] text-way-dim lg:inline"> {f.unit}</span>
-                        </span>
-                        <span className="hidden font-mono text-[10px] font-semibold lg:block" style={{ color: mv.c }}>
-                          {mv.s}
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="h-11 w-11 rounded-full border border-dashed border-way-line2 lg:h-[68px] lg:w-[68px]" />
-                  )}
-                  <div
-                    className="flex w-full items-start justify-center rounded-t-[10px] border border-b-0 pt-2 transition-[height] duration-[900ms] ease-[cubic-bezier(.2,.8,.2,1)] lg:rounded-t-[14px] lg:pt-3 lg:[height:var(--hd)]"
-                    style={{
-                      height: hM,
-                      '--hd': `${hD}px`,
-                      background: first ? 'linear-gradient(180deg, rgba(250,204,21,.18), rgba(250,204,21,.03))' : 'linear-gradient(180deg, rgba(148,163,184,.12), rgba(148,163,184,.02))',
-                      borderColor: first ? 'rgba(250,204,21,.35)' : '#253044',
-                    }}
-                  >
-                    <span className="font-brand text-[30px] leading-none lg:text-[54px]" style={{ color: MEDAL[pi] }}>
-                      {pi + 1}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        <div className="border-t border-way-line2">
-          {rest.map((r, i) => {
-            const p = m.person(r.id);
-            const isMe = r.id === m.me.id;
-            const mv = r.v == null ? { s: '', c: '#64748b' } : moveOf(r);
-            const above = r.v != null ? ranked[r.rank - 2] : null;
-            const sub = r.v == null ? 'Hasn’t synced yet' : `${fmtVal(above.v - r.v, f.dec)} ${f.unit} behind ${displayName(m.person(above.id))}`;
-            return (
-              <div
-                key={r.id}
-                className={cx(
-                  'flex items-center gap-2.5 px-3.5 py-3 lg:grid lg:grid-cols-[44px_40px_minmax(0,1fr)_220px_120px] lg:gap-3.5 lg:px-6 lg:py-[13px] lg:hover:bg-[#121928]',
-                  i && 'border-t border-way-line',
-                  isMe && 'bg-emerald-500/7'
-                )}
-              >
-                <span className="w-[22px] text-center font-mono text-[13px] font-semibold text-way-dim lg:w-auto lg:text-left lg:text-[15px]">
-                  {r.v == null ? '–' : String(r.rank).padStart(2, '0')}
-                </span>
-                <Avatar person={p} isMe={isMe} size={32} />
-                <div className="flex min-w-0 flex-1 flex-col gap-1 lg:gap-[3px]">
-                  <div className="flex items-center gap-1.5 lg:gap-2">
-                    <span className="truncate text-[13px] font-semibold lg:text-sm">{isMe ? 'You' : displayName(p)}</span>
-                    {p?.username ? <span className="hidden font-mono text-[11px] font-medium text-way-faint lg:inline">@{p.username}</span> : null}
-                    <span className="hidden rounded-[5px] border border-way-line2 px-[5px] py-px font-mono text-[10px] font-semibold text-way-mute lg:inline">
-                      LV {m.levelOfPerson(r.id)}
-                    </span>
-                    <span className="font-mono text-[10px] font-semibold lg:hidden" style={{ color: mv.c }}>
-                      {mv.s}
-                    </span>
-                  </div>
-                  <div className="h-[3px] overflow-hidden rounded-full bg-way-track lg:hidden">
-                    <div className={cx('h-full', EASE)} style={{ width: `${r.v == null ? 0 : (r.v / max) * 100 * k}%`, background: isMe ? '#34d399' : f.color }} />
-                  </div>
-                  <span className="hidden text-[11px] text-way-dim lg:block">{sub}</span>
-                </div>
-                <div className="hidden h-[5px] overflow-hidden rounded-full bg-way-track lg:block">
-                  <div className={cx('h-full rounded-full', EASE)} style={{ width: `${r.v == null ? 0 : (r.v / max) * 100 * k}%`, background: isMe ? '#34d399' : f.color }} />
-                </div>
-                <div className="flex flex-col items-end gap-0.5">
-                  <span className={cx('font-mono text-[13px] font-semibold lg:text-[15px]', r.v == null ? 'text-way-faint' : 'text-way-ink')}>
-                    {r.v == null ? 'no data' : fmtVal(r.v, f.dec)}
-                  </span>
-                  <span className="hidden font-mono text-[10px] font-semibold lg:block" style={{ color: mv.c }}>
-                    {mv.s}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-          {!m.competitors.length ? (
-            <div className="flex flex-col items-center gap-2 px-6 py-6 text-center">
-              <span className="text-[13px] text-way-mute">Nobody to compete with yet.</span>
-              <Btn variant="primary" size="sm" onClick={onAdd}>
-                <UserPlus size={13} />
-                Add someone
-              </Btn>
-            </div>
-          ) : null}
-        </div>
-        <div className="hidden border-t border-way-line px-6 pb-4 pt-3 text-[11px] text-way-dim lg:block">
-          Only stats you both agreed on are compared · numbers update when each person opens WAY (at most every 30 min)
-          {f.agg === 'avg' ? ' · sleep is an average per night' : ''}
-        </div>
-      </Card>
-
-      {/* Your rank + quests */}
-      <div className="flex flex-col gap-3.5 lg:col-span-4 lg:gap-5">
-        <Card className="relative flex items-center gap-3.5 overflow-hidden border-[rgba(250,204,21,.3)] p-4 lg:flex-col lg:items-stretch lg:gap-4 lg:p-6">
-          <div className="hidden items-center justify-between lg:flex">
-            <Eyebrow>Your rank</Eyebrow>
-            <span className="font-mono text-[11px] font-medium text-way-dim">
-              {f.label} · {pLabel}
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2.5">
-            <span className="font-brand text-5xl leading-none text-way-gold lg:text-[76px] lg:leading-[.85]">{my.rank}</span>
-            <span className="hidden whitespace-nowrap font-mono text-[13px] font-medium text-way-dim lg:inline">of {ranked.length || 1}</span>
-          </div>
-          <div className="flex min-w-0 flex-col gap-[3px] lg:gap-1.5">
-            <span className="text-[13px] font-semibold lg:text-xs lg:font-normal lg:text-way-ink2">{my.headline}</span>
-            <div className="hidden h-1.5 overflow-hidden rounded-full bg-way-track lg:block">
-              <div className={cx('h-full rounded-full bg-way-gold', EASE)} style={{ width: `${Math.min(100, my.pass) * k}%` }} />
-            </div>
-            <span className="text-xs text-way-mute [text-wrap:pretty]">{my.sub}</span>
-          </div>
-        </Card>
-
-        <Section title="Weekly quests" right={m.season.left} className="lg:hidden" />
-        <Card className="flex flex-col overflow-hidden lg:pb-2 lg:pt-[22px]">
-          <div className="hidden items-center justify-between px-[22px] pb-3 lg:flex">
-            <Eyebrow>Weekly quests</Eyebrow>
-            <span className="font-mono text-[11px] font-medium text-way-dim">{m.season.left}</span>
-          </div>
-          {m.quests.map((q, i) => {
-            const Icon = q.claimed ? Check : ICONS[q.icon];
-            const tone = q.claimed ? ['rgba(52,211,153,.14)', '#34d399', '#34d399'] : q.done ? ['rgba(250,204,21,.16)', '#facc15', '#facc15'] : ['#1a2130', '#94a3b8', '#64748b'];
-            return (
-              <div key={q.id} className={cx('flex items-center gap-3 px-3.5 py-[13px] lg:px-[22px] lg:py-3', (i || true) && i ? 'border-t border-way-line' : 'lg:border-t lg:border-way-line')}>
-                <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] transition-colors lg:h-9 lg:w-9" style={{ background: tone[0], color: tone[1] }}>
-                  <Icon size={16} />
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
-                  <div className="flex justify-between gap-1.5">
-                    <span className="text-[13px] font-medium">{q.label}</span>
-                    <span className="whitespace-nowrap font-mono text-[11px] font-semibold text-way-dim">{q.progStr}</span>
-                  </div>
-                  <div className="h-1 overflow-hidden rounded-full bg-way-track">
-                    <div className={cx('h-full', EASE)} style={{ width: `${q.pct * k}%`, background: tone[2] }} />
-                  </div>
-                </div>
-                {q.done && !q.claimed ? (
-                  <button
-                    type="button"
-                    onClick={() => onClaim(q)}
-                    className="whitespace-nowrap rounded-[9px] bg-way-gold px-2.5 py-[7px] text-[11px] font-bold text-[#1a1300] shadow-[0_0_16px_rgba(250,204,21,.4)]"
-                  >
-                    Claim {q.xp}
-                  </button>
-                ) : (
-                  <span className={cx('w-[62px] text-right font-mono text-[11px] font-semibold', q.claimed ? 'text-way-protein' : 'text-way-dim')}>
-                    {q.claimed ? 'Claimed' : `+${q.xp} XP`}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </Card>
-      </div>
-
-      {/* Feed */}
-      <Card className="flex flex-col pb-2 pt-[18px] lg:col-span-8 lg:pt-[22px]">
-        <div className="flex items-center justify-between px-4 pb-3 lg:px-6">
-          <Eyebrow>Live feed</Eyebrow>
-          <span className="font-mono text-[11px] font-medium text-way-dim">Competitors only · no private data</span>
-        </div>
-        {m.feed.length ? (
-          m.feed.map((e) => {
-            const p = m.person(e.personId);
-            const Icon = ICONS[e.icon] || PartyPopper;
-            return (
-              <div key={e.key} className="flex items-center gap-3 border-t border-way-line px-4 py-3 lg:gap-3.5 lg:px-6">
-                <Avatar person={p} size={36}>
-                  <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-way-card" style={{ background: e.iconBg }}>
-                    <Icon size={10} className="text-way-page" />
-                  </span>
-                </Avatar>
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="text-[13px] lg:text-sm">
-                    <strong className="font-semibold">{displayName(p)}</strong> {e.text}
-                  </span>
-                  <span className="font-mono text-[11px] font-medium text-way-dim">{relDay(e.day, m.today)}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onCheer(e)}
-                  aria-pressed={e.mine}
-                  className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-[background,color,border-color,transform] duration-200"
-                  style={
-                    e.mine
-                      ? { background: 'rgba(250,204,21,.14)', color: '#facc15', borderColor: 'rgba(250,204,21,.4)', transform: 'scale(1.06)' }
-                      : { color: '#94a3b8', borderColor: '#253044' }
-                  }
-                >
-                  <PartyPopper size={13} />
-                  {e.count}
-                </button>
-              </div>
-            );
-          })
-        ) : (
-          <p className="border-t border-way-line px-6 py-6 text-center text-[13px] text-way-dim">
-            Wins from people you compete with show up here: 10k-step days, big climbs, long nights of sleep.
-          </p>
-        )}
-      </Card>
-
-      {/* Badges */}
-      <Card className="flex flex-col gap-4 p-[18px] lg:col-span-4 lg:p-[22px]">
-        <div className="flex items-center justify-between">
-          <Eyebrow>Badges</Eyebrow>
-          <span className="font-mono text-[11px] font-medium text-way-dim">
-            {m.badges.filter((b) => b.got).length} of {m.badges.length} earned
-          </span>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          {m.badges.map((b) => {
-            const Icon = ICONS[b.icon] || Swords;
-            return (
-              <div
-                key={b.id}
-                title={b.got ? `${b.label}: earned` : `${b.label}: ${b.prog}`}
-                className="flex flex-col items-center gap-[7px] rounded-2xl border px-1.5 py-3"
-                style={{ background: b.got ? `${b.color}0d` : 'transparent', borderColor: b.got ? `${b.color}40` : '#1c2433' }}
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-full" style={{ background: `conic-gradient(${b.color} ${b.p * 360 * k}deg, #1f2937 0)` }}>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: b.got ? `linear-gradient(${b.color}2e, ${b.color}2e), #0f1420` : '#0f1420' }}>
-                    <Icon size={18} style={{ color: b.got ? b.color : '#475569' }} />
-                  </div>
-                </div>
-                <span className="text-center text-[11px] font-semibold" style={{ color: b.got ? '#f1f5f9' : '#64748b' }}>
-                  {b.label}
-                </span>
-                <span className="font-mono text-[10px] font-medium text-way-dim">{b.got ? 'Earned' : b.prog}</span>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-    </div>
   );
 }
 
@@ -531,7 +162,7 @@ export function DuelsTab({ m, k, onNudge, onNewDuel, onReviewDuel }) {
               <strong className="font-semibold">{displayName(pending.from)}</strong> challenged you to a {FIELDS[pending.item.metric].label.toLowerCase()} duel
             </span>
           </div>
-          <button type="button" onClick={() => onReviewDuel(pending)} className="rounded-xl bg-way-over px-[18px] py-3 text-[13px] font-bold text-[#1a0508]">
+          <button type="button" onClick={() => onReviewDuel(pending)} className="rounded-xl bg-way-over px-[18px] py-3 text-[13px] font-semibold text-[#1a0508]">
             Review
           </button>
         </Card>
@@ -560,7 +191,7 @@ const KITS = [
   { label: 'Coach', Icon: Dumbbell, color: '#a78bfa', desc: 'Steps, distance, active cal · 90 days', fields: ['steps', 'distance_km', 'active_kcal'], days: 90 },
 ];
 
-export function FamilyTab({ m, k, onCheckIn, onManage, onKit, onOpenData }) {
+export function FamilyTab({ m, k, onCheckIn, onManage, onKit, onOpenData, onAlias }) {
   return (
     <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 lg:gap-5">
       <div className="flex items-baseline justify-between px-0.5 pt-1 lg:col-span-12 lg:-mb-1.5 lg:p-0">
@@ -574,7 +205,10 @@ export function FamilyTab({ m, k, onCheckIn, onManage, onKit, onOpenData }) {
           <div className="flex items-center gap-2.5 lg:gap-3">
             <Avatar person={s.owner} size={42} />
             <div className="flex min-w-0 flex-1 flex-col gap-0.5 lg:gap-[3px]">
-              <span className="text-sm font-semibold lg:text-base">{displayName(s.owner)}</span>
+              <button type="button" onClick={() => onAlias(s.owner)} className="group flex items-center gap-1.5 text-left" title="Set a nickname (only you see it)">
+                <span className="text-sm font-semibold lg:text-base">{displayName(s.owner)}</span>
+                <Pencil size={11} className="text-way-faint transition-colors group-hover:text-way-ink2" />
+              </button>
               <span className="font-mono text-[10px] font-medium text-way-dim lg:text-[11px]">{s.meta}</span>
             </div>
             <span className="rounded-full bg-way-track px-2 py-[3px] font-mono text-[10px] font-semibold text-way-mute lg:px-2.5 lg:py-1 lg:text-[11px]">{s.chip}</span>
@@ -660,10 +294,10 @@ export function FamilyTab({ m, k, onCheckIn, onManage, onKit, onOpenData }) {
             <div className="flex min-w-0 items-center gap-2.5">
               <Avatar person={s.viewer} size={34} />
               <div className="flex min-w-0 flex-col gap-px">
-                <span className="text-[13px] font-semibold lg:text-sm">
+                <button type="button" onClick={() => onAlias(s.viewer)} className="text-left text-[13px] font-semibold hover:underline lg:text-sm" title="Set a nickname (only you see it)">
                   {displayName(s.viewer)}
                   {s.conn.label ? <span className="font-normal text-way-dim"> · {s.conn.label}</span> : null}
-                </span>
+                </button>
                 <span className="font-mono text-[11px] font-medium text-way-dim">{s.views}</span>
               </div>
             </div>
@@ -714,7 +348,7 @@ export function FamilyTab({ m, k, onCheckIn, onManage, onKit, onOpenData }) {
 
 /* ================================ INBOX ================================ */
 
-export function InboxTab({ m, onReview, onDecline, onCancel }) {
+export function InboxTab({ m, onReview, onDecline, onCancel, onRevise }) {
   const describe = (x) => {
     if (x.kind === 'duel') return { what: `challenged you to a ${FIELDS[x.item.metric].label.toLowerCase()} duel`, Icon: Swords, c: '#fb7185', fields: [x.item.metric] };
     const c = x.item;
@@ -737,6 +371,9 @@ export function InboxTab({ m, onReview, onDecline, onCancel }) {
                   </span>
                 </Avatar>
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5 lg:gap-[7px]">
+                  {x.item.revised_from ? (
+                    <span className="self-start rounded-full bg-amber-400/12 px-2 py-0.5 font-heading text-[10px] font-bold tracking-[0.12em] text-way-kcal">NEW TERMS</span>
+                  ) : null}
                   <span className="text-[13px] lg:text-sm">
                     <strong className="font-semibold">{displayName(x.from)}</strong>
                     {x.from?.username ? <span className="text-way-dim"> @{x.from.username}</span> : null} {d.what}{' '}
@@ -750,11 +387,15 @@ export function InboxTab({ m, onReview, onDecline, onCancel }) {
                 </div>
               </div>
               <div className="flex shrink-0 gap-2">
-                <Btn variant="outline" onClick={() => onDecline(x)} className="flex-1 rounded-[10px] font-normal lg:order-1 lg:flex-none">
+                <Btn variant="outline" onClick={() => onDecline(x)} className="flex-1 rounded-[10px] font-normal lg:flex-none">
                   Decline
                 </Btn>
-                <Btn variant="primary" onClick={() => onReview(x)} className="flex-[2] rounded-[10px] lg:order-2 lg:flex-none">
-                  Review
+                <Btn variant="outline" onClick={() => onRevise(x)} className="flex-1 rounded-[10px] lg:flex-none">
+                  <Pencil size={12} />
+                  Revise
+                </Btn>
+                <Btn variant="primary" onClick={() => onReview(x)} className="flex-[1.4] rounded-[10px] lg:flex-none">
+                  Accept…
                 </Btn>
               </div>
             </Card>
@@ -832,7 +473,7 @@ const RULES = [
   [ShieldCheck, 'These rules are enforced by the database, not just this screen.'],
 ];
 
-export function PrivacyTab({ m, copied, onCopy, onChangeName, onBlock, onUnblock }) {
+export function PrivacyTab({ m, copied, onCopy, onChangeName, onBlock, onUnblock, onAlias }) {
   const connected = m.connectedPeople;
   return (
     <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 lg:gap-5">
@@ -865,7 +506,9 @@ export function PrivacyTab({ m, copied, onCopy, onChangeName, onBlock, onUnblock
         <Card className="flex flex-col pb-1.5 pt-[18px] lg:pt-[22px]">
           <div className="flex items-center justify-between px-4 pb-3 lg:px-6">
             <Eyebrow>People you’re connected to</Eyebrow>
-            <span className="font-mono text-[11px] font-medium text-way-dim">Blocking ends everything with them</span>
+            <span className="font-mono text-[11px] font-medium text-way-dim">
+              Friends {m.friendCount}/3 · Family {m.familyCount}/3
+            </span>
           </div>
           {connected.map((p) => (
             <div key={p.id} className="flex items-center gap-3 border-t border-way-line px-4 py-2.5 lg:px-6">
@@ -873,7 +516,12 @@ export function PrivacyTab({ m, copied, onCopy, onChangeName, onBlock, onUnblock
               <span className="flex-1 text-[13px]">
                 {displayName(p)}
                 {p.username ? <span className="text-way-dim"> @{p.username}</span> : null}
+                {p.alias ? <span className="ml-1.5 rounded bg-way-track px-1.5 py-px font-mono text-[10px] text-way-mute">nickname</span> : null}
               </span>
+              <Btn variant="outline" size="sm" onClick={() => onAlias(p)} className="rounded-[9px] font-normal" title="Only you see nicknames">
+                <Pencil size={12} />
+                <span className="hidden sm:inline">Nickname</span>
+              </Btn>
               <Btn variant="dangerOutline" size="sm" onClick={() => onBlock(p)} className="rounded-[9px]">
                 <Ban size={12} />
                 Block

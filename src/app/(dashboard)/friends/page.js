@@ -5,7 +5,8 @@ import FriendsClient from '@/components/friends/FriendsClient';
 
 export const dynamic = 'force-dynamic';
 
-export default async function FriendsPage() {
+export default async function FriendsPage({ searchParams }) {
+  const params = await searchParams;
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -19,5 +20,5 @@ export default async function FriendsPage() {
 
   if (!profile) redirect('/onboarding');
 
-  return <FriendsClient userId={user.id} today={todayLocalDate()} profile={profile} />;
+  return <FriendsClient userId={user.id} today={todayLocalDate()} profile={profile} initialTab={params?.tab} />;
 }

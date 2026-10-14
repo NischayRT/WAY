@@ -15,6 +15,8 @@ import BodyAgeCard from './BodyAgeCard';
 import MealsSection from './MealsSection';
 import WeekCard, { buildWeek } from './WeekCard';
 import WeightCard from './WeightCard';
+import StreakCard from './StreakCard';
+import RankCard from './RankCard';
 
 const EXTRA_KEYS = ['heart', 'oxygen', 'floors', 'sleep', 'glucose'];
 const EMPTY = { categories: [], overallTotals: { calories: 0, protein: 0, carbs: 0, fat: 0 } };
@@ -69,6 +71,7 @@ export default function TodayClient({
   initialSelectedDate,
   outOfRange,
   googleHealth = { connected: false },
+  streak,
 }) {
   const router = useRouter();
   const [isNavigating, startTransition] = useTransition();
@@ -89,6 +92,8 @@ export default function TodayClient({
 
   // Steps, distance and active calories for the day on screen.
   const steps = useJson(googleHealth.connected ? `/api/google-health/steps?date=${selectedDate}` : null);
+  const bodyAge = useJson(googleHealth.connected ? '/api/body-age' : null);
+  const bodyAgeReady = !!(bodyAge.data?.eligible && bodyAge.data?.result);
   const health = useMemo(() => {
     const s = steps.data;
     return {
@@ -262,10 +267,18 @@ export default function TodayClient({
       <WeekStrip days={week} selectedDate={selectedDate} onSelect={handleSelectDate} variant="mobile" />
 
       <div className={cx('grid grid-cols-1 gap-3.5 transition-opacity lg:grid-cols-12 lg:gap-5', isNavigating && 'opacity-60')}>
-        <div className="lg:col-span-8">
-          <ScoreCard d={d} k={k} connectHref={connectHref()} />
+        {/* Competing with friends: a short-lived rank banner. */}
+        <RankCard userId={profile?.id} today={today} className="lg:col-span-12" />
+
+        {/* No Google Health: calories and macros only. With it: the Daily Score,
+            and Body Age beside it once every stat it needs is available. */}
+        <div className={bodyAgeReady ? 'lg:col-span-8' : 'lg:col-span-12'}>
+          <ScoreCard d={d} k={k} connectHref={connectHref()} showScore={!!googleHealth.connected} />
         </div>
-        <BodyAgeCard connected={!!googleHealth.connected} realAge={profile?.age} className="lg:col-span-4" />
+        {bodyAgeReady ? <BodyAgeCard data={bodyAge.data} className="lg:col-span-4" /> : null}
+        <div className="lg:hidden">
+          <StreakCard streak={streak} k={k} />
+        </div>
 
         {googleHealth.connected ? (
           <>
@@ -286,13 +299,17 @@ export default function TodayClient({
                   className="min-w-0 [grid-column:span_var(--sm)/span_var(--sm)] lg:[grid-column:span_var(--lg)/span_var(--lg)]"
                   style={{ '--sm': tiles.length % 2 === 1 && i === tiles.length - 1 ? 2 : 1, '--lg': tileSpan(i, tiles.length) }}
                 >
-                  <HealthTile
-                    tileKey={t.key}
-                    model={t.model}
-                    k={k}
-                    delay={120 + i * 60}
-                    connectHref={connectHref(t.key === 'sleep' ? 'sleep' : null)}
-                  />
+                  {t.model.state ? (
+                    <HealthTile tileKey={t.key} model={t.model} k={k} delay={120 + i * 60} connectHref={connectHref(t.key === 'sleep' ? 'sleep' : null)} />
+                  ) : (
+                    <Link
+                      href={`/activity#stat-${t.key}`}
+                      title="Open in Activity"
+                      className="block h-full rounded-[18px] transition-transform duration-200 hover:-translate-y-0.5 md:rounded-[20px] [&>div]:h-full"
+                    >
+                      <HealthTile tileKey={t.key} model={t.model} k={k} delay={120 + i * 60} />
+                    </Link>
+                  )}
                 </div>
               ))}
             </div>
@@ -304,6 +321,9 @@ export default function TodayClient({
         </div>
 
         <div className="flex flex-col gap-3.5 lg:col-span-4 lg:gap-5 lg:pt-[52px]">
+          <div className="hidden lg:block">
+            <StreakCard streak={streak} k={k} />
+          </div>
           <div className="order-2 lg:order-1">
             <WeightCard
               profile={profile}

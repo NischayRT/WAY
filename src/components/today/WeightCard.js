@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { Scale, PersonStanding, ChevronDown } from 'lucide-react';
+import { Scale, PersonStanding, ChevronDown, ChevronRight } from 'lucide-react';
 import { weightProgress } from '@/lib/goalState';
 import { buildBodyModel } from '@/lib/bodyPreview';
 import { Card, Eyebrow, Btn, polyPoints, f1 } from '@/components/way/ui';
@@ -86,10 +86,11 @@ export default function WeightCard({ profile, weightLogs, selectedDate, today, c
       </div>
 
       <div className="flex items-baseline justify-between">
-        <div className="flex items-baseline gap-[5px] lg:gap-1.5">
-          <span className="font-brand text-[40px] leading-none lg:text-5xl">{now ? f1(now) : '—'}</span>
+        <Link href="/activity#weight" className="group flex items-baseline gap-[5px] lg:gap-1.5" title="Open weight history">
+          <span className="font-brand text-[40px] leading-none transition-colors group-hover:text-white lg:text-5xl">{now ? f1(now) : '—'}</span>
           <span className="font-mono text-xs font-medium text-way-dim">kg</span>
-        </div>
+          <ChevronRight size={14} className="self-center text-way-faint transition-colors group-hover:text-way-ink2" />
+        </Link>
         {targetKg != null ? (
           <span className="font-mono text-xs font-semibold text-way-protein lg:text-[13px]">→ {targetKg} kg</span>
         ) : (
@@ -185,7 +186,7 @@ export default function WeightCard({ profile, weightLogs, selectedDate, today, c
               <Btn as={Link} href="/settings?tab=body&sub=goal" variant="outline" className="h-auto flex-1 rounded-[10px] py-[9px] text-xs font-medium">
                 Change goal
               </Btn>
-              <Btn as={Link} href="/activity" variant="outline" className="h-auto flex-1 rounded-[10px] py-[9px] text-xs font-medium">
+              <Btn as={Link} href="/activity#weight" variant="outline" className="h-auto flex-1 rounded-[10px] py-[9px] text-xs font-medium">
                 Full history
               </Btn>
             </div>

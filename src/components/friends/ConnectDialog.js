@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { AtSign, Swords, Share2, Eye, Check, Circle, Lock } from 'lucide-react';
-import { FIELDS, FIELD_KEYS, COMPETE_KEYS, displayName } from '@/lib/friends';
+import { FIELDS, FIELD_KEYS, COMPETE_KEYS, FRIEND_LIMIT, FAMILY_LIMIT, displayName } from '@/lib/friends';
 import { Modal, Btn, Segmented, cx } from '@/components/way/ui';
 
 const MODES = [
@@ -90,14 +90,15 @@ function UsernameInput({ value, onChange, hint = true }) {
  *  { type: 'add', mode, fields, days, label } · { type: 'duel', username?, metric, days }
  *  { type: 'review', conn, from } · { type: 'reviewDuel', duel, from }
  *  { type: 'manage', conn, to } · { type: 'username', current }
+ *  { type: 'revise', conn, from } · { type: 'reviseDuel', duel, from }  (answer with new terms)
  */
-export default function ConnectDialog({ md, meId, supabase, onClose, onDone }) {
+export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onSwitch }) {
   const [s, setS] = useState(() => ({
     username: md.username || '',
     mode: md.mode || 'compete',
     fields: md.fields || (md.conn ? md.conn.fields : ['steps', 'distance_km', 'active_kcal']),
-    days: md.days ?? 30,
-    metric: md.metric || 'steps',
+    days: md.days ?? (md.duel ? Math.round((new Date(md.duel.ends_on) - new Date(md.duel.starts_on)) / 86400000) + 1 : 30),
+    metric: md.metric || md.duel?.metric || 'steps',
     label: md.label || '',
     name: md.current || '',
   }));
@@ -125,7 +126,11 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone }) {
   if (md.type === 'add') {
     const options = s.mode === 'compete' ? COMPETE_KEYS : FIELD_KEYS;
     const fields = s.fields.filter((k) => options.includes(k));
-    valid = fields.length > 0 && s.username.replace('@', '').length >= 3;
+    const isFriend = s.mode === 'compete';
+    const used = isFriend ? md.counts?.friends ?? 0 : md.counts?.family ?? 0;
+    const limit = isFriend ? FRIEND_LIMIT : FAMILY_LIMIT;
+    const full = used >= limit;
+    valid = !full && fields.length > 0 && s.username.replace('@', '').length >= 3;
     title = 'Add someone';
     cta = s.mode === 'compete' ? 'Send challenge' : s.mode === 'offer' ? 'Share' : 'Send request';
     ctaTone = s.mode === 'compete' ? 'compete' : 'primary';
@@ -169,6 +174,16 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone }) {
           </div>
         ) : null}
         {s.mode === 'offer' ? <SensitiveWarning fields={fields} /> : null}
+        <div className={cx('flex items-center justify-between rounded-xl px-3 py-2 text-xs', full ? 'border border-rose-400/30 bg-rose-400/8 text-rose-200' : 'bg-way-rail text-way-mute')}>
+          <span>
+            {full
+              ? `You have ${limit} ${isFriend ? 'friends' : 'family members'}, the most allowed. Remove one in Privacy to add someone new.`
+              : `${isFriend ? 'Friends' : 'Family'} are capped at ${limit} so it stays personal.`}
+          </span>
+          <span className="ml-3 shrink-0 font-mono font-semibold">
+            {used}/{limit}
+          </span>
+        </div>
       </>
     );
   } else if (md.type === 'duel') {
@@ -238,9 +253,16 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone }) {
         isCompete ? `You're now competing with ${who}` : isOffer ? `${who} now shares with you` : `Now sharing with ${who}`
       );
     secondary = (
-      <Btn variant="outline" onClick={() => run('respond_connection', { p_id: c.id, p_accept: false }, `Declined ${who}`)} disabled={busy}>
-        Decline
-      </Btn>
+      <span className="flex gap-2">
+        <Btn variant="outline" onClick={() => run('respond_connection', { p_id: c.id, p_accept: false }, `Declined ${who}`)} disabled={busy}>
+          Decline
+        </Btn>
+        {onSwitch ? (
+          <Btn variant="outline" onClick={() => onSwitch({ type: 'revise', conn: c, from: md.from })} disabled={busy}>
+            Revise
+          </Btn>
+        ) : null}
+      </span>
     );
     body = (
       <>
@@ -273,15 +295,102 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone }) {
     ctaTone = 'compete';
     submit = () => run('respond_duel', { p_id: d.id, p_accept: true }, `Duel accepted. Beat ${who}!`);
     secondary = (
-      <Btn variant="outline" onClick={() => run('respond_duel', { p_id: d.id, p_accept: false }, `Declined ${who}`)} disabled={busy}>
-        Decline
-      </Btn>
+      <span className="flex gap-2">
+        <Btn variant="outline" onClick={() => run('respond_duel', { p_id: d.id, p_accept: false }, `Declined ${who}`)} disabled={busy}>
+          Decline
+        </Btn>
+        {onSwitch ? (
+          <Btn variant="outline" onClick={() => onSwitch({ type: 'reviseDuel', duel: d, from: md.from })} disabled={busy}>
+            Revise
+          </Btn>
+        ) : null}
+      </span>
     );
     body = (
       <span className="text-sm text-way-ink2 [text-wrap:pretty]">
         A {len}-day {FIELDS[d.metric].label.toLowerCase()} duel, starting tomorrow. Only your {FIELDS[d.metric].label.toLowerCase()} for those days is
         compared.
       </span>
+    );
+  } else if (md.type === 'revise') {
+    const c = md.conn;
+    const who = displayName(md.from);
+    const isCompete = c.kind === 'compete';
+    const iShare = c.kind === 'share' && c.owner_id === meId; // they asked for my data
+    const options = isCompete ? COMPETE_KEYS : FIELD_KEYS;
+    const fields = s.fields.filter((k) => options.includes(k));
+    valid = fields.length > 0;
+    title = `New terms for ${who}`;
+    cta = 'Send new terms';
+    ctaTone = isCompete ? 'compete' : 'primary';
+    submit = () =>
+      run('revise_connection', { p_id: c.id, p_fields: fields, p_days: iShare && s.days ? s.days : null }, `New terms sent to ${who}. They can accept, decline or revise.`);
+    body = (
+      <>
+        <span className="text-[13px] text-way-mute [text-wrap:pretty]">
+          {isCompete
+            ? 'Pick what you’d rather compare. Their request is replaced by yours, and nothing is shared until they accept.'
+            : iShare
+              ? 'Choose what you’re willing to share instead, and for how long. They’ll get it as an offer to accept.'
+              : 'Ask for different items instead. They decide whether to share them, and for how long.'}
+        </span>
+        <div className="flex flex-col gap-1.5 rounded-xl bg-way-rail px-3 py-2.5 text-xs text-way-dim">
+          <span>They asked for</span>
+          <div className="flex flex-wrap gap-1">
+            {c.fields.map((k) => (
+              <span key={k} className="rounded-full border border-way-line2 px-2 py-0.5 text-way-mute">
+                {FIELDS[k]?.label}
+              </span>
+            ))}
+          </div>
+        </div>
+        <span className="text-xs font-semibold text-way-ink2">{isCompete ? 'Compare instead' : iShare ? 'Share instead' : 'Ask for instead'}</span>
+        <FieldPicker options={options} value={fields} onChange={(f) => set({ fields: f })} />
+        {iShare ? (
+          <>
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+              <span className="text-xs text-way-mute">For how long</span>
+              <Segmented stretch size="sm" className="flex-1 rounded-xl bg-way-rail p-[3px]" value={s.days} onChange={(v) => set({ days: v })} options={DURATIONS} />
+            </div>
+            <SensitiveWarning fields={fields} />
+          </>
+        ) : null}
+      </>
+    );
+  } else if (md.type === 'reviseDuel') {
+    const d = md.duel;
+    const who = displayName(md.from);
+    title = `Counter ${who}’s challenge`;
+    cta = 'Send counter-challenge';
+    ctaTone = 'compete';
+    submit = () => run('revise_duel', { p_id: d.id, p_metric: s.metric, p_days: s.days }, `Counter-challenge sent to ${who}`);
+    body = (
+      <>
+        <span className="text-[13px] text-way-mute [text-wrap:pretty]">
+          They proposed {FIELDS[d.metric].label.toLowerCase()}. Pick the stat and length you want; it goes back to them to accept.
+        </span>
+        <div className="flex flex-wrap gap-1.5">
+          {COMPETE_KEYS.map((k) => {
+            const on = s.metric === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={on}
+                onClick={() => set({ metric: k })}
+                className="rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors"
+                style={on ? { background: FIELDS[k].color, color: '#090d16', borderColor: FIELDS[k].color } : { color: '#94a3b8', borderColor: '#253044' }}
+              >
+                {FIELDS[k].label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+          <span className="text-xs text-way-mute">How long</span>
+          <Segmented stretch size="sm" className="flex-1 rounded-xl bg-way-rail p-[3px]" value={s.days} onChange={(v) => set({ days: v })} options={DUEL_LENGTHS} />
+        </div>
+      </>
     );
   } else if (md.type === 'manage') {
     const c = md.conn;
@@ -356,7 +465,7 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone }) {
             onClick={submit}
             disabled={!valid || busy}
             className={cx(
-              'h-11 flex-1 rounded-xl px-5 text-sm font-bold transition-colors disabled:bg-way-track disabled:text-way-faint md:flex-none',
+              'h-11 flex-1 rounded-xl px-5 text-sm font-semibold transition-colors disabled:bg-way-track disabled:text-way-faint md:flex-none',
               ctaCls
             )}
           >

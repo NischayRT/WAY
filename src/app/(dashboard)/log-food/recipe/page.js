@@ -4,8 +4,6 @@ import RecipeBuilderClient from '@/components/logging/RecipeBuilderClient';
 
 export const dynamic = 'force-dynamic';
 
-const MAX_STARTERS = 8;
-
 export default async function RecipePage({ searchParams }) {
   const supabase = await createServerSupabaseClient();
   const {
@@ -26,6 +24,7 @@ export default async function RecipePage({ searchParams }) {
   ]);
 
   // Group recipe lines per dish; the user's own dishes first, then the rest.
+  // All of them are searchable as "start from a similar dish".
   const byFood = new Map();
   for (const l of recipeLines ?? []) {
     if (!l.foods) continue;
@@ -35,7 +34,6 @@ export default async function RecipePage({ searchParams }) {
   const starters = [...byFood.values()]
     .filter((d) => d.lines.length >= 2)
     .sort((a, b) => (b.created_by === user.id) - (a.created_by === user.id) || a.name.localeCompare(b.name))
-    .slice(0, MAX_STARTERS)
     .map(({ created_by: _ignored, ...d }) => d);
 
   return <RecipeBuilderClient authorName={profile?.full_name ?? null} starters={starters} initialName={initialName} />;

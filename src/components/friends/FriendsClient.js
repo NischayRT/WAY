@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { RefreshCw, UserPlus, Flame, Swords, Trophy, AtSign, Database, Sparkles } from 'lucide-react';
+import { RefreshCw, UserPlus, Flame, Swords, Trophy, AtSign, Database, Sparkles, Users } from 'lucide-react';
 import { addDays } from '@/lib/dateUtils';
 import {
   FIELDS,
@@ -23,7 +23,8 @@ import PageSkeleton from '@/components/way/PageSkeleton';
 import { useFriendsData } from './useFriendsData';
 import ConnectDialog from './ConnectDialog';
 import { Avatar } from './parts';
-import { ArenaTab, DuelsTab, FamilyTab, InboxTab, PrivacyTab } from './tabs';
+import { DuelsTab, FamilyTab, InboxTab, PrivacyTab } from './tabs';
+import { ArenaTab } from './arena';
 
 const TABS = [
   { key: 'arena', label: 'Arena' },
@@ -48,7 +49,11 @@ function dailyValue(byDay, field, from, to) {
 /** Turns the raw rows into everything the tabs render. */
 export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
   const now = new Date();
-  const person = (id) => d.people.get(id) || (id === userId ? { id, username: profile.username, full_name: profile.full_name } : { id });
+  const person = (id) => {
+    const base = d.people.get(id) || (id === userId ? { id, username: profile.username, full_name: profile.full_name } : { id });
+    const alias = id !== userId ? d.aliases?.get(id) : null;
+    return alias ? { ...base, alias } : base;
+  };
   const me = { ...person(userId), id: userId };
   const other = (c) => (c.owner_id === userId ? c.other_id : c.owner_id);
   const blockedIds = new Set(d.blocks.map((b) => b.blocked_id));
@@ -201,6 +206,10 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
     ...d.duels.filter((x) => x.status === 'active' || x.status === 'pending').map((x) => (x.challenger_id === userId ? x.opponent_id : x.challenger_id)),
   ]);
   const connectedPeople = [...connectedIds].filter((id) => !blockedIds.has(id)).map(person);
+  const circle = (kind) =>
+    new Set(d.connections.filter((c) => c.kind === kind && ['pending', 'active'].includes(c.status) && (kind === 'compete' || !c.ends_at || new Date(c.ends_at) > now)).map(other)).size;
+  const friendCount = circle('compete');
+  const familyCount = circle('share');
 
   const changed = profile.username_changed_at ? String(profile.username_changed_at).slice(0, 10) : null;
   const waitDays = changed ? RENAME_DAYS - daysBetween(changed, today) : 0;
@@ -230,6 +239,8 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
     sharesOut,
     views: d.views,
     connectedPeople,
+    friendCount,
+    familyCount,
     blocked: d.blocks.map((b) => person(b.blocked_id)),
     canRename,
     renameHint: canRename ? 'You can change it once every 30 days.' : `You can change it again in ${waitDays} day${waitDays === 1 ? '' : 's'}.`,
@@ -276,6 +287,57 @@ function OpenDataDialog({ share, stats, today, onClose }) {
   );
 }
 
+/** Your private nickname for someone. Only you ever see it. */
+function AliasDialog({ person, supabase, onClose, onDone }) {
+  const [v, setV] = useState(person.alias || '');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const save = async (value) => {
+    setBusy(true);
+    setErr(null);
+    const name = value.trim().slice(0, 24);
+    const { error } = name
+      ? await supabase.from('contact_aliases').upsert({ other_id: person.id, alias: name, updated_at: new Date().toISOString() }, { onConflict: 'owner_id,other_id' })
+      : await supabase.from('contact_aliases').delete().eq('other_id', person.id);
+    setBusy(false);
+    if (error) return setErr(/contact_aliases/.test(error.message) ? 'Run the latest supabase/add-friends.sql to use nicknames.' : error.message);
+    onDone(name ? `Saved as “${name}”` : 'Nickname removed');
+  };
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Nickname"
+      subtitle={`For @${person.username || 'them'} · only you can see it`}
+      footer={
+        <>
+          {person.alias ? (
+            <Btn variant="outline" onClick={() => save('')} disabled={busy} className="mr-auto">
+              Remove
+            </Btn>
+          ) : null}
+          <Btn variant="primary" onClick={() => save(v)} disabled={busy || !v.trim()} className="md:ml-auto">
+            {busy ? 'Saving…' : 'Save'}
+          </Btn>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        <input
+          autoFocus
+          value={v}
+          maxLength={24}
+          onChange={(e) => setV(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && v.trim() && save(v)}
+          placeholder="e.g. Mom, Coach Ravi, Gym buddy"
+          className="h-11 rounded-xl border border-way-line2 bg-way-rail px-3.5 text-[15px] text-way-ink outline-none placeholder:text-way-faint focus:border-way-faint"
+        />
+        {err ? <p className="text-[13px] text-rose-300">{err}</p> : null}
+      </div>
+    </Modal>
+  );
+}
+
 function ConfirmDialog({ cf, onClose }) {
   const [busy, setBusy] = useState(false);
   return (
@@ -307,17 +369,18 @@ function ConfirmDialog({ cf, onClose }) {
   );
 }
 
-export default function FriendsClient({ userId, today, profile }) {
+export default function FriendsClient({ userId, today, profile, initialTab = 'arena' }) {
   const router = useRouter();
   const d = useFriendsData(userId, today);
   const k = useMounted() ? 1 : 0;
   const [toast, showToast] = useToast();
-  const [tab, setTab] = useState('arena');
-  const [metric, setMetric] = useState('steps');
+  const [tab, setTab] = useState(TABS.some((t) => t.key === initialTab) ? initialTab : 'arena');
+  const [metric, setMetric] = useState('all');
   const [period, setPeriod] = useState('week');
   const [md, setMd] = useState(null);
   const [cf, setCf] = useState(null);
   const [openData, setOpenData] = useState(null);
+  const [aliasFor, setAliasFor] = useState(null);
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(() => new Set());
   const [cheerFlip, setCheerFlip] = useState(() => new Map());
@@ -327,7 +390,7 @@ export default function FriendsClient({ userId, today, profile }) {
   const m = useMemo(
     () => (ready ? buildModel({ d, userId, profile, today, cheerFlip, sent }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ready, d.people, d.connections, d.duels, d.stats, d.duelBoard, d.claims, d.views, d.nudges, d.cheers, d.foodDays, d.blocks, userId, profile, today, cheerFlip, sent]
+    [ready, d.people, d.connections, d.duels, d.stats, d.duelBoard, d.claims, d.views, d.nudges, d.cheers, d.foodDays, d.blocks, d.aliases, userId, profile, today, cheerFlip, sent]
   );
 
   // Cheer totals for the events in the feed.
@@ -351,7 +414,7 @@ export default function FriendsClient({ userId, today, profile }) {
   }, [tab, hasSharesIn, recordViews]);
 
   // Keys 1-5 switch tabs, like a game menu.
-  const dialogOpen = !!(md || cf || openData);
+  const dialogOpen = !!(md || cf || openData || aliasFor);
   useEffect(() => {
     const onKey = (e) => {
       if (dialogOpen || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -465,13 +528,18 @@ export default function FriendsClient({ userId, today, profile }) {
     else if (r?.error) showToast(r.error, null, 'error');
     else showToast('Your numbers are up to date', RefreshCw);
   };
-  const add = () => setMd({ type: 'add' });
+  const circle = { friends: m.friendCount, family: m.familyCount };
+  const add = () => setMd({ type: 'add', counts: circle });
+  const onRevise = (x) =>
+    setMd(x.kind === 'duel' ? { type: 'reviseDuel', duel: x.item, from: x.from } : { type: 'revise', conn: x.item, from: x.from });
+  const onAlias = (p) => setAliasFor(p);
 
   const inboxCount = m.incoming.length;
   const chips = [
     { Icon: Flame, label: 'Log streak', v: `${m.foodStreak} day${m.foodStreak === 1 ? '' : 's'}`, c: '#fb923c' },
     { Icon: Swords, label: 'Duel record', v: `${m.record.w}–${m.record.l}${m.record.d ? `–${m.record.d}` : ''}`, c: '#fb7185' },
     { Icon: Trophy, label: 'Steps this week', v: m.seasonRank, c: '#facc15' },
+    { Icon: Users, label: 'Friends · Family', v: `${m.friendCount}/3 · ${m.familyCount}/3`, c: '#60a5fa' },
   ];
 
   return (
@@ -490,7 +558,7 @@ export default function FriendsClient({ userId, today, profile }) {
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex items-baseline gap-2">
               <span className="font-heading text-[22px] font-bold leading-none md:text-[28px]">@{m.me.username}</span>
-              <span className="rounded-md border border-way-line2 px-1.5 py-px font-mono text-[11px] font-bold text-way-ink2">LV {lv.level}</span>
+              <span className="rounded-md border border-way-line2 px-1.5 py-px font-mono text-[11px] font-semibold text-way-ink2">LV {lv.level}</span>
             </div>
             <span className="font-heading text-[11px] font-bold tracking-[0.14em] text-way-protein">{lv.title}</span>
             <div className="flex items-center gap-2">
@@ -544,7 +612,7 @@ export default function FriendsClient({ userId, today, profile }) {
                 <span className="hidden rounded border border-way-line2 px-1 font-mono text-[10px] font-medium text-way-dim md:inline">{i + 1}</span>
                 {t.label}
                 {t.key === 'inbox' && inboxCount ? (
-                  <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-way-over px-1 font-mono text-[10px] font-bold text-[#1a0508] md:static">
+                  <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-way-over px-1 font-mono text-[10px] font-semibold text-[#1a0508] md:static">
                     {inboxCount}
                   </span>
                 ) : null}
@@ -572,17 +640,19 @@ export default function FriendsClient({ userId, today, profile }) {
             k={k}
             onCheckIn={onCheckIn}
             onManage={(s) => setMd({ type: 'manage', conn: s.conn, to: s.viewer })}
-            onKit={(kt) => setMd({ type: 'add', mode: 'offer', fields: kt.fields, days: kt.days, label: kt.label })}
+            onKit={(kt) => setMd({ type: 'add', mode: 'offer', fields: kt.fields, days: kt.days, label: kt.label, counts: circle })}
+            onAlias={onAlias}
             onOpenData={setOpenData}
           />
         ) : tab === 'inbox' ? (
-          <InboxTab m={model} onReview={onReview} onDecline={onDecline} onCancel={onCancel} />
+          <InboxTab m={model} onReview={onReview} onDecline={onDecline} onCancel={onCancel} onRevise={onRevise} />
         ) : (
           <PrivacyTab
             m={model}
             copied={copied}
             onCopy={onCopy}
             onChangeName={() => setMd({ type: 'username', current: m.me.username })}
+            onAlias={onAlias}
             onBlock={onBlock}
             onUnblock={onUnblock}
           />
@@ -603,8 +673,20 @@ export default function FriendsClient({ userId, today, profile }) {
           </div>
         </Modal>
       ) : null}
-      {md ? <ConnectDialog key={JSON.stringify([md.type, md.conn?.id, md.duel?.id, md.mode])} md={md} meId={userId} supabase={d.supabase} onClose={() => setMd(null)} onDone={done} /> : null}
+      {md ? <ConnectDialog key={JSON.stringify([md.type, md.conn?.id, md.duel?.id, md.mode])} md={md} meId={userId} supabase={d.supabase} onClose={() => setMd(null)} onDone={done} onSwitch={setMd} /> : null}
       {cf ? <ConfirmDialog cf={cf} onClose={() => setCf(null)} /> : null}
+      {aliasFor ? (
+        <AliasDialog
+          person={aliasFor}
+          supabase={d.supabase}
+          onClose={() => setAliasFor(null)}
+          onDone={(msg) => {
+            setAliasFor(null);
+            showToast(msg);
+            d.reload();
+          }}
+        />
+      ) : null}
       {openData ? <OpenDataDialog share={openData} stats={d.stats} today={today} onClose={() => setOpenData(null)} /> : null}
       {toast}
     </main>

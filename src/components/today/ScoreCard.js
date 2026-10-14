@@ -1,6 +1,7 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronRight, ArrowUpRight } from 'lucide-react';
 import { Card, Eyebrow, Dot, fmt, cx } from '@/components/way/ui';
 
 const EASE = 'transition-[width] duration-[900ms] ease-[cubic-bezier(.2,.8,.2,1)]';
@@ -26,8 +27,10 @@ function SplitBars({ split, k, className = '' }) {
 /**
  * One hero for the day: the score (food + activity), one sentence on what's
  * left, calories split by meal budget, then protein, carbs and fat once each.
+ * Without Google Health there's no score: just calories and the macro split.
+ * The calories and macros open the Nutrition page.
  */
-export default function ScoreCard({ d, k, connectHref }) {
+export default function ScoreCard({ d, k, connectHref, showScore = true }) {
   const split = [{ label: 'Food', val: d.food, color: '#fbbf24' }];
   if (d.connected) split.push({ label: 'Activity', val: d.act, color: '#60a5fa' });
 
@@ -37,12 +40,89 @@ export default function ScoreCard({ d, k, connectHref }) {
       className="flex items-center justify-between gap-2 rounded-xl border border-dashed border-way-line2 px-3 py-2.5 text-left text-xs text-way-mute transition-colors hover:text-way-ink lg:rounded-[10px]"
     >
       <span>
-        <span className="lg:hidden">Activity isn&apos;t counted yet. Log in to Google Health to add it.</span>
-        <span className="hidden lg:inline">Log in to Google Health to count activity →</span>
+        <span className="lg:hidden">
+          {showScore ? 'Activity isn’t counted yet. Log in to Google Health to add it.' : 'Log in to Google Health for your Daily Score and activity.'}
+        </span>
+        <span className="hidden lg:inline">
+          {showScore ? 'Log in to Google Health to count activity →' : 'Log in to Google Health to unlock your Daily Score →'}
+        </span>
       </span>
       <ChevronRight size={14} className="shrink-0 lg:hidden" />
     </a>
   ) : null;
+
+  // Calories by meal + macros
+  const nutrition = (
+    <div className="flex flex-col gap-[18px] lg:justify-between lg:gap-[26px]">
+      <Link href="/nutrition#calories" className="group -m-2 flex flex-col gap-2.5 rounded-2xl p-2 transition-colors hover:bg-way-hover/60 lg:gap-3.5">
+        <div className={cx('items-baseline justify-between', showScore ? 'hidden lg:flex' : 'flex')}>
+          <span className="flex items-center gap-1.5">
+            <Eyebrow>{showScore ? 'Calories by meal' : 'Calories & nutrition'}</Eyebrow>
+            <ArrowUpRight size={13} className="text-way-faint transition-colors group-hover:text-way-ink2" />
+          </span>
+          <span className="font-mono text-[13px] font-semibold" style={{ color: d.leftColor }}>
+            {d.leftStr}
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between">
+          <div className="flex items-baseline gap-1.5 lg:gap-2">
+            <span className="font-mono text-[22px] font-semibold text-way-kcal lg:text-4xl lg:leading-none">{fmt(d.totals.calories)}</span>
+            <span className="font-mono text-xs font-medium text-way-dim lg:text-sm">/ {fmt(d.targets.targetCalories)} kcal</span>
+          </div>
+          <span className={cx('font-mono text-xs font-semibold lg:hidden', !showScore && 'hidden')} style={{ color: d.leftColor }}>
+            {d.leftStr}
+          </span>
+        </div>
+        <div className="flex h-2.5 gap-[3px] lg:h-3.5 lg:gap-1">
+          {d.meals.map((m) => (
+            <div key={m.key} className="overflow-hidden rounded-[3px] bg-way-track lg:rounded" style={{ flex: m.frac * 100 }}>
+              <div className={cx('h-full', EASE)} style={{ width: `${m.fill * k}%`, background: m.barColor }} />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-4 gap-1.5 lg:gap-3">
+          {d.meals.map((m) => (
+            <div key={m.key} className="flex flex-col gap-px lg:gap-0.5">
+              <span className="text-[11px] text-way-mute lg:text-xs">{m.label}</span>
+              <span className="font-mono text-[11px] font-semibold lg:text-xs" style={{ color: m.valColor }}>
+                {fmt(m.totals.calories)}
+                <span className="text-way-faint">/{fmt(m.budget)}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </Link>
+      <div className="hidden h-px bg-way-line lg:block" />
+      <Link href="/nutrition#macros" className="-m-2 grid grid-cols-3 gap-3.5 rounded-2xl p-2 transition-colors hover:bg-way-hover/60 lg:gap-6">
+        {d.macros.map((m) => (
+          <div key={m.label} className="flex flex-col gap-1.5 lg:gap-2">
+            <div className="flex items-center gap-1.5 text-[11px] text-way-mute lg:gap-[7px] lg:text-xs">
+              <Dot color={m.color} />
+              {m.label}
+            </div>
+            <div className="flex items-baseline gap-[3px] lg:gap-1">
+              <span className="font-mono text-lg font-semibold lg:text-[26px]">{Math.round(m.v)}</span>
+              <span className="font-mono text-[11px] font-medium text-way-dim lg:text-xs">/{m.t}g</span>
+            </div>
+            <div className="h-1 overflow-hidden rounded-full bg-way-track lg:h-[5px]">
+              <div className={cx('h-full rounded-full', EASE)} style={{ width: `${Math.min(100, (m.v / m.t) * 100) * k}%`, background: m.color }} />
+            </div>
+            <span className="hidden text-xs text-way-dim lg:block">{m.note}</span>
+          </div>
+        ))}
+      </Link>
+    </div>
+  );
+
+  if (!showScore) {
+    return (
+      <Card rise className="flex flex-col gap-[18px] p-[18px] lg:gap-6 lg:p-7">
+        {nutrition}
+        <p className="text-sm leading-[1.45] text-way-ink2 [text-wrap:pretty]">{d.sentence}</p>
+        {nudge}
+      </Card>
+    );
+  }
 
   return (
     <Card rise className="flex flex-col gap-[18px] p-[18px] lg:grid lg:grid-cols-[300px_1px_minmax(0,1fr)] lg:gap-7 lg:p-7">
@@ -81,63 +161,7 @@ export default function ScoreCard({ d, k, connectHref }) {
 
       <div className="h-px bg-way-line lg:h-auto" />
 
-      {/* Calories by meal + macros */}
-      <div className="flex flex-col gap-[18px] lg:justify-between lg:gap-[26px]">
-        <div className="flex flex-col gap-2.5 lg:gap-3.5">
-          <div className="hidden items-baseline justify-between lg:flex">
-            <Eyebrow>Calories by meal</Eyebrow>
-            <span className="font-mono text-[13px] font-semibold" style={{ color: d.leftColor }}>
-              {d.leftStr}
-            </span>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <div className="flex items-baseline gap-1.5 lg:gap-2">
-              <span className="font-mono text-[22px] font-semibold text-way-kcal lg:text-4xl lg:leading-none">{fmt(d.totals.calories)}</span>
-              <span className="font-mono text-xs font-medium text-way-dim lg:text-sm">/ {fmt(d.targets.targetCalories)} kcal</span>
-            </div>
-            <span className="font-mono text-xs font-semibold lg:hidden" style={{ color: d.leftColor }}>
-              {d.leftStr}
-            </span>
-          </div>
-          <div className="flex h-2.5 gap-[3px] lg:h-3.5 lg:gap-1">
-            {d.meals.map((m) => (
-              <div key={m.key} className="overflow-hidden rounded-[3px] bg-way-track lg:rounded" style={{ flex: m.frac * 100 }}>
-                <div className={cx('h-full', EASE)} style={{ width: `${m.fill * k}%`, background: m.barColor }} />
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-4 gap-1.5 lg:gap-3">
-            {d.meals.map((m) => (
-              <div key={m.key} className="flex flex-col gap-px lg:gap-0.5">
-                <span className="text-[11px] text-way-mute lg:text-xs">{m.label}</span>
-                <span className="font-mono text-[11px] font-semibold lg:text-xs" style={{ color: m.valColor }}>
-                  {fmt(m.totals.calories)}
-                  <span className="text-way-faint">/{fmt(m.budget)}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="hidden h-px bg-way-line lg:block" />
-        <div className="grid grid-cols-3 gap-3.5 lg:gap-6">
-          {d.macros.map((m) => (
-            <div key={m.label} className="flex flex-col gap-1.5 lg:gap-2">
-              <div className="flex items-center gap-1.5 text-[11px] text-way-mute lg:gap-[7px] lg:text-xs">
-                <Dot color={m.color} />
-                {m.label}
-              </div>
-              <div className="flex items-baseline gap-[3px] lg:gap-1">
-                <span className="font-mono text-lg font-semibold lg:text-[26px]">{Math.round(m.v)}</span>
-                <span className="font-mono text-[11px] font-medium text-way-dim lg:text-xs">/{m.t}g</span>
-              </div>
-              <div className="h-1 overflow-hidden rounded-full bg-way-track lg:h-[5px]">
-                <div className={cx('h-full rounded-full', EASE)} style={{ width: `${Math.min(100, (m.v / m.t) * 100) * k}%`, background: m.color }} />
-              </div>
-              <span className="hidden text-xs text-way-dim lg:block">{m.note}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {nutrition}
     </Card>
   );
 }

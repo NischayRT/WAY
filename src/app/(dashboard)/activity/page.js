@@ -20,7 +20,7 @@ export default async function ActivityPage() {
     supabase
       .from('profiles')
       .select(
-        'height_cm, weight_kg, age, sex, goal, step_goal, distance_goal_km, burn_goal_kcal, waist_cm, hip_cm, chest_cm, bicep_cm, dream_target_weight_kg, dream_target_date'
+        'height_cm, weight_kg, age, sex, goal, activity_level, step_goal, distance_goal_km, burn_goal_kcal, waist_cm, hip_cm, chest_cm, bicep_cm, dream_target_weight_kg, dream_target_date'
       )
       .eq('id', user.id)
       .single(),

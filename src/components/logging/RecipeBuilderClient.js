@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Check, Save, Plus, Minus, X, CircleAlert } from 'lucide-react';
+import { ArrowLeft, Check, Save, Plus, Minus, X, CircleAlert, Search, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabaseClient';
 import { getCurrentUserId } from '@/lib/currentUser';
 import { getCachedIngredients, peekCachedIngredients, invalidateFoodCache } from '@/lib/cache/foodCache';
@@ -25,6 +25,7 @@ export default function RecipeBuilderClient({ authorName, starters, initialName 
   const [ingredients, setIngredients] = useState(() => peekCachedIngredients() ?? []);
   const [name, setName] = useState(initialName);
   const [starter, setStarter] = useState(null);
+  const [sq, setSq] = useState(''); // similar-dish search
   const [method, setMethod] = useState('curry');
   const [cls, setCls] = useState('main');
   const [lines, setLines] = useState([]); // [{ ingredient, g }]
@@ -52,6 +53,16 @@ export default function RecipeBuilderClient({ authorName, starters, initialName 
     setError(null);
   };
   const ingById = useMemo(() => new Map(ingredients.map((i) => [i.id, i])), [ingredients]);
+
+  // Every dish with a recipe is searchable; the name you type also suggests one.
+  const sql = sq.trim().toLowerCase();
+  const similar = sql ? starters.filter((s) => s.name.toLowerCase().includes(sql)).slice(0, 12) : [];
+  const nl = name.trim().toLowerCase();
+  const nameMatch =
+    nl.length >= 3 && !lines.length
+      ? starters.find((s) => s.name.toLowerCase() === nl) ||
+        starters.find((s) => s.name.toLowerCase().includes(nl) || nl.includes(s.name.toLowerCase()))
+      : null;
 
   const applyStarter = (s) => {
     const ls = s.lines.map((l) => ({ ingredient: ingById.get(l.ingredient_id), g: Number(l.quantity_g) })).filter((l) => l.ingredient);
@@ -307,8 +318,56 @@ export default function RecipeBuilderClient({ authorName, starters, initialName 
               <div className="flex min-w-0 flex-col gap-2">
                 <Eyebrow>Start from a similar dish</Eyebrow>
                 {starters.length ? (
+                  <div className="relative">
+                    <div className="flex items-center gap-2 rounded-xl border border-way-line2 bg-way-card px-3 focus-within:border-way-faint md:bg-way-page">
+                      <Search size={15} className="text-way-dim" />
+                      <input
+                        value={sq}
+                        onChange={(e) => setSq(e.target.value)}
+                        placeholder={`Search ${starters.length} dishes to copy their ingredients`}
+                        className="h-11 flex-1 bg-transparent text-sm text-way-ink outline-none placeholder:text-way-faint"
+                      />
+                      {sq ? (
+                        <button type="button" onClick={() => setSq('')} aria-label="Clear" className="text-way-dim hover:text-way-ink">
+                          <X size={14} />
+                        </button>
+                      ) : null}
+                    </div>
+                    {similar.length && sq.trim() ? (
+                      <div className="absolute inset-x-0 top-[calc(100%+4px)] z-20 max-h-64 overflow-auto rounded-xl border border-way-line2 bg-[#111827] shadow-[0_12px_30px_rgba(0,0,0,.45)]">
+                        {similar.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              applyStarter(s);
+                              setSq('');
+                            }}
+                            className="flex w-full items-center justify-between gap-2 border-t border-way-line px-3 py-2.5 text-left text-[13px] first:border-t-0 hover:bg-way-hover"
+                          >
+                            <span className="truncate">{s.name}</span>
+                            <span className="shrink-0 font-mono text-[11px] text-way-dim">{s.lines.length} ingredients</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : sq.trim() ? (
+                      <p className="pt-1.5 text-xs text-way-dim">No dish called “{sq.trim()}” has a recipe yet.</p>
+                    ) : null}
+                  </div>
+                ) : null}
+                {nameMatch && starter !== nameMatch.id ? (
+                  <button
+                    type="button"
+                    onClick={() => applyStarter(nameMatch)}
+                    className="way-rise flex items-center gap-2 self-start rounded-xl border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-left text-xs text-amber-100"
+                  >
+                    <Sparkles size={13} className="shrink-0 text-way-kcal" />
+                    Looks like “{nameMatch.name}”. Copy its {nameMatch.lines.length} ingredients?
+                  </button>
+                ) : null}
+                {starters.length ? (
                   <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
-                    {starters.map((s) => (
+                    {starters.slice(0, 6).map((s) => (
                       <Chip key={s.id} on={starter === s.id} onClick={() => applyStarter(s)} className="min-h-[38px] px-3.5 text-[13px] font-medium md:min-h-9">
                         {s.name}
                       </Chip>

@@ -17,6 +17,7 @@ import WeekCard, { buildWeek } from './WeekCard';
 import WeightCard from './WeightCard';
 import StreakCard from './StreakCard';
 import RankCard from './RankCard';
+import HealthDataNotice from '@/components/way/HealthDataNotice';
 
 const EXTRA_KEYS = ['heart', 'oxygen', 'floors', 'sleep', 'glucose'];
 const EMPTY = { categories: [], overallTotals: { calories: 0, protein: 0, carbs: 0, fat: 0 } };
@@ -274,6 +275,7 @@ export default function TodayClient({
             and Body Age beside it once every stat it needs is available. */}
         <div className={bodyAgeReady ? 'lg:col-span-8' : 'lg:col-span-12'}>
           <ScoreCard d={d} k={k} connectHref={connectHref()} showScore={!!googleHealth.connected} />
+          {!googleHealth.connected ? <HealthDataNotice className="mt-2 px-1" /> : null}
         </div>
         {bodyAgeReady ? <BodyAgeCard data={bodyAge.data} className="lg:col-span-4" /> : null}
         <div className="lg:hidden">

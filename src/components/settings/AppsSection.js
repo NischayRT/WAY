@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Heart, RefreshCw, CircleCheck, CircleAlert, TriangleAlert, Footprints, Navigation, Flame, HeartPulse, Moon, Droplets, Building2, Activity } from 'lucide-react';
 import { Card, Eyebrow, Toggle, Btn, cx } from '@/components/way/ui';
+import HealthDataNotice from '@/components/way/HealthDataNotice';
 
 const READS = [
   ['Steps', Footprints, '#60a5fa'],
@@ -123,6 +124,7 @@ export default function AppsSection({ connected, canWrite, syncEnabled: initialS
         )}
       </div>
       <p className="max-w-[620px] text-[13px] leading-normal text-way-mute [text-wrap:pretty] md:text-sm">{blurb}</p>
+      {!connected ? <HealthDataNotice className="max-w-[620px]" /> : null}
 
       {connected ? (
         <div className="flex flex-col gap-2 md:gap-2.5">

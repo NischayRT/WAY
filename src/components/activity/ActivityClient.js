@@ -11,6 +11,7 @@ import { PAGE, PageHeader, Card, Eyebrow, Segmented, Btn, fmt, f1, useMounted, p
 import { EditTilesDialog, useTileSelection, TILE_ICONS } from '@/components/way/tiles';
 import WeightLogDialog from '@/components/way/WeightLogDialog';
 import { useJson } from '@/components/way/useJson';
+import HealthDataNotice from '@/components/way/HealthDataNotice';
 
 const RANGES = [
   ['7D', 7],
@@ -607,6 +608,7 @@ export default function ActivityClient({ userId, profile, entries, goals, google
           <Btn as="a" href={connectHref()} variant="primary" className="self-start rounded-[10px] lg:self-stretch lg:rounded-xl">
             Log in to Google Health
           </Btn>
+          <HealthDataNotice />
         </div>
       ) : !baView ? (
         <div className="h-24 animate-pulse rounded-xl bg-way-track/60" />
@@ -762,7 +764,7 @@ export default function ActivityClient({ userId, profile, entries, goals, google
             ))}
           </>
         ) : (
-          <Card className="flex flex-col items-start gap-3 border-dashed border-way-line2 p-5 lg:col-span-12 lg:flex-row lg:items-center lg:justify-between lg:gap-5 lg:p-7">
+          <Card className="flex flex-col items-start gap-3 border-dashed border-way-line2 p-5 lg:col-span-12 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between lg:gap-5 lg:p-7">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-blue-400/30 bg-blue-400/10">
                 <Activity size={22} className="text-way-carbs" />
@@ -777,6 +779,7 @@ export default function ActivityClient({ userId, profile, entries, goals, google
             <Btn as="a" href={connectHref()} variant="primary" className="rounded-[10px] lg:h-11 lg:rounded-xl lg:px-[18px] lg:text-sm">
               {reauth ? 'Reconnect' : 'Log in to Google Health'}
             </Btn>
+            {!reauth ? <HealthDataNotice className="basis-full" /> : null}
           </Card>
         )}
 

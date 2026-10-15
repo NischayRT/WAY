@@ -2,6 +2,7 @@
 
 import { Footprints } from 'lucide-react';
 import { ui } from '@/lib/ui';
+import HealthDataNotice from '@/components/way/HealthDataNotice';
 
 export default function GoogleHealthOnboardingStep({ onSkip }) {
   return (
@@ -43,6 +44,7 @@ export default function GoogleHealthOnboardingStep({ onSkip }) {
         </button>
       </div>
 
+      <HealthDataNotice className="text-center" />
       <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
         You can connect or disconnect any time from Settings.
       </p>

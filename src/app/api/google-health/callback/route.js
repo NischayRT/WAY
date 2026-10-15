@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
+import { encryptToken } from '@/lib/tokenCrypto';
 import { exchangeCodeForTokens, NUTRITION_WRITE_SCOPE, METRICS_WRITE_SCOPE, OPTIONAL_SCOPES } from '@/lib/googleHealth';
 
 // Must match the list in ../connect/route.js. This said '/progress' while
@@ -66,8 +67,9 @@ export async function GET(request) {
 
     const { error } = await supabase.from('google_health_connections').upsert({
       user_id: user.id,
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
+      // encrypted at rest (lib/tokenCrypto.js)
+      access_token: encryptToken(tokens.access_token),
+      refresh_token: encryptToken(tokens.refresh_token),
       expires_at: expiresAt,
       // Google returns only what the user ticked on the consent screen, so
       // this is the source of truth for whether we may write.

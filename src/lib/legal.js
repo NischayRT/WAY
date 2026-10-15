@@ -3,7 +3,8 @@
 export const LEGAL = {
   // Must match the app name on the Google OAuth consent screen exactly.
   APP_NAME: 'WAY Studio',
-  SITE_URL: 'https://way-the-studio.vercel.app',
+  // Set NEXT_PUBLIC_SITE_URL in Vercel to your custom domain (e.g. https://yourdomain.com).
+  SITE_URL: (process.env.NEXT_PUBLIC_SITE_URL || 'https://way-the-studio.vercel.app').replace(/\/+$/, ''),
   // Google Search Console HTML-tag token (only the content="..." value).
   // Paste it here so verification does not depend on a Vercel env variable.
   // It is public in the page source anyway, so this is safe to commit.

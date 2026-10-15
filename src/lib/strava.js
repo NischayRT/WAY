@@ -1,3 +1,4 @@
+import { encryptToken, decryptToken } from '@/lib/tokenCrypto';
 // src/lib/strava.js
 
 const STRAVA_TOKEN_ENDPOINT = 'https://www.strava.com/oauth/token';
@@ -41,7 +42,7 @@ export async function getValidStravaAccessToken(supabase, userId) {
   if (!connection) return null;
 
   const isExpired = connection.expires_at * 1000 <= Date.now() + 60_000;
-  if (!isExpired) return connection.access_token;
+  if (!isExpired) return decryptToken(connection.access_token);
 
   // Refresh token
   const res = await fetch(STRAVA_TOKEN_ENDPOINT, {
@@ -50,7 +51,7 @@ export async function getValidStravaAccessToken(supabase, userId) {
     body: JSON.stringify({
       client_id: process.env.NEXT_PUBLIC_STRAVA_CLIENT_ID,
       client_secret: process.env.STRAVA_CLIENT_SECRET,
-      refresh_token: connection.refresh_token,
+      refresh_token: decryptToken(connection.refresh_token),
       grant_type: 'refresh_token',
     }),
   });
@@ -64,8 +65,8 @@ export async function getValidStravaAccessToken(supabase, userId) {
   await supabase
     .from('strava_connections')
     .update({
-      access_token: refreshed.access_token,
-      refresh_token: refreshed.refresh_token,
+      access_token: encryptToken(refreshed.access_token),
+      refresh_token: encryptToken(refreshed.refresh_token),
       expires_at: refreshed.expires_at,
     })
     .eq('user_id', userId);

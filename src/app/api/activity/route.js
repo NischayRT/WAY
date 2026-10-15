@@ -4,10 +4,13 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { getValidAccessToken, fetchDailyMetrics } from '@/lib/googleHealth';
 import { getValidStravaAccessToken, fetchStravaDailyMetrics } from '@/lib/strava';
+import { isValidDateStr, todayLocalDate } from '@/lib/dateUtils';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const dateStr = searchParams.get('date');
+  const requested = searchParams.get('date');
+  // Only a real calendar date, not in the future; anything else means today.
+  const dateStr = isValidDateStr(requested) && requested <= todayLocalDate() ? requested : null;
 
   const supabase = await createServerSupabaseClient();
   const {
@@ -48,4 +51,4 @@ export async function GET(request) {
     console.error('[api]', err);
     return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
   }
-}
+}

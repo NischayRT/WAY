@@ -101,7 +101,10 @@ export async function POST(request) {
 
   if (payload.length) {
     const { error } = await supabase.from('daily_stats').upsert(payload, { onConflict: 'user_id,day' });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      console.error('[friends/sync] upsert', error.message);
+      return NextResponse.json({ error: 'Could not update' }, { status: 500 });
+    }
   }
   // Keep only the window friends can see.
   await supabase.from('daily_stats').delete().eq('user_id', user.id).lt('day', from);

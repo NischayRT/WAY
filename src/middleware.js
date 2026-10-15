@@ -6,22 +6,78 @@ import { createServerClient } from '@supabase/ssr';
 // that need no profile (/login, /auth/*, legal pages), and JSON APIs.
 const PROFILE_CHECK_EXEMPT_PREFIXES = ['/onboarding', '/login', '/auth', '/api', '/privacy', '/terms'];
 
-// Baseline browser security headers for every HTML/API response.
-// A Content-Security-Policy is deliberately not set here yet (see notes):
-// a wrong CSP breaks Supabase/Google sign-in, so roll it out as
-// Report-Only first.
+// Browser security headers for every page and API response.
+//
+// Content-Security-Policy: only this site's own scripts may run, the page
+// may only talk to this site and our Supabase project, it can't be framed
+// (clickjacking), plugins/<object> are off, and <base>/<form> can't be
+// pointed elsewhere. 'unsafe-inline' for scripts is still needed by Next.js'
+// inline bootstrap on static pages; everything else is locked down.
+const SUPABASE_ORIGIN = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin;
+  } catch {
+    return '';
+  }
+})();
+const SUPABASE_WS = SUPABASE_ORIGIN.replace(/^http/, 'ws');
+const isDev = process.env.NODE_ENV !== 'production';
+
+const CSP = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  // blob:/data: — the 3D body models decode their textures from blob URLs
+  `connect-src 'self' blob: data: ${SUPABASE_ORIGIN} ${SUPABASE_WS}`.trim(),
+  "worker-src 'self' blob:",
+  "media-src 'self' blob: data:",
+  "manifest-src 'self'",
+  "frame-src 'none'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  `form-action 'self' https://accounts.google.com ${SUPABASE_ORIGIN}`.trim(),
+  ...(isDev ? [] : ['upgrade-insecure-requests']),
+].join('; ');
+
 const SECURITY_HEADERS = {
+  'Content-Security-Policy': CSP,
   'X-Frame-Options': 'DENY',
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()',
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+  'X-DNS-Prefetch-Control': 'off',
 };
 
 function withSecurityHeaders(response) {
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) response.headers.set(k, v);
   return response;
+}
+
+// Cross-site request forgery guard for the JSON API: a request that changes
+// something (POST/PUT/PATCH/DELETE) must come from this site's own pages.
+// Browsers always send Origin (and Sec-Fetch-Site) on such requests, so a
+// form or script on another website is refused even if the user is signed
+// in. Same-origin fetches from the app are unaffected.
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+function isCrossSiteWrite(request) {
+  if (SAFE_METHODS.has(request.method)) return false;
+  if (!request.nextUrl.pathname.startsWith('/api/')) return false;
+  const site = request.headers.get('sec-fetch-site');
+  if (site && site !== 'same-origin' && site !== 'none') return true;
+  const origin = request.headers.get('origin');
+  if (!origin) return false; // non-browser clients still need a valid session cookie
+  try {
+    const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
+    return new URL(origin).host !== host;
+  } catch {
+    return true;
+  }
 }
 
 // Supabase keeps the session in cookies named sb-<project>-auth-token
@@ -32,6 +88,10 @@ function hasSessionCookie(request) {
 }
 
 export async function middleware(request) {
+  if (isCrossSiteWrite(request)) {
+    return withSecurityHeaders(NextResponse.json({ error: 'Forbidden' }, { status: 403 }));
+  }
+
   // Next.js link prefetches skip the auth round trip. This is only a
   // performance shortcut: every protected page still checks the user itself.
   const isPrefetch =

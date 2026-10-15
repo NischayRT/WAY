@@ -1,0 +1,5 @@
+# How to report a security problem in WAY Studio (RFC 9116).
+Contact: mailto:way.the.studio@gmail.com
+Expires: 2027-10-15T00:00:00.000Z
+Preferred-Languages: en
+Policy: https://way-the-studio.vercel.app/privacy

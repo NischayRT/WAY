@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { revokeGoogleToken } from '@/lib/googleHealth';
+import { decryptToken } from '@/lib/tokenCrypto';
 
 export async function POST() {
   const supabase = await createServerSupabaseClient();
@@ -16,7 +17,15 @@ export async function POST() {
     .select('refresh_token')
     .eq('user_id', user.id)
     .maybeSingle();
-  if (connection?.refresh_token) await revokeGoogleToken(connection.refresh_token);
+  if (connection?.refresh_token) {
+    let token = null;
+    try {
+      token = decryptToken(connection.refresh_token);
+    } catch (err) {
+      console.error('[google-health/disconnect] decrypt', err?.message);
+    }
+    if (token) await revokeGoogleToken(token);
+  }
 
   const { error } = await supabase.from('google_health_connections').delete().eq('user_id', user.id);
   if (error) {

@@ -5,6 +5,7 @@
 // GOOGLE_HEALTH_CLIENT_SECRET, which must stay server-side only.
 
 import { todayLocalDate } from '@/lib/dateUtils';
+import { encryptToken, decryptToken, isEncrypted } from '@/lib/tokenCrypto';
 
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -95,16 +96,39 @@ export async function getValidAccessToken(supabase, userId) {
 
   if (!connection) return null;
 
+  // Tokens are stored encrypted (lib/tokenCrypto.js). Rows written before
+  // encryption was turned on are plaintext: encrypt them now, once.
+  let accessToken;
+  let refreshToken;
+  try {
+    accessToken = decryptToken(connection.access_token);
+    refreshToken = decryptToken(connection.refresh_token);
+  } catch (e) {
+    // Key missing or changed: the stored tokens are unusable. Drop the row so
+    // the app shows "Connect Google Health" again instead of failing forever.
+    console.error('[google-health] could not decrypt stored tokens:', e.message);
+    await supabase.from('google_health_connections').delete().eq('user_id', userId);
+    const err = new Error('Stored Google Health tokens could not be read; please reconnect.');
+    err.reauthRequired = true;
+    throw err;
+  }
+  if (!isEncrypted(connection.refresh_token) && isEncrypted(encryptToken('probe'))) {
+    await supabase
+      .from('google_health_connections')
+      .update({ access_token: encryptToken(accessToken), refresh_token: encryptToken(refreshToken) })
+      .eq('user_id', userId);
+  }
+
   const isExpired = new Date(connection.expires_at).getTime() <= Date.now() + 60_000; // 60s buffer
-  if (!isExpired) return connection.access_token;
+  if (!isExpired) return accessToken;
 
   try {
-    const refreshed = await refreshAccessToken(connection.refresh_token);
+    const refreshed = await refreshAccessToken(refreshToken);
     const newExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
 
     await supabase
       .from('google_health_connections')
-      .update({ access_token: refreshed.access_token, expires_at: newExpiresAt })
+      .update({ access_token: encryptToken(refreshed.access_token), expires_at: newExpiresAt })
       .eq('user_id', userId);
 
     return refreshed.access_token;

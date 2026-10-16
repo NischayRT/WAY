@@ -50,7 +50,7 @@ function isFresh(entry) {
 async function loadFoods(supabase) {
   const { data, error } = await supabase
     .from('foods')
-    .select('id, name, region, calories_kcal, protein_g, carbs_g, fat_g, created_by, author_name, source, serving_size_g')
+    .select('id, name, region, category, calories_kcal, protein_g, carbs_g, fat_g, created_by, author_name, source, serving_size_g')
     .order('id', { ascending: false });
   if (error) throw error;
   return data ?? [];

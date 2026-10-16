@@ -25,14 +25,15 @@ import {
   CookingPot,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabaseClient';
-import { getCachedFoods, peekCachedFoods } from '@/lib/cache/foodCache';
+import { getCachedFoods, peekCachedFoods, getCachedIngredients, invalidateFoodCache } from '@/lib/cache/foodCache';
 import { syncToGoogleHealth } from '@/lib/googleHealthSyncClient';
 import { addDays } from '@/lib/dateUtils';
 import { snackMealType, groupForMealType } from '@/lib/daily';
-import { portionOf, portionLabel, portionNutrition } from '@/lib/portions';
+import { portionOf } from '@/lib/portions';
 import { PAGE, Card, Eyebrow, Segmented, Dot, fmt, useToast, useLocalPref, cx } from '@/components/way/ui';
 import { useJson } from '@/components/way/useJson';
 import IngredientPicker from './IngredientPicker';
+import AmountSheet from './AmountSheet';
 
 const MEALS = [
   { key: 'breakfast', label: 'Breakfast', Icon: Sunrise },
@@ -74,7 +75,44 @@ const sumLogs = (logs) =>
     { k: 0, p: 0, c: 0, f: 0 }
   );
 
-function Stepper({ qty, onDec, onInc, decIcon = 'minus', tone = 'accent', wide = false }) {
+// Nutrition for g grams of a food (values are per 100 g).
+const nutr = (food, g) => {
+  const r = (Number(g) || 0) / 100;
+  return {
+    g,
+    calories: (Number(food.calories_kcal) || 0) * r,
+    protein: (Number(food.protein_g) || 0) * r,
+    carbs: (Number(food.carbs_g) || 0) * r,
+    fat: (Number(food.fat_g) || 0) * r,
+  };
+};
+
+// "½", "1", "1¼", "2.3"
+const countLabel = (n) => {
+  const q = Math.round(n * 4) / 4;
+  if (Math.abs(q - n) < 0.01) {
+    const whole = Math.floor(q);
+    const frac = { 0: '', 0.25: '¼', 0.5: '½', 0.75: '¾' }[q - whole];
+    return `${whole || !frac ? whole : ''}${frac}`;
+  }
+  return (Math.round(n * 10) / 10).toString();
+};
+const PLURAL = { glass: 'glasses', katori: 'katoris' };
+
+// An ingredient shown and logged like a food (resolved to a real food row at log time).
+const ingredientAsFood = (i) => ({
+  id: `ing-${i.id}`,
+  ingredientId: i.id,
+  isIngredient: true,
+  name: i.name,
+  calories_kcal: i.calories_kcal,
+  protein_g: i.protein_g,
+  carbs_g: i.carbs_g,
+  fat_g: i.fat_g,
+  serving_size_g: 100,
+});
+
+function Stepper({ qty, onDec, onInc, onEdit, decIcon = 'minus', tone = 'accent', wide = false }) {
   const accent = tone === 'accent';
   const DecIcon = decIcon === 'trash' ? Trash2 : Minus;
   return (
@@ -92,15 +130,18 @@ function Stepper({ qty, onDec, onInc, decIcon = 'minus', tone = 'accent', wide =
       >
         <DecIcon size={13} />
       </button>
-      <span
+      <button
+        type="button"
+        onClick={onEdit}
+        title="Set an exact amount"
         className={cx(
-          'text-center font-mono text-[11px] font-semibold',
+          'self-stretch rounded-md px-0.5 text-center font-mono text-[11px] font-semibold underline decoration-dotted underline-offset-4 hover:bg-white/5',
           accent ? 'text-emerald-100 md:text-xs' : 'text-way-ink',
           wide ? 'min-w-[48px] md:min-w-[72px]' : 'min-w-[44px] md:min-w-[60px]'
         )}
       >
         {qty}
-      </span>
+      </button>
       <button
         type="button"
         onClick={onInc}
@@ -131,6 +172,10 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
   const [recent, setRecent] = useState([]);
   const [nonce, setNonce] = useState(0);
   const [units, setUnits] = useLocalPref('way.logfood.units', 'portions');
+  const [ingredients, setIngredients] = useState([]);
+  const [myPortions, setMyPortions] = useState(() => new Map()); // food id -> { unit, g }
+  const [recipeIds, setRecipeIds] = useState(() => new Set()); // foods that have an ingredient list
+  const [editing, setEditing] = useState(null); // { food, grams }
   const [toastNode, toast] = useToast();
   const grams = units === 'grams';
 
@@ -143,6 +188,29 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
       live = false;
     };
     // supabase client is stable for the page's life
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Ingredients (banana, paneer, oats…) are searchable and loggable too.
+  useEffect(() => {
+    let live = true;
+    getCachedIngredients(supabase)
+      .then((data) => live && setIngredients(data))
+      .catch(() => {});
+    // The user's own portion sizes ("my bowl = 250 g").
+    supabase
+      .from('user_portions')
+      .select('food_id, unit, grams')
+      .then(({ data }) => live && data && setMyPortions(new Map(data.map((r) => [r.food_id, { unit: r.unit, g: Number(r.grams) }]))));
+    // Which dishes have a recipe (ingredient list).
+    supabase
+      .from('dish_ingredients')
+      .select('food_id')
+      .limit(20000)
+      .then(({ data }) => live && data && setRecipeIds(new Set(data.map((r) => r.food_id))));
+    return () => {
+      live = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -253,7 +321,72 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
     });
   const nOf = (id) => tray.find((x) => x.food.id === id)?.n || 0;
 
-  const qty = (food, n) => (grams ? `${fmt(portionOf(food).g * n)} g` : portionLabel(food, n));
+  // Portion for a food: the user's saved size, else the standard one.
+  const pOf = (food) => (typeof food.id === 'number' && myPortions.get(food.id)) || portionOf(food);
+  const portionNutrition = (food, n) => nutr(food, pOf(food).g * n);
+  const portionLabel = (food, n) => {
+    const { unit, g } = pOf(food);
+    if (unit === 'serving' && g === 100) return `${fmt(g * n)} g`;
+    const plural = n > 1 ? PLURAL[unit] || `${unit}s` : unit;
+    return `${countLabel(n)} ${plural}`;
+  };
+  const openEditor = (food) => {
+    const n0 = nOf(food.id) || 1;
+    setEditing({ food, grams: pOf(food).g * n0 });
+  };
+
+  // Recipe lines for a dish: [{ quantity_g, ingredient }], and the cooked weight they make.
+  const loadRecipe = async (food) => {
+    const [{ data: lines, error }, { data: row }] = await Promise.all([
+      supabase
+        .from('dish_ingredients')
+        .select('quantity_g, ingredients (id, name, calories_kcal, protein_g, carbs_g, fat_g)')
+        .eq('food_id', food.id),
+      supabase.from('foods').select('raw_weight_g, final_weight_g').eq('id', food.id).maybeSingle(),
+    ]);
+    if (error) throw error;
+    const clean = (lines || []).filter((l) => l.ingredients).map((l) => ({ quantity_g: Number(l.quantity_g) || 0, ingredient: l.ingredients }));
+    const raw = clean.reduce((a, l) => a + l.quantity_g, 0);
+    return { lines: clean, cooked: Number(row?.final_weight_g) || Number(row?.raw_weight_g) || raw };
+  };
+
+  const saveMyPortion = async (foodId, portion) => {
+    setMyPortions((m) => new Map(m).set(foodId, portion));
+    const { error } = await supabase.from('user_portions').upsert({ food_id: foodId, unit: portion.unit, grams: Math.round(portion.g) }, { onConflict: 'user_id,food_id' });
+    if (error) toast('Portion size used for now, but couldn’t be saved', X, 'error');
+  };
+
+  const applyAmount = ({ grams, portion, saveDefault, lines }) => {
+    const food = editing.food;
+    setEditing(null);
+    if (lines) {
+      // Log the recipe as its ingredients, with the amounts the user set.
+      setTray((t) => {
+        let next = t.filter((x) => x.food.id !== food.id);
+        for (const { ingredient, g } of lines) {
+          const f = ingredientAsFood(ingredient);
+          const unitG = pOf(f).g;
+          const i = next.findIndex((x) => x.food.id === f.id);
+          if (i >= 0) next = next.map((x, j) => (j === i ? { ...x, n: x.n + g / unitG } : x));
+          else next = [...next, { food: f, n: g / unitG }];
+        }
+        return next;
+      });
+      toast(`${food.name} added as ${lines.length} ingredients`, Check);
+      return;
+    }
+    const std = pOf(food);
+    const changed = portion.unit !== std.unit || Math.round(portion.g) !== Math.round(std.g);
+    if (changed && typeof food.id === 'number') {
+      if (saveDefault) saveMyPortion(food.id, portion);
+      else setMyPortions((m) => new Map(m).set(food.id, portion)); // this session only
+    } else if (saveDefault && typeof food.id === 'number') {
+      saveMyPortion(food.id, portion);
+    }
+    setN(food, grams / portion.g);
+  };
+
+  const qty = (food, n) => (grams ? `${fmt(pOf(food).g * n)} g` : portionLabel(food, n));
   const ql = q.trim().toLowerCase();
   const results = useMemo(() => {
     if (!ql) return [];
@@ -265,8 +398,17 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
       else if (nm.includes(ql)) contains.push(f);
       if (starts.length >= MAX_RESULTS) break;
     }
-    return [...starts, ...contains].slice(0, MAX_RESULTS);
-  }, [foods, ql]);
+    const names = new Set(foods.map((f) => f.name.toLowerCase()));
+    const ingStarts = [];
+    const ingContains = [];
+    for (const i of ingredients) {
+      const nm = i.name.toLowerCase();
+      if (names.has(nm)) continue;
+      if (nm.startsWith(ql)) ingStarts.push(ingredientAsFood(i));
+      else if (nm.includes(ql)) ingContains.push(ingredientAsFood(i));
+    }
+    return [...starts, ...ingStarts, ...contains, ...ingContains].slice(0, MAX_RESULTS);
+  }, [foods, ingredients, ql]);
 
   const lists = {
     suggested: suggested.map((f) => ({ food: f })),
@@ -349,10 +491,30 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
     if (!n || saving) return;
     setSaving(true);
     const mealType = meal === 'snacks' ? (initialMeal && groupForMealType(initialMeal) === 'snacks' ? initialMeal : snackMealType()) : meal;
+    // Ingredients become shared foods the first time anyone logs them.
+    const ids = new Map();
+    let createdFood = false;
+    for (const t of tray) {
+      if (!t.food.isIngredient) continue;
+      const { data: fid, error: rpcError } = await supabase.rpc('food_for_ingredient', { p_ingredient_id: t.food.ingredientId });
+      if (rpcError || !fid) {
+        setSaving(false);
+        toast(
+          /function .* does not exist|schema cache/i.test(rpcError?.message || '')
+            ? 'Logging ingredients needs the latest database update.'
+            : `Couldn't add ${t.food.name}. Please try again.`,
+          X,
+          'error'
+        );
+        return;
+      }
+      ids.set(t.food.id, fid);
+      createdFood = true;
+    }
     const rows = tray.map((t) => ({
       user_id: userId,
-      food_id: t.food.id,
-      quantity_g: Math.round(portionOf(t.food).g * t.n),
+      food_id: ids.get(t.food.id) ?? t.food.id,
+      quantity_g: Math.round(pOf(t.food).g * t.n),
       meal_type: mealType,
       logged_at: date,
     }));
@@ -363,6 +525,10 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
       return;
     }
     if (inserted?.length) syncToGoogleHealth({ action: 'food_upsert', logIds: inserted.map((r) => r.id) });
+    if (createdFood) {
+      invalidateFoodCache();
+      getCachedFoods(supabase).then(setFoods).catch(() => {});
+    }
     toast(`${mealLabel} logged to ${date === today ? 'today' : day.short} · ${fmt(tot.k)} kcal`, Check);
     setTray([]);
     setTrayOpen(false);
@@ -398,8 +564,9 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
           tone="plain"
           qty={qty(t.food, t.n)}
           decIcon={t.n <= 0.5 ? 'trash' : 'minus'}
-          onDec={() => setN(t.food, t.n - 0.5)}
-          onInc={() => setN(t.food, t.n + 0.5)}
+          onDec={() => setN(t.food, t.n <= 0.5 ? 0 : Math.max(0.5, Math.round((t.n - 0.5) * 2) / 2))}
+          onInc={() => setN(t.food, Math.round((t.n + 0.5) * 2) / 2)}
+          onEdit={() => openEditor(t.food)}
         />
       </div>
     );
@@ -568,7 +735,13 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                 : '';
               const isMine = !!food.created_by && food.created_by === userId;
               const control = cnt ? (
-                <Stepper wide qty={qty(food, cnt)} onDec={() => setN(food, cnt - 0.5)} onInc={() => setN(food, cnt + 0.5)} />
+                <Stepper
+                  wide
+                  qty={qty(food, cnt)}
+                  onDec={() => setN(food, cnt <= 0.5 ? 0 : Math.max(0.5, Math.round((cnt - 0.5) * 2) / 2))}
+                  onInc={() => setN(food, Math.round((cnt + 0.5) * 2) / 2)}
+                  onEdit={() => openEditor(food)}
+                />
               ) : (
                 <>
                   <button
@@ -602,6 +775,9 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                   <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
                     <div className="flex min-w-0 items-center gap-1.5 md:gap-2">
                       <span className="truncate text-sm font-medium md:text-[15px]">{food.name}</span>
+                      {food.isIngredient ? (
+                        <span className="shrink-0 rounded-[5px] border border-sky-400/35 px-1 py-px font-mono text-[10px] font-semibold text-way-carbs">INGREDIENT</span>
+                      ) : null}
                       {isMine ? (
                         <span className="shrink-0 rounded-[5px] border border-emerald-400/35 px-1 py-px font-mono text-[10px] font-semibold text-way-protein">
                           <span className="md:hidden">MINE</span>
@@ -621,6 +797,16 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                       {when ? <span className="text-xs text-way-dim">{when}</span> : null}
                     </div>
                     {reason ? <span className="text-[11px] text-way-protein md:hidden">{reason}</span> : null}
+                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <button type="button" onClick={() => openEditor(food)} className="text-left text-[11px] font-semibold text-way-mute underline decoration-dotted underline-offset-4 hover:text-way-ink md:text-xs">
+                        Custom amount
+                      </button>
+                      {recipeIds.has(food.id) ? (
+                        <button type="button" onClick={() => openEditor(food)} className="text-left text-[11px] font-semibold text-way-carbs underline decoration-dotted underline-offset-4 hover:text-sky-300 md:text-xs">
+                          Ingredients
+                        </button>
+                      ) : null}
+                    </span>
                     {uses ? (
                       <span className={cx('truncate text-[11px] md:text-xs', match.missing.length ? 'text-way-kcal' : 'text-way-protein')}>{uses}</span>
                     ) : null}
@@ -823,6 +1009,18 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
           </button>
         </div>
       </div>
+      {editing ? (
+        <AmountSheet
+          open
+          onClose={() => setEditing(null)}
+          food={editing.food}
+          grams={editing.grams}
+          portion={pOf(editing.food)}
+          defaultPortion={portionOf(editing.food)}
+          loadRecipe={recipeIds.has(editing.food.id) ? loadRecipe : null}
+          onApply={applyAmount}
+        />
+      ) : null}
       {toastNode}
     </main>
   );

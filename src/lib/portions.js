@@ -40,11 +40,17 @@ const RULES = [
 const PLURAL = { glass: 'glasses', katori: 'katoris', puri: 'puris', naan: 'naans', vada: 'vadas', idli: 'idlis' };
 
 /** { unit, g } for one portion of a food. */
+// Raw ingredients are weighed, except things you naturally count.
+const COUNTABLE = new Set(['banana', 'fruit', 'egg', 'slice', 'roti', 'idli', 'biscuit']);
+
 export function portionOf(food) {
   const serving = Number(food?.serving_size_g);
   if (food?.source === 'user_calculated' && serving > 0) return { unit: 'serving', g: Math.round(serving) };
+  const ingredient = food?.isIngredient || food?.category === 'ingredient';
   const name = String(food?.name || '').toLowerCase();
-  for (const [re, unit, g] of RULES) if (re.test(name)) return { unit, g };
+  for (const [re, unit, g] of RULES) {
+    if (re.test(name)) return !ingredient || COUNTABLE.has(unit) ? { unit, g } : { unit: 'serving', g: 100 };
+  }
   return { unit: 'serving', g: 100 };
 }
 

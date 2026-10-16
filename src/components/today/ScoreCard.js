@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ChevronRight, ArrowUpRight } from 'lucide-react';
 import { Card, Eyebrow, Dot, fmt, cx } from '@/components/way/ui';
+import { LoadRingsCompact, LoadRingsWide, hasLoad } from '@/components/way/LoadRings';
 
 const EASE = 'transition-[width] duration-[900ms] ease-[cubic-bezier(.2,.8,.2,1)]';
 
@@ -30,7 +31,8 @@ function SplitBars({ split, k, className = '' }) {
  * Without Google Health there's no score: just calories and the macro split.
  * The calories and macros open the Nutrition page.
  */
-export default function ScoreCard({ d, k, connectHref, showScore = true }) {
+export default function ScoreCard({ d, k, connectHref, showScore = true, load = null }) {
+  const showLoad = showScore && hasLoad(load);
   const split = [{ label: 'Food', val: d.food, color: '#fbbf24' }];
   if (d.connected) split.push({ label: 'Activity', val: d.act, color: '#60a5fa' });
 
@@ -152,6 +154,7 @@ export default function ScoreCard({ d, k, connectHref, showScore = true }) {
           <SplitBars split={split} k={k} className="w-28 shrink-0 pb-1.5 lg:hidden" />
         </div>
         <p className="text-sm leading-[1.45] text-way-ink2 [text-wrap:pretty] lg:text-[15px] lg:leading-normal">{d.sentence}</p>
+        {showLoad ? <LoadRingsCompact load={load} className="lg:hidden" /> : null}
         <div className="lg:hidden">{nudge}</div>
         <div className="mt-auto hidden flex-col gap-3 lg:flex">
           <SplitBars split={split} k={k} />
@@ -162,6 +165,9 @@ export default function ScoreCard({ d, k, connectHref, showScore = true }) {
       <div className="h-px bg-way-line lg:h-auto" />
 
       {nutrition}
+
+      {/* Recovery · Strain · Sleep: desktop row across the card, only with data */}
+      {showLoad ? <LoadRingsWide load={load} className="-mx-7 -mb-7 hidden border-t border-way-line lg:col-span-3 lg:grid" /> : null}
     </Card>
   );
 }

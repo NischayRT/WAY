@@ -9,6 +9,7 @@ import { calculateBMR, calculateTDEE, ACTIVITY_MULTIPLIERS } from '@/lib/bmrTdee
 import { TILE_DEFS, FLOORS_GOAL } from '@/lib/daily';
 import { PAGE, PageHeader, Card, Eyebrow, Segmented, Btn, fmt, f1, useMounted, polyPoints, cx } from '@/components/way/ui';
 import { EditTilesDialog, useTileSelection, TILE_ICONS } from '@/components/way/tiles';
+import { LoadRingsCompact, LoadRingsWide, LoadTrend, hasLoad } from '@/components/way/LoadRings';
 import WeightLogDialog from '@/components/way/WeightLogDialog';
 import { useJson } from '@/components/way/useJson';
 import HealthDataNotice from '@/components/way/HealthDataNotice';
@@ -487,6 +488,9 @@ export default function ActivityClient({ userId, profile, entries, goals, google
 
   // Body Age shows only once every stat it needs is there, right under the weight chart.
   const bodyAgeReady = googleHealthConnected && !!ba.data?.eligible;
+  const loadDays = Math.min(range, 31);
+  const loadRes = useJson(googleHealthConnected ? `/api/google-health/daily-load?date=${today}&days=${loadDays}` : null);
+  const load = loadRes.data?.connected ? loadRes.data : null;
 
   // Body composition
   const compCard = (
@@ -747,6 +751,19 @@ export default function ActivityClient({ userId, profile, entries, goals, google
 
         {compCard}
         {bodyAgeReady ? bodyAgeCard : null}
+
+        {/* Recovery · Strain · Sleep: only when there's data for it */}
+        {hasLoad(load) ? (
+          <Card rise className="flex flex-col gap-4 overflow-hidden p-[18px] lg:col-span-12 lg:gap-0 lg:p-0">
+            <div className="flex items-baseline justify-between gap-3 lg:px-7 lg:pt-6">
+              <Eyebrow>Recovery · Strain · Sleep</Eyebrow>
+              <span className="font-mono text-[11px] font-medium text-way-dim">today · trend over {loadDays} days</span>
+            </div>
+            <LoadRingsCompact load={load} className="lg:hidden" />
+            <LoadRingsWide load={load} className="hidden lg:grid" />
+            <LoadTrend series={load.series} className="lg:border-t lg:border-way-line lg:px-7 lg:py-5" />
+          </Card>
+        ) : null}
 
         {/* Your stats */}
         {googleHealthConnected && !reauth ? (

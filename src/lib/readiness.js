@@ -40,7 +40,7 @@ const MIN_BASELINE = 7;
  * @param dates   sorted ascending list of all dates available
  * @returns { score, parts: { hrv, rhr, sleep }, values } | null
  */
-function readinessOn(byDay, dateStr, dates) {
+export function readinessOn(byDay, dateStr, dates) {
   const today = byDay[dateStr];
   if (!today) return null;
   const prior = dates.filter((d) => d < dateStr).slice(-BASELINE_DAYS).map((d) => byDay[d]);

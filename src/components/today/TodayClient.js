@@ -94,6 +94,7 @@ export default function TodayClient({
   // Steps, distance and active calories for the day on screen.
   const steps = useJson(googleHealth.connected ? `/api/google-health/steps?date=${selectedDate}` : null);
   const bodyAge = useJson(googleHealth.connected ? '/api/body-age' : null);
+  const load = useJson(googleHealth.connected ? `/api/google-health/daily-load?date=${selectedDate}` : null);
   const bodyAgeReady = !!(bodyAge.data?.eligible && bodyAge.data?.result);
   const health = useMemo(() => {
     const s = steps.data;
@@ -274,7 +275,7 @@ export default function TodayClient({
         {/* No Google Health: calories and macros only. With it: the Daily Score,
             and Body Age beside it once every stat it needs is available. */}
         <div className={bodyAgeReady ? 'lg:col-span-8' : 'lg:col-span-12'}>
-          <ScoreCard d={d} k={k} connectHref={connectHref()} showScore={!!googleHealth.connected} />
+          <ScoreCard d={d} k={k} connectHref={connectHref()} showScore={!!googleHealth.connected} load={load.data?.connected ? load.data : null} />
           {!googleHealth.connected ? <HealthDataNotice className="mt-2 px-1" /> : null}
         </div>
         {bodyAgeReady ? <BodyAgeCard data={bodyAge.data} className="lg:col-span-4" /> : null}

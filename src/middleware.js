@@ -92,6 +92,16 @@ export async function middleware(request) {
     return withSecurityHeaders(NextResponse.json({ error: 'Forbidden' }, { status: 403 }));
   }
 
+  // Supabase falls back to the Site URL root (/?code=...) when the return
+  // address it was given isn't on its Redirect URLs list (e.g. www vs no-www).
+  // Finish the sign-in instead of leaving the user on the landing page.
+  const { pathname: path, searchParams: params } = request.nextUrl;
+  if (path === '/' && params.has('code')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/auth/callback';
+    return withSecurityHeaders(NextResponse.redirect(url));
+  }
+
   // Next.js link prefetches skip the auth round trip. This is only a
   // performance shortcut: every protected page still checks the user itself.
   const isPrefetch =

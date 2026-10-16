@@ -1183,3 +1183,83 @@ export async function fetchBodyAgeInputs(accessToken, { to: toStr = null, window
     sourceCounts: { sleep: sleep?.length ?? null, restingHr: rhr?.length ?? null, hrv: hrv?.length ?? null, vo2: vo2?.length ?? null },
   };
 }
+
+
+/* ------------------------------------------------------------------ */
+/* Recovery · Strain · Sleep (lib/dailyLoad.js)                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Per-day inputs for Recovery, Strain and Sleep, ascending by date:
+ * [{ date, steps, fat, cardio, peak, hrv, rhr, sleepMin, wakeClock, latency }].
+ * Covers `days` days ending on `to`, plus 30 days before for the personal
+ * baselines (HRV, resting HR, sleep). Missing permissions just leave fields
+ * empty; `needsPermission` says which.
+ */
+export async function fetchDailyLoadInputs(accessToken, to, days = 1) {
+  const span = Math.max(1, Math.min(31, days));
+  const from = shiftDate(to, -(span - 1));
+  const baseFrom = shiftDate(from, -30);
+  const loadFrom = shiftDate(from, -1); // yesterday's strain feeds sleep need
+  const perm = {};
+  const guard = (key, p) =>
+    p.catch((e) => {
+      if (e.permissionDenied) perm[key] = true;
+      else console.warn(`[daily-load] ${key}:`, e.message);
+      return null;
+    });
+
+  const [steps, zones, hrv, rhr, sleep] = await Promise.all([
+    guard('activity', dailyRollupRange(accessToken, 'steps', loadFrom, to, 90, (p) => toNum(p.steps?.countSum ?? p.steps?.count))),
+    guard('activity', rollupObjectsParallel(accessToken, 'active-zone-minutes', loadFrom, to, 14)),
+    guard('metrics', listAll(accessToken, 'daily-heart-rate-variability', dailyFilter('dailyHeartRateVariability', baseFrom, to), 1000)),
+    guard('metrics', listAll(accessToken, 'daily-resting-heart-rate', dailyFilter('dailyRestingHeartRate', baseFrom, to), 1000)),
+    guard('sleep', fetchSleepRange(accessToken, baseFrom, to)),
+  ]);
+
+  const rows = new Map();
+  const put = (d, k, v) => {
+    if (!d || v == null || !Number.isFinite(v)) return;
+    rows.set(d, { ...(rows.get(d) || { date: d }), [k]: v });
+  };
+  for (const [d, v] of steps || []) put(d, 'steps', v);
+  for (const [d, o] of zones || []) {
+    let fat = 0;
+    let cardio = 0;
+    let peak = 0;
+    let any = false;
+    for (const [k, v] of Object.entries(o || {})) {
+      const n = toNum(v);
+      if (n == null) continue;
+      if (/fat/i.test(k)) (fat += n), (any = true);
+      else if (/cardio/i.test(k)) (cardio += n), (any = true);
+      else if (/peak/i.test(k)) (peak += n), (any = true);
+    }
+    if (any) {
+      put(d, 'fat', fat);
+      put(d, 'cardio', cardio);
+      put(d, 'peak', peak);
+    }
+  }
+  for (const p of hrv || []) {
+    const o = p.dailyHeartRateVariability;
+    put(dateStrOf(o?.date), 'hrv', toNum(o?.averageHeartRateVariabilityMilliseconds) ?? numberField(o, 'variability'));
+  }
+  for (const p of rhr || []) {
+    const o = p.dailyRestingHeartRate;
+    put(dateStrOf(o?.date), 'rhr', toNum(o?.beatsPerMinute));
+  }
+  const nights = new Map();
+  for (const p of sleep || []) {
+    const n = sleepNight(p.sleep);
+    if (!n.d || !n.mins) continue;
+    const prev = nights.get(n.d);
+    if (!prev || n.main || n.mins > prev.mins) nights.set(n.d, { ...n, latency: toNum(p.sleep?.summary?.minutesToFallAsleep) });
+  }
+  for (const [d, n] of nights) {
+    put(d, 'sleepMin', n.mins);
+    if (n.end != null) put(d, 'wakeClock', ((n.end % 1440) + 1440) % 1440);
+    if (n.latency != null) put(d, 'latency', n.latency);
+  }
+  return { days: [...rows.values()].sort((a, b) => (a.date < b.date ? -1 : 1)), from, to, needsPermission: perm };
+}

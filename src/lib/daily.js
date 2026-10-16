@@ -177,7 +177,12 @@ export function tileModel(key, { health = {}, extra, goals = {}, loading = false
     case 'heart': {
       const bpm = d.restingBpm ?? d.latestBpm;
       if (bpm == null && d.todayMin == null) return { state: 'empty', sub: 'No heart rate recorded' };
-      const lohi = d.todayMin != null ? `Low ${d.todayMin} · high ${d.todayMax} today` : 'No readings today yet';
+      const lohi =
+        d.todayMin != null && d.todayMax != null
+          ? `Low ${d.todayMin} · high ${d.todayMax} today`
+          : d.todayMin != null
+            ? `Low ${d.todayMin} today`
+            : 'No readings today yet';
       return {
         v: String(bpm ?? d.todayAvg ?? '—'),
         unit: d.restingBpm != null ? 'bpm resting' : 'bpm',

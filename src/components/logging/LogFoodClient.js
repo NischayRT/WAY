@@ -172,6 +172,7 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
   const [recent, setRecent] = useState([]);
   const [nonce, setNonce] = useState(0);
   const [units, setUnits] = useLocalPref('way.logfood.units', 'portions');
+  const [kind, setKind] = useLocalPref('way.logfood.kind', 'all'); // all | recipes | ingredients
   const [ingredients, setIngredients] = useState([]);
   const [myPortions, setMyPortions] = useState(() => new Map()); // food id -> { unit, g }
   const [recipeIds, setRecipeIds] = useState(() => new Set()); // foods that have an ingredient list
@@ -388,7 +389,10 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
 
   const qty = (food, n) => (grams ? `${fmt(pOf(food).g * n)} g` : portionLabel(food, n));
   const ql = q.trim().toLowerCase();
-  const results = useMemo(() => {
+  // Raw ingredients (searched from the ingredient list, or already logged once) vs dishes/recipes.
+  const isIng = (f) => !!(f.isIngredient || f.category === 'ingredient');
+  const kindOk = (f) => kind === 'all' || (kind === 'ingredients' ? isIng(f) : !isIng(f));
+  const allResults = useMemo(() => {
     if (!ql) return [];
     const starts = [];
     const contains = [];
@@ -396,7 +400,7 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
       const nm = f.name.toLowerCase();
       if (nm.startsWith(ql)) starts.push(f);
       else if (nm.includes(ql)) contains.push(f);
-      if (starts.length >= MAX_RESULTS) break;
+      if (starts.length >= MAX_RESULTS * 3) break;
     }
     const names = new Set(foods.map((f) => f.name.toLowerCase()));
     const ingStarts = [];
@@ -407,8 +411,13 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
       if (nm.startsWith(ql)) ingStarts.push(ingredientAsFood(i));
       else if (nm.includes(ql)) ingContains.push(ingredientAsFood(i));
     }
-    return [...starts, ...ingStarts, ...contains, ...ingContains].slice(0, MAX_RESULTS);
+    return [...starts, ...ingStarts, ...contains, ...ingContains];
   }, [foods, ingredients, ql]);
+  const results = useMemo(() => allResults.filter(kindOk).slice(0, MAX_RESULTS), [allResults, kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  const kindCounts = useMemo(() => {
+    const ing = allResults.filter(isIng).length;
+    return { all: allResults.length, ingredients: ing, recipes: allResults.length - ing };
+  }, [allResults]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lists = {
     suggested: suggested.map((f) => ({ food: f })),
@@ -416,7 +425,7 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
     mine: mine.map((f) => ({ food: f })),
     cook: haveKey && dishRes.key === haveKey ? dishRes.matches.map((m) => ({ food: byId.get(m.food.id) || m.food, match: m })) : [],
   };
-  const items = ql ? results.map((f) => ({ food: f })) : lists[tab];
+  const items = ql ? results.map((f) => ({ food: f })) : lists[tab].filter((x) => kindOk(x.food));
 
   const tot = tray.reduce(
     (a, t) => {
@@ -482,7 +491,8 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
           : 'No dishes use these yet. Try adding more ingredients.',
   };
   const blurb = ql ? (items.length ? `${items.length}${items.length >= MAX_RESULTS ? '+' : ''} match${items.length === 1 ? '' : 'es'} for “${q.trim()}”` : '') : blurbs[tab];
-  const empty = !!ql && items.length === 0 && foods.length > 0;
+  const hiddenByKind = !!ql && items.length === 0 && kind !== 'all' && kindCounts.all > 0;
+  const empty = !!ql && items.length === 0 && foods.length > 0 && !hiddenByKind;
   const recipeHref = ql && !items.length ? `/log-food/recipe?name=${encodeURIComponent(q.trim())}` : '/log-food/recipe';
   const recipeCta = ql && !items.length ? `Build “${q.trim()}” as a recipe` : 'Build a custom recipe';
 
@@ -708,7 +718,19 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                 </Link>
               </div>
             ) : null}
-            <span className="px-0.5 text-xs leading-normal text-way-mute [text-wrap:pretty] md:text-[13px]">{blurb}</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="min-w-0 flex-1 px-0.5 text-xs leading-normal text-way-mute [text-wrap:pretty] md:text-[13px]">{blurb}</span>
+              <Segmented
+                size="sm"
+                value={kind}
+                onChange={setKind}
+                options={[
+                  { value: 'all', label: ql ? `All ${kindCounts.all > MAX_RESULTS ? `${MAX_RESULTS}+` : kindCounts.all}` : 'All' },
+                  { value: 'recipes', label: ql ? `Recipes ${kindCounts.recipes}` : 'Recipes' },
+                  { value: 'ingredients', label: ql ? `Ingredients ${kindCounts.ingredients}` : 'Ingredients' },
+                ]}
+              />
+            </div>
           </div>
 
           {!ql && tab === 'cook' ? <IngredientPicker supabase={supabase} chosen={have} onChange={setHave} /> : null}
@@ -834,6 +856,16 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                         : 'No dishes use these yet.'
                     : 'Nothing here yet.'}
               </p>
+            ) : null}
+            {hiddenByKind ? (
+              <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
+                <span className="text-sm text-way-ink2">
+                  No {kind === 'ingredients' ? 'ingredients' : 'recipes'} match “{q.trim()}”.
+                </span>
+                <button type="button" onClick={() => setKind('all')} className="rounded-[10px] border border-way-line2 px-3.5 py-2 text-[13px] font-semibold text-way-ink2 hover:bg-way-hover">
+                  Show all {kindCounts.all} results
+                </button>
+              </div>
             ) : null}
             {empty ? (
               <div className="flex flex-col items-center gap-1.5 px-4 py-[22px] text-center md:gap-2 md:px-5 md:py-10">

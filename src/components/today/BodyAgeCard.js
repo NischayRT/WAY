@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, TrendingDown, TrendingUp } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Circle, Lock, TrendingDown, TrendingUp } from 'lucide-react';
 import { Card, Eyebrow, cx } from '@/components/way/ui';
 
 const SPAN = 10; // years either side shown on the dial
@@ -145,6 +145,69 @@ export default function BodyAgeCard({ data, className = '', delay = 80 }) {
           </div>
         ))}
       </div>
+    </Card>
+  );
+}
+
+const lockedActions = (returnTo) => ({
+  'allow-sleep': { href: `/api/google-health/connect?returnTo=${encodeURIComponent(returnTo)}&extra=sleep`, text: 'Allow sleep' },
+  measurements: { href: '/body', text: 'Add measurements' },
+  profile: { href: '/settings', text: 'Complete profile' },
+});
+
+/**
+ * Body Age while it's still locked: what it needs and how far along each
+ * input is, so the card is never just missing. `data` = /api/body-age reply.
+ */
+export function BodyAgeLocked({ data, returnTo = '/activity', id, className = '', delay = 80 }) {
+  const reqs = data?.requirements || [];
+  if (!reqs.length) return null;
+  const met = reqs.filter((r) => r.met).length;
+  const actions = lockedActions(returnTo);
+  return (
+    <Card id={id} rise delay={delay} className={cx('flex scroll-mt-6 flex-col gap-4 p-[18px] lg:p-7', className)}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2">
+          <Lock size={13} className="text-way-faint" />
+          <Eyebrow>Body age</Eyebrow>
+        </span>
+        <span className="font-mono text-[11px] font-medium text-way-dim">
+          {met}/{reqs.length} ready{data.window?.days ? ` · ${data.window.days} days` : ''}
+        </span>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm text-way-ink2 [text-wrap:pretty]">Unlocks once every input below is in. It updates on its own as your watch syncs.</span>
+        <div className="h-1.5 overflow-hidden rounded-full bg-way-line">
+          <div className="h-full rounded-full bg-way-gold transition-[width] duration-700" style={{ width: `${(met / reqs.length) * 100}%` }} />
+        </div>
+      </div>
+      <ul className="grid gap-x-8 gap-y-2.5 md:grid-cols-2">
+        {reqs.map((r) => {
+          const a = !r.met && r.action ? actions[r.action] : null;
+          return (
+            <li key={r.key} className="flex items-start gap-2.5 text-[13px]">
+              {r.met ? (
+                <CheckCircle2 size={16} className="mt-px shrink-0 text-emerald-400" />
+              ) : (
+                <Circle size={16} className="mt-px shrink-0 text-way-faint" />
+              )}
+              <span className={cx('min-w-0 flex-1 leading-snug [text-wrap:pretty]', r.met ? 'text-way-mute' : 'text-way-ink2')}>{r.label}</span>
+              {!r.met && r.need > 1 ? (
+                <span className="shrink-0 font-mono text-[12px] text-way-dim">
+                  {r.have}/{r.need}
+                </span>
+              ) : null}
+              {a ? (
+                <a href={a.href} className="shrink-0 text-[12px] font-semibold text-way-gold underline underline-offset-2">
+                  {a.text}
+                </a>
+              ) : null}
+              {!r.met && r.action === 'read-error' ? <span className="shrink-0 text-[12px] font-semibold text-rose-300">Couldn’t read</span> : null}
+              {!r.met && r.action === 'sleep-blocked' ? <span className="shrink-0 text-[12px] font-semibold text-amber-300">Blocked by Google</span> : null}
+            </li>
+          );
+        })}
+      </ul>
     </Card>
   );
 }

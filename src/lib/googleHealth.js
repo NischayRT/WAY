@@ -431,9 +431,11 @@ function statsOf(obj) {
   for (const [k, v] of Object.entries(obj || {})) {
     const n = toNum(v);
     if (n === null) continue;
-    const key = k.toLowerCase();
-    if (key.includes('min')) out.min = n;
-    else if (key.includes('max')) out.max = n;
+    // Drop "PerMinute" first: "beatsPerMinuteMax" contains "min", which put
+    // the day's high into `min` and left `max` empty ("high null").
+    const key = k.toLowerCase().replace(/perminute/g, '');
+    if (key.includes('max')) out.max = n;
+    else if (/min(?!ute)/.test(key)) out.min = n;
     else if (key.includes('avg') || key.includes('average') || key.includes('mean')) out.avg = n;
     else if (key.includes('count') || key.includes('sum')) out.sum = n;
   }
@@ -613,12 +615,10 @@ async function floorsTile(accessToken, dateStr) {
 
 /** Main sleep that ENDED on dateStr (i.e. last night, for today). */
 async function sleepTile(accessToken, dateStr) {
-  const points = await listPoints(
-    accessToken,
-    'sleep',
-    `sleep.interval.civil_end_time >= "${dateStr}" AND sleep.interval.civil_end_time < "${shiftDate(dateStr, 1)}"`,
-    25
-  );
+  // Same reader as Recovery/Sleep (reconcile first): a plain list of sleep is
+  // refused with 403 on some accounts even with sleep allowed, which showed
+  // "Allow WAY to read this" while the Sleep ring had last night's data.
+  const points = await fetchSleepRange(accessToken, dateStr, dateStr);
   const sessions = points.map((p) => p.sleep).filter(Boolean);
   if (!sessions.length) return { minutesAsleep: null };
   const main =
@@ -727,13 +727,18 @@ async function listAll(accessToken, dataType, filter, pageSize, maxPages = 20, e
 async function fetchSleepRange(accessToken, from, to) {
   const filterFor = (a, b) => `sleep.interval.civil_end_time >= "${a}" AND sleep.interval.civil_end_time < "${shiftDate(b, 1)}"`;
   const errors = [];
+  // A 403 only means "no sleep permission" if nothing has read sleep yet: some
+  // accounts may reconcile but not list, so a night with no sleep (reconcile
+  // → 0 points, list → 403) must stay "no data", not "allow access".
+  let readOk = false;
   const attempt = async (label, fn) => {
     try {
       const pts = await fn();
+      readOk = true;
       if (pts.length) return pts;
       errors.push(`${label}: 0 points`);
     } catch (e) {
-      if (e.permissionDenied) throw e;
+      if (e.permissionDenied && !readOk) throw e;
       errors.push(`${label}: ${e.message}`);
     }
     return null;
@@ -1043,6 +1048,13 @@ export async function fetchBodyAgeInputs(accessToken, { to: toStr = null, window
     }
     if (any) zoneDays.push({ d, mod, vig });
   }
+  // A day with no Active Zone Minutes comes back with no zone fields at all
+  // rather than zeros, so worn days (500+ steps) without an entry are 0 min.
+  if (zones) {
+    const seen = new Set(zoneDays.map((r) => r.d));
+    for (const [d] of stepDays) if (!seen.has(d)) zoneDays.push({ d, mod: 0, vig: 0 });
+    zoneDays.sort((x, y) => (x.d < y.d ? -1 : 1));
+  }
   const rhrRows = (rhr || [])
     .map((p) => ({ d: dateStrOf(p.dailyRestingHeartRate?.date), v: toNum(p.dailyRestingHeartRate?.beatsPerMinute) }))
     .filter((r) => r.d && r.v);
@@ -1239,6 +1251,14 @@ export async function fetchDailyLoadInputs(accessToken, to, days = 1) {
       put(d, 'fat', fat);
       put(d, 'cardio', cardio);
       put(d, 'peak', peak);
+    }
+  }
+  // No Active Zone Minutes that day = no zone fields at all (not zeros). If the
+  // zone read worked and the watch logged steps, that's 0 minutes in zones, so
+  // Strain still shows (it was missing on most quiet days).
+  if (zones) {
+    for (const r of rows.values()) {
+      if (r.steps > 0 && r.fat == null && r.cardio == null && r.peak == null) Object.assign(r, { fat: 0, cardio: 0, peak: 0 });
     }
   }
   for (const p of hrv || []) {

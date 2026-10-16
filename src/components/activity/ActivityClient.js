@@ -13,6 +13,7 @@ import { LoadRingsCompact, LoadRingsWide, LoadTrend, hasLoad } from '@/component
 import WeightLogDialog from '@/components/way/WeightLogDialog';
 import { useJson } from '@/components/way/useJson';
 import HealthDataNotice from '@/components/way/HealthDataNotice';
+import { BodyAgeLocked } from '@/components/today/BodyAgeCard';
 
 const RANGES = [
   ['7D', 7],
@@ -750,7 +751,11 @@ export default function ActivityClient({ userId, profile, entries, goals, google
         </Card>
 
         {compCard}
-        {bodyAgeReady ? bodyAgeCard : null}
+        {bodyAgeReady ? (
+          bodyAgeCard
+        ) : googleHealthConnected && ba.data?.connected && ba.data.eligible === false ? (
+          <BodyAgeLocked id="body-age" data={ba.data} returnTo="/activity" className="lg:col-span-12" />
+        ) : null}
 
         {/* Recovery · Strain · Sleep: only when there's data for it */}
         {hasLoad(load) ? (

@@ -9,7 +9,25 @@ import { buildAuthUrl, OPTIONAL_SCOPES } from '@/lib/googleHealth';
 const ALLOWED_RETURN_TO = ['/settings', '/home', '/activity'];
 
 export async function GET(request) {
-  const { origin, searchParams } = new URL(request.url);
+  const { origin, searchParams, host } = new URL(request.url);
+
+  // The OAuth state cookie must be set on the same host Google sends the user
+  // back to (GOOGLE_HEALTH_REDIRECT_URI). If the user is on the other host
+  // (www vs no-www, or the old vercel.app address), restart the flow there;
+  // otherwise the callback can't find the cookie and the connect fails.
+  try {
+    const callbackHost = new URL(process.env.GOOGLE_HEALTH_REDIRECT_URI).host;
+    const forwardedHost = request.headers.get('x-forwarded-host') || host;
+    if (callbackHost && forwardedHost !== callbackHost && !forwardedHost.startsWith('localhost')) {
+      const target = new URL(request.url);
+      target.host = callbackHost;
+      target.protocol = 'https:';
+      target.port = '';
+      return NextResponse.redirect(target.toString());
+    }
+  } catch {
+    // GOOGLE_HEALTH_REDIRECT_URI missing or invalid: carry on as before
+  }
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },

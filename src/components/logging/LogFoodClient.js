@@ -632,17 +632,17 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
         </div>
         <div className="flex items-center gap-3">
           <Segmented
-            className="hidden md:flex"
+            className="hidden lg:flex"
             value={meal}
             onChange={setMeal}
             options={MEALS.map((m) => ({ value: m.key, label: m.label, icon: m.Icon }))}
           />
-          <div className="md:hidden">{dayPicker(false)}</div>
-          <div className="hidden md:block">{dayPicker(true)}</div>
+          <div className="lg:hidden">{dayPicker(false)}</div>
+          <div className="hidden lg:block">{dayPicker(true)}</div>
         </div>
       </header>
 
-      <div className="grid grid-cols-4 gap-1 rounded-[14px] border border-way-line bg-way-card p-1 md:hidden">
+      <div className="grid grid-cols-4 gap-1 rounded-[14px] border border-way-line bg-way-card p-1 lg:hidden">
         {MEALS.map((m) => (
           <button
             key={m.key}

@@ -545,7 +545,7 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   return (
     <main className={PAGE}>
       {/* Player card */}
-      <Card className="way-rise relative flex flex-col gap-4 overflow-hidden p-4 md:flex-row md:items-center md:gap-6 md:p-6">
+      <Card className="way-rise relative flex flex-col gap-4 overflow-hidden p-4 md:p-6 lg:flex-row lg:items-center lg:gap-6">
         <div className="pointer-events-none absolute -left-16 -top-24 h-[260px] w-[260px] rounded-full bg-[radial-gradient(circle,rgba(52,211,153,.12),rgba(52,211,153,0)_70%)]" />
         <div className="relative flex items-center gap-3.5 md:gap-5">
           <div
@@ -556,8 +556,8 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
             <Avatar person={m.me} isMe size={70} className="hidden md:flex" ring="0 0 0 4px #0f1420" />
           </div>
           <div className="flex min-w-0 flex-col gap-1">
-            <div className="flex items-baseline gap-2">
-              <span className="font-heading text-[22px] font-bold leading-none md:text-[28px]">@{m.me.username}</span>
+            <div className="flex min-w-0 items-baseline gap-2">
+              <span className="truncate font-heading text-[22px] font-bold leading-none md:text-[28px]">@{m.me.username}</span>
               <span className="rounded-md border border-way-line2 px-1.5 py-px font-mono text-[11px] font-semibold text-way-ink2">LV {lv.level}</span>
             </div>
             <span className="font-heading text-[11px] font-bold tracking-[0.14em] text-way-protein">{lv.title}</span>
@@ -565,7 +565,7 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
               <div className="h-1.5 w-[140px] overflow-hidden rounded-full bg-way-track md:w-[200px]">
                 <div className="h-full rounded-full bg-way-protein transition-[width] duration-[900ms]" style={{ width: `${lv.pct * k}%` }} />
               </div>
-              <span className="font-mono text-[11px] text-way-dim">{lv.into} / 1000 XP</span>
+              <span className="whitespace-nowrap font-mono text-[11px] text-way-dim">{lv.into} / 1000 XP</span>
             </div>
           </div>
         </div>
@@ -580,12 +580,12 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
             </div>
           ))}
         </div>
-        <div className="relative flex gap-2 md:ml-auto">
-          <Btn variant="outline" onClick={onUpdate} disabled={d.syncing} className="flex-1 md:flex-none" title="Push your latest numbers to friends">
+        <div className="relative flex gap-2 md:self-start lg:ml-auto lg:self-auto">
+          <Btn variant="outline" onClick={onUpdate} disabled={d.syncing} className="flex-1 md:flex-none md:px-5" title="Push your latest numbers to friends">
             <RefreshCw size={14} className={d.syncing ? 'animate-spin' : ''} />
             {d.syncing ? 'Updating…' : 'Update'}
           </Btn>
-          <Btn variant="primary" onClick={add} className="flex-1 md:flex-none">
+          <Btn variant="primary" onClick={add} className="flex-1 md:flex-none md:px-5">
             <UserPlus size={14} />
             Add someone
           </Btn>
@@ -620,7 +620,7 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
             );
           })}
         </nav>
-        <span className="hidden pb-3 font-mono text-[11px] font-medium text-way-dim md:block">{m.season.label}</span>
+        <span className="hidden whitespace-nowrap pb-3 font-mono text-[11px] font-medium text-way-dim lg:block">{m.season.label}</span>
       </div>
 
       <div key={tab} className="way-rise">

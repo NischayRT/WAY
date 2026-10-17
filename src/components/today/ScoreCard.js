@@ -131,8 +131,8 @@ export default function ScoreCard({ d, k, connectHref, showScore = true, load = 
       {/* Score */}
       <div className="flex flex-col gap-[18px] lg:gap-4">
         <div className="flex items-end justify-between gap-3 lg:block">
-          <div className="flex flex-col gap-1.5 lg:gap-4">
-            <div className="flex items-center gap-1.5 whitespace-nowrap lg:gap-2">
+          <div className="flex min-w-0 flex-col gap-1.5 lg:gap-4">
+            <div className="flex flex-wrap items-center gap-1.5 lg:gap-2">
               <Eyebrow>Daily score</Eyebrow>
               <span
                 className="whitespace-nowrap rounded-full border px-[7px] py-0.5 font-mono text-[10px] font-semibold"
@@ -151,7 +151,7 @@ export default function ScoreCard({ d, k, connectHref, showScore = true, load = 
               <span className="font-mono text-xs font-medium text-way-dim lg:text-[13px]">/100</span>
             </div>
           </div>
-          <SplitBars split={split} k={k} className="w-28 shrink-0 pb-1.5 lg:hidden" />
+          <SplitBars split={split} k={k} className="w-[38%] min-w-0 max-w-28 shrink-0 pb-1.5 lg:hidden" />
         </div>
         <p className="text-sm leading-[1.45] text-way-ink2 [text-wrap:pretty] lg:text-[15px] lg:leading-normal">{d.sentence}</p>
         {showLoad ? <LoadRingsCompact load={load} className="lg:hidden" /> : null}

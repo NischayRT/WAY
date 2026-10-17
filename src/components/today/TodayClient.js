@@ -28,7 +28,7 @@ function WeekStrip({ days, selectedDate, onSelect, variant }) {
     <div
       className={cx(
         'gap-1 rounded-2xl border border-way-line bg-way-card p-1',
-        desktop ? 'hidden rounded-[14px] md:flex' : 'grid grid-cols-7 md:hidden'
+        desktop ? 'hidden rounded-[14px] lg:flex' : 'grid grid-cols-7 lg:hidden'
       )}
     >
       {days.map((day) => {

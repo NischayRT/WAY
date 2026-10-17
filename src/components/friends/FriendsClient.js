@@ -545,50 +545,54 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   return (
     <main className={PAGE}>
       {/* Player card */}
-      <Card className="way-rise relative flex flex-col gap-4 overflow-hidden p-4 md:p-6 lg:flex-row lg:items-center lg:gap-6">
+      <Card className="way-rise relative flex flex-col gap-4 overflow-hidden p-4 md:gap-5 md:p-6">
         <div className="pointer-events-none absolute -left-16 -top-24 h-[260px] w-[260px] rounded-full bg-[radial-gradient(circle,rgba(52,211,153,.12),rgba(52,211,153,0)_70%)]" />
-        <div className="relative flex items-center gap-3.5 md:gap-5">
-          <div
-            className="flex h-[68px] w-[68px] shrink-0 items-center justify-center rounded-full md:h-[84px] md:w-[84px]"
-            style={{ background: `conic-gradient(#34d399 ${lv.pct * 3.6 * k}deg, #1a2130 0)`, transition: 'background 900ms' }}
-          >
-            <Avatar person={m.me} isMe size={56} className="md:hidden" ring="0 0 0 3px #0f1420" />
-            <Avatar person={m.me} isMe size={70} className="hidden md:flex" ring="0 0 0 4px #0f1420" />
-          </div>
-          <div className="flex min-w-0 flex-col gap-1">
-            <div className="flex min-w-0 items-baseline gap-2">
-              <span className="truncate font-heading text-[22px] font-bold leading-none md:text-[28px]">@{m.me.username}</span>
-              <span className="rounded-md border border-way-line2 px-1.5 py-px font-mono text-[11px] font-semibold text-way-ink2">LV {lv.level}</span>
+        {/* Name + level, with the actions beside it from 1024px */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-6">
+          <div className="relative flex min-w-0 items-center gap-3.5 md:gap-5">
+            <div
+              className="flex h-[68px] w-[68px] shrink-0 items-center justify-center rounded-full md:h-[84px] md:w-[84px]"
+              style={{ background: `conic-gradient(#34d399 ${lv.pct * 3.6 * k}deg, #1a2130 0)`, transition: 'background 900ms' }}
+            >
+              <Avatar person={m.me} isMe size={56} className="md:hidden" ring="0 0 0 3px #0f1420" />
+              <Avatar person={m.me} isMe size={70} className="hidden md:flex" ring="0 0 0 4px #0f1420" />
             </div>
-            <span className="font-heading text-[11px] font-bold tracking-[0.14em] text-way-protein">{lv.title}</span>
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-[140px] overflow-hidden rounded-full bg-way-track md:w-[200px]">
-                <div className="h-full rounded-full bg-way-protein transition-[width] duration-[900ms]" style={{ width: `${lv.pct * k}%` }} />
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex min-w-0 items-baseline gap-2">
+                <span className="truncate font-heading text-[22px] font-bold leading-none md:text-[28px]">@{m.me.username}</span>
+                <span className="rounded-md border border-way-line2 px-1.5 py-px font-mono text-[11px] font-semibold text-way-ink2">LV {lv.level}</span>
               </div>
-              <span className="whitespace-nowrap font-mono text-[11px] text-way-dim">{lv.into} / 1000 XP</span>
+              <span className="font-heading text-[11px] font-bold tracking-[0.14em] text-way-protein">{lv.title}</span>
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 w-[140px] overflow-hidden rounded-full bg-way-track md:w-[200px]">
+                  <div className="h-full rounded-full bg-way-protein transition-[width] duration-[900ms]" style={{ width: `${lv.pct * k}%` }} />
+                </div>
+                <span className="whitespace-nowrap font-mono text-[11px] text-way-dim">{lv.into} / 1000 XP</span>
+              </div>
             </div>
+          </div>
+          <div className="relative flex shrink-0 gap-2 lg:ml-auto">
+            <Btn variant="outline" onClick={onUpdate} disabled={d.syncing} className="flex-1 md:flex-none md:px-5" title="Push your latest numbers to friends">
+              <RefreshCw size={14} className={d.syncing ? 'animate-spin' : ''} />
+              {d.syncing ? 'Updating…' : 'Update'}
+            </Btn>
+            <Btn variant="primary" onClick={add} className="flex-1 md:flex-none md:px-5">
+              <UserPlus size={14} />
+              Add someone
+            </Btn>
           </div>
         </div>
-        <div className="relative hidden flex-1 justify-center gap-3 lg:flex">
+        {/* Stats: their own row so they never squeeze the name or buttons */}
+        <div className="relative hidden gap-3 md:grid md:grid-cols-2 lg:grid-cols-4">
           {chips.map((c) => (
-            <div key={c.label} className="flex items-center gap-2.5 rounded-2xl border border-way-line bg-way-rail px-3.5 py-2.5">
-              <c.Icon size={16} style={{ color: c.c }} />
-              <div className="flex flex-col">
-                <span className="text-[11px] text-way-dim">{c.label}</span>
-                <span className="font-mono text-sm font-semibold">{c.v}</span>
+            <div key={c.label} className="flex min-w-0 items-center gap-3 rounded-2xl border border-way-line bg-way-rail px-4 py-3">
+              <c.Icon size={16} className="shrink-0" style={{ color: c.c }} />
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="truncate text-[11px] text-way-dim">{c.label}</span>
+                <span className="truncate whitespace-nowrap font-mono text-sm font-semibold">{c.v}</span>
               </div>
             </div>
           ))}
-        </div>
-        <div className="relative flex gap-2 md:self-start lg:ml-auto lg:self-auto">
-          <Btn variant="outline" onClick={onUpdate} disabled={d.syncing} className="flex-1 md:flex-none md:px-5" title="Push your latest numbers to friends">
-            <RefreshCw size={14} className={d.syncing ? 'animate-spin' : ''} />
-            {d.syncing ? 'Updating…' : 'Update'}
-          </Btn>
-          <Btn variant="primary" onClick={add} className="flex-1 md:flex-none md:px-5">
-            <UserPlus size={14} />
-            Add someone
-          </Btn>
         </div>
       </Card>
 

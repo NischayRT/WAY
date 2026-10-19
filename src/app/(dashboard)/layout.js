@@ -22,7 +22,7 @@ export default async function DashboardLayout({ children }) {
   }
 
   return (
-    <div className="dark min-h-screen bg-way-page text-way-ink [color-scheme:dark] md:pl-[76px]">
+    <div className="way-app dark min-h-screen overflow-x-clip bg-way-page text-way-ink [color-scheme:dark] md:pl-[76px]">
       {children}
       <WayNav initial={initial} />
     </div>

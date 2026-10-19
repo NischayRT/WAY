@@ -170,6 +170,20 @@ html.dark {
   margin: 0;
 }
 
+/* Nothing may widen the page sideways (iOS then zooms the whole page out and
+   shows a strip beside it). clip, unlike hidden, keeps position: sticky working. */
+html,
+body {
+  overflow-x: clip;
+}
+/* The signed-in app is dark only: paint the page behind it dark too, so any
+   overscroll or rounding gap never flashes the light default. */
+html:has(.way-app),
+html:has(.way-app) body {
+  background-color: #090d16;
+  color-scheme: dark;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);

@@ -236,26 +236,31 @@ export default function TodayClient({
         </div>
         <div className="flex items-center gap-3">
           <WeekStrip days={week} selectedDate={selectedDate} onSelect={handleSelectDate} variant="desktop" />
-          <button
-            type="button"
-            aria-label="Pick a date"
-            title="Pick a date"
-            onClick={() => (dateInput.current?.showPicker ? dateInput.current.showPicker() : dateInput.current?.click())}
-            className="relative hidden h-[42px] w-[42px] items-center justify-center rounded-xl border border-way-line bg-way-card text-way-mute transition-colors hover:text-way-ink md:flex"
-          >
-            <Calendar size={17} />
-          </button>
-          <input
-            ref={dateInput}
-            type="date"
-            aria-hidden="true"
-            tabIndex={-1}
-            min={minDate}
-            max={today}
-            value={selectedDate}
-            onChange={(e) => handleSelectDate(e.target.value)}
-            className="pointer-events-none absolute h-0 w-0 opacity-0"
-          />
+          {/* The native picker sits under the button, inside it. iOS gives date
+              inputs a built-in minimum width (w-0 is ignored), so the old
+              free-floating hidden input made the page wider than the phone. */}
+          <div className="relative hidden md:flex">
+            <button
+              type="button"
+              aria-label="Pick a date"
+              title="Pick a date"
+              onClick={() => (dateInput.current?.showPicker ? dateInput.current.showPicker() : dateInput.current?.click())}
+              className="relative z-[1] flex h-[42px] w-[42px] items-center justify-center rounded-xl border border-way-line bg-way-card text-way-mute transition-colors hover:text-way-ink"
+            >
+              <Calendar size={17} />
+            </button>
+            <input
+              ref={dateInput}
+              type="date"
+              aria-hidden="true"
+              tabIndex={-1}
+              min={minDate}
+              max={today}
+              value={selectedDate}
+              onChange={(e) => handleSelectDate(e.target.value)}
+              className="pointer-events-none absolute inset-0 h-full w-full min-w-0 appearance-none opacity-0"
+            />
+          </div>
           <Link
             href="/settings"
             aria-label="Settings"

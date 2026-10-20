@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { getAuthUser } from '@/lib/authServer';
 
 // Routes that must NOT trigger the profile-completeness redirect below:
 // where an incomplete-profile user is supposed to land (/onboarding), pages
@@ -133,18 +134,22 @@ export async function middleware(request) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   const { pathname } = request.nextUrl;
   const isExempt = PROFILE_CHECK_EXEMPT_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   // Signed-in user with no profile row yet goes to /onboarding before any
-  // protected page renders.
-  if (user && !isExempt) {
+  // protected page renders. Once a profile is found it is remembered in a
+  // small cookie (tied to the user id), so later requests skip the database
+  // round trip. API routes check auth themselves and never redirect here.
+  const isApi = pathname.startsWith('/api/');
+  const knownProfile = user && request.cookies.get(PROFILE_OK_COOKIE)?.value === user.id;
+  if (user && !isExempt && !isApi && !knownProfile) {
     const { data: profile } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
-    if (!profile) {
+    if (profile) {
+      response.cookies.set(PROFILE_OK_COOKIE, user.id, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30 });
+    } else {
       const redirect = NextResponse.redirect(new URL('/onboarding', request.url));
       // Keep any refreshed auth cookies on the redirect too.
       response.cookies.getAll().forEach((c) => redirect.cookies.set(c));
@@ -154,6 +159,8 @@ export async function middleware(request) {
 
   return withSecurityHeaders(response);
 }
+
+const PROFILE_OK_COOKIE = 'way_profile_ok';
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico|models/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|glb|woff2)$).*)'],

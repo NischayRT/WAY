@@ -5,12 +5,11 @@ import { MEAL_CATEGORIES } from '@/lib/mealCategories';
 
 const MEAL_TYPES = MEAL_CATEGORIES.map((c) => c.value);
 import { syncFoodLogs } from '@/lib/googleHealthSync';
+import { getAuthUser } from '@/lib/authServer';
 
 export async function POST(request) {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -73,4 +72,4 @@ export async function POST(request) {
   }
 
   return NextResponse.json({ success: true, count: newRows.length });
-}
+}

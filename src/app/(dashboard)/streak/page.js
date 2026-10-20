@@ -3,14 +3,13 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { todayLocalDate } from '@/lib/dateUtils';
 import { loadLoginStreak, loadStreak, recordVisit } from '@/lib/streak';
 import StreakClient from '@/components/streak/StreakClient';
+import { getAuthUser } from '@/lib/authServer';
 
 export const dynamic = 'force-dynamic';
 
 export default async function StreakPage() {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) redirect('/login');
 
   const today = todayLocalDate();

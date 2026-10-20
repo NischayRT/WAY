@@ -1,22 +1,35 @@
 'use client';
 
+import { useMemo } from 'react';
 import * as THREE from 'three';
 
-// The goal/current cut: a thin flat slice through the body at the split
-// height, a faint glass fill with a crisp border. Bodies are drawn 2.0 units
-// tall; the slice is wide enough for outstretched arms, shallow front to back.
-const PLANE = new THREE.PlaneGeometry(1.7, 0.62);
-const EDGES = new THREE.EdgesGeometry(PLANE);
+// The goal/current cut: a flat, borderless slice through the body at the
+// split height. It is much wider than the stage and fades out radially, so
+// it reads as an endless plane with no visible edge.
+const SIZE = 7;
+
+function fadeTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.18, 'rgba(255,255,255,0.75)');
+  grad.addColorStop(0.45, 'rgba(255,255,255,0.22)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 256, 256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
 export default function SplitSlice({ y, x = 0 }) {
+  const alphaMap = useMemo(() => fadeTexture(), []);
   return (
-    <group position={[x, y, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <mesh geometry={PLANE} renderOrder={2}>
-        <meshBasicMaterial color="#34d399" transparent opacity={0.14} side={THREE.DoubleSide} depthWrite={false} />
-      </mesh>
-      <lineSegments geometry={EDGES} renderOrder={3}>
-        <lineBasicMaterial color="#6ee7b7" transparent opacity={0.95} />
-      </lineSegments>
-    </group>
+    <mesh position={[x, y, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={2}>
+      <planeGeometry args={[SIZE, SIZE]} />
+      <meshBasicMaterial color="#34d399" alphaMap={alphaMap} transparent opacity={0.32} side={THREE.DoubleSide} depthWrite={false} />
+    </mesh>
   );
 }

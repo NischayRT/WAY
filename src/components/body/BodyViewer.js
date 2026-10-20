@@ -13,6 +13,8 @@ import SplitSlice from './SplitSlice';
 const STAGE_Y = -1;
 const TOP = 1;
 const H = 2;
+// Side by side: each body's arms reach ~0.72 from its centre, so this leaves a clear gap.
+const SIDE_X = 0.9;
 
 function Tag({ y, tone, children }) {
   const goal = tone === 'goal';
@@ -51,13 +53,16 @@ function Stage({ currentData, targetData, mode, progress, sway, yaw, dragging })
   // three.js objects are mutable by design: the cut planes and the bodies'
   // rotation are moved every frame, outside React's render.
   /* eslint-disable react-hooks/immutability */
-  useFrame(({ clock, camera }) => {
+  useFrame(({ clock, camera, size }) => {
     keepAbove.constant = side ? 1e3 : -splitY;
     keepBelow.constant = side ? 1e3 : splitY;
     const rot = yaw.current + (sway && !dragging.current ? Math.sin(clock.elapsedTime * 0.7) * 0.55 : 0);
     if (goalRef.current) goalRef.current.rotation.y = rot;
     if (curRef.current) curRef.current.rotation.y = rot;
-    const z = side ? 5.1 : 4.45;
+    // Side by side: pull back until both bodies (about 3.4 units wide with
+    // the gap) fit the canvas width, and never closer than a comfortable view.
+    const fit = 1.75 / (Math.tan((camera.fov * Math.PI) / 360) * Math.max(0.3, size.width / Math.max(1, size.height)));
+    const z = side ? Math.max(6, fit) : 4.45;
     if (Math.abs(camera.position.z - z) > 0.001) {
       camera.position.z += (z - camera.position.z) * 0.15;
       camera.updateProjectionMatrix();
@@ -69,7 +74,7 @@ function Stage({ currentData, targetData, mode, progress, sway, yaw, dragging })
     <>
       <group position={[0, STAGE_Y, 0]}>
         {targetData ? (
-          <group position={[side ? 0.5 : 0, 0, 0]}>
+          <group position={[side ? SIDE_X : 0, 0, 0]}>
             <group ref={goalRef}>
               <RealisticAvatar3D {...targetData} color="#10b981" roughness={0.32} isTarget clippingPlanes={above} />
             </group>
@@ -79,7 +84,7 @@ function Stage({ currentData, targetData, mode, progress, sway, yaw, dragging })
             </mesh>
           </group>
         ) : null}
-        <group position={[side ? -0.5 : 0, 0, 0]}>
+        <group position={[side ? -SIDE_X : 0, 0, 0]}>
           <group ref={curRef}>
             <RealisticAvatar3D {...currentData} color="#94a3b8" roughness={0.45} isTarget={false} clippingPlanes={targetData && !side ? below : null} />
           </group>

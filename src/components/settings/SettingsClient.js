@@ -33,9 +33,10 @@ export default function SettingsClient({ profile, email, initialSection, initial
     if (banner) router.replace(`/settings?tab=${initialSection}`, { scroll: false });
   }, [banner, initialSection, router]);
 
-  const go = (key) => {
+  const go = (key, { scroll = false } = {}) => {
     setSec(key);
     window.history.replaceState(null, '', `/settings?tab=${key}`);
+    if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const hint = (key, h) => (key === 'apps' ? (googleHealth.connected ? 'Google Health · on' : 'Google Health · off') : h);
 
@@ -75,33 +76,40 @@ export default function SettingsClient({ profile, email, initialSection, initial
         ))}
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-7 md:grid-cols-[240px_minmax(0,1fr)]">
-        <nav className="sticky top-8 hidden flex-col gap-1 md:flex" aria-label="Settings sections">
-          {SECS.map(([key, label, , Icon, h]) => {
-            const on = sec === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => go(key)}
-                aria-current={on ? 'page' : undefined}
-                className={cx(
-                  'flex items-center gap-3 rounded-[14px] border px-3.5 py-3 text-left transition-colors',
-                  on ? 'border-way-line2 bg-way-card' : 'border-transparent hover:bg-way-card'
-                )}
-              >
-                <Icon size={17} className="w-5 shrink-0" style={{ color: on ? '#34d399' : '#64748b' }} />
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className={cx('text-sm font-semibold', on ? 'text-way-ink' : 'text-way-ink2')}>{label}</span>
-                  <span className="text-[11px] text-way-dim">{hint(key, h)}</span>
-                </span>
-              </button>
-            );
-          })}
-        </nav>
+      <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[56px_minmax(0,1fr)] md:gap-6">
+        {/* Icon rail that opens over the content on hover (or keyboard focus). */}
+        <div className="sticky top-6 hidden h-[232px] md:block">
+          <nav
+            className="group/rail absolute left-0 top-0 z-20 flex w-14 flex-col gap-1 overflow-hidden rounded-2xl border border-transparent p-1 transition-[width,background-color,border-color,box-shadow] duration-200 ease-out hover:w-64 hover:border-way-line hover:bg-way-card hover:shadow-[0_18px_40px_rgba(0,0,0,.45)] focus-within:w-64 focus-within:border-way-line focus-within:bg-way-card"
+            aria-label="Settings sections"
+          >
+            {SECS.map(([key, label, , Icon, h]) => {
+              const on = sec === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => go(key)}
+                  aria-current={on ? 'page' : undefined}
+                  title={label}
+                  className={cx(
+                    'flex h-[52px] w-full items-center gap-3 rounded-xl border px-[13px] text-left transition-colors',
+                    on ? 'border-way-line2 bg-way-track' : 'border-transparent hover:bg-way-hover'
+                  )}
+                >
+                  <Icon size={18} className="w-5 shrink-0" style={{ color: on ? '#34d399' : '#64748b' }} />
+                  <span className="flex min-w-0 flex-col gap-0.5 whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-focus-within/rail:opacity-100">
+                    <span className={cx('text-sm font-semibold', on ? 'text-way-ink' : 'text-way-ink2')}>{label}</span>
+                    <span className="text-[11px] text-way-dim">{hint(key, h)}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
 
         <div className="min-w-0">
-          {sec === 'profile' ? <ProfileSection profile={profile} /> : null}
+          {sec === 'profile' ? <ProfileSection profile={profile} onSaved={() => go('body', { scroll: true })} /> : null}
           {sec === 'body' ? <BodySection profile={profile} currentWeightKg={currentWeightKg} startKg={startKg} today={today} initialTab={initialBodyTab} /> : null}
           {sec === 'apps' ? (
             <AppsSection connected={googleHealth.connected} canWrite={googleHealth.canWrite} syncEnabled={googleHealth.syncEnabled} banner={banner} />

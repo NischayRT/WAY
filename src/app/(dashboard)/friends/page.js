@@ -2,15 +2,14 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { redirect } from 'next/navigation';
 import { todayLocalDate } from '@/lib/dateUtils';
 import FriendsClient from '@/components/friends/FriendsClient';
+import { getAuthUser } from '@/lib/authServer';
 
 export const dynamic = 'force-dynamic';
 
 export default async function FriendsPage({ searchParams }) {
   const params = await searchParams;
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) redirect('/login');
 

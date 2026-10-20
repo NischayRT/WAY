@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { getValidAccessToken, fetchDailyMetrics } from '@/lib/googleHealth';
 import { todayLocalDate, isValidDateStr } from '@/lib/dateUtils';
+import { getAuthUser } from '@/lib/authServer';
 
 // GET /api/google-health/steps?date=YYYY-MM-DD[&debug=1]
 //
@@ -10,9 +11,7 @@ import { todayLocalDate, isValidDateStr } from '@/lib/dateUtils';
 // week strip shows that day's activity rather than always today's.
 export async function GET(request) {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

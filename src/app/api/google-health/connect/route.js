@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { buildAuthUrl, OPTIONAL_SCOPES } from '@/lib/googleHealth';
+import { getAuthUser } from '@/lib/authServer';
 
 // Only these paths may be used as a post-connect destination. Anything
 // else (including an attacker-supplied URL) falls back to /settings, so
@@ -29,9 +30,7 @@ export async function GET(request) {
     // GOOGLE_HEALTH_REDIRECT_URI missing or invalid: carry on as before
   }
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) return NextResponse.redirect(`${origin}/login`);
 

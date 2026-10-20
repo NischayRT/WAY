@@ -4,14 +4,13 @@ import { todayLocalDate, addDays, clampDate } from '@/lib/dateUtils';
 import { MEAL_CATEGORIES } from '@/lib/mealCategories';
 import { resolveDateTargets } from '@/lib/weightTimeline';
 import LogFoodClient from '@/components/logging/LogFoodClient';
+import { getAuthUser } from '@/lib/authServer';
 
 export const dynamic = 'force-dynamic';
 
 export default async function LogFoodPage({ searchParams }) {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) redirect('/login');
 
   // Today can be parked on an earlier day; ?date= carries it over so meals

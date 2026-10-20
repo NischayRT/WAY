@@ -2,6 +2,6 @@
 
 export const cx = (...parts) => parts.filter(Boolean).join(' ');
 
-/** Page body: 16px gutters on phones, room for the bottom bar; 40px gutters on desktop. */
+/** Page body: 12px gutters on phones, room for the bottom bar; 24px (32px wide) gutters on desktop. */
 export const PAGE =
-  'mx-auto flex w-full max-w-[1360px] flex-col gap-3.5 px-4 pt-6 pb-[calc(104px+env(safe-area-inset-bottom))] md:gap-5 md:px-10 md:pt-8 md:pb-10';
+  'mx-auto flex w-full max-w-[1360px] flex-col gap-3 px-3 pt-4 pb-[calc(96px+env(safe-area-inset-bottom))] md:gap-4 md:px-6 md:pt-6 md:pb-8 xl:px-8';

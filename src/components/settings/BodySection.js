@@ -19,6 +19,7 @@ import { BODY_LIBRARY, selectBody } from '@/lib/bodyLibrary';
 import { weightProgress } from '@/lib/goalState';
 import { addDays } from '@/lib/dateUtils';
 import { Card, Eyebrow, Segmented, fmt, useLocalPref, cx } from '@/components/way/ui';
+import { invalidateJson } from '@/components/way/useJson';
 
 // three.js loads only when this section opens.
 const BodyViewer = dynamic(() => import('@/components/body/BodyViewer'), {
@@ -206,6 +207,7 @@ export default function BodySection({ profile, currentWeightKg, startKg, today, 
       .eq('id', profile.id);
     if (error) return setErr(error.message);
     flashFor('meas');
+    invalidateJson('/api/');
     router.refresh();
   };
   const confirmGoal = async () => {
@@ -227,6 +229,7 @@ export default function BodySection({ profile, currentWeightKg, startKg, today, 
       .eq('id', profile.id);
     if (error) return setErr(error.message);
     flashFor('goal');
+    invalidateJson('/api/');
     router.refresh();
   };
 

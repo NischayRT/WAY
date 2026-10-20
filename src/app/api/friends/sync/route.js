@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { getValidAccessToken, fetchDailyHistory, fetchExtraHistory } from '@/lib/googleHealth';
 import { todayLocalDate, addDays } from '@/lib/dateUtils';
+import { getAuthUser } from '@/lib/authServer';
 
 // POST /api/friends/sync[?force=1]
 //
@@ -18,9 +19,7 @@ const round = (v, dp = 0) => (v == null || !Number.isFinite(Number(v)) ? null : 
 
 export async function POST(request) {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const force = new URL(request.url).searchParams.get('force') === '1';

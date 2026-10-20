@@ -4,6 +4,7 @@ import { resolveDailyTargets } from '@/lib/bmrTdee';
 import { computeDailyTotalsByDate } from '@/lib/weekStatus';
 import { todayLocalDate, addDays } from '@/lib/dateUtils';
 import NutritionClient from '@/components/nutrition/NutritionClient';
+import { getAuthUser } from '@/lib/authServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,9 +17,7 @@ export default async function NutritionPage() {
   const today = todayLocalDate();
   const windowStart = addDays(today, -(WINDOW_DAYS - 1));
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) redirect('/login');
 
   const [{ data: profile }, { data: logs }] = await Promise.all([

@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { getValidAccessToken, fetchDailyMetrics } from '@/lib/googleHealth';
 import { getValidStravaAccessToken, fetchStravaDailyMetrics } from '@/lib/strava';
 import { isValidDateStr, todayLocalDate } from '@/lib/dateUtils';
+import { getAuthUser } from '@/lib/authServer';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -13,9 +14,7 @@ export async function GET(request) {
   const dateStr = isValidDateStr(requested) && requested <= todayLocalDate() ? requested : null;
 
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

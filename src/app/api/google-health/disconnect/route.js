@@ -2,12 +2,11 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { revokeGoogleToken } from '@/lib/googleHealth';
 import { decryptToken } from '@/lib/tokenCrypto';
+import { getAuthUser } from '@/lib/authServer';
 
 export async function POST() {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

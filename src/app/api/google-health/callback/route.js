@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { encryptToken } from '@/lib/tokenCrypto';
 import { exchangeCodeForTokens, NUTRITION_WRITE_SCOPE, METRICS_WRITE_SCOPE, OPTIONAL_SCOPES } from '@/lib/googleHealth';
+import { getAuthUser } from '@/lib/authServer';
 
 // Must match the list in ../connect/route.js. This said '/progress' while
 // connect allowed '/activity', so connecting from the Activity page always
@@ -46,9 +47,7 @@ export async function GET(request) {
   if (!expectedState || returnedState !== expectedState) return failure('state_mismatch');
 
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) return redirectTo('/login');
 

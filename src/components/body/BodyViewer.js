@@ -97,7 +97,7 @@ function Stage({ currentData, targetData, mode, progress, sway, yaw, dragging })
         </group>
       </group>
       {targetData && !side && p > 0.01 && p < 0.99 ? (
-        <SplitSlice y={splitY} />
+        <SplitSlice y={splitY} rx={0.68} rz={0.3} />
       ) : null}
       {targetData && !side && p > 0.03 ? <Tag y={(TOP + splitY) / 2} tone="goal">Goal body</Tag> : null}
       {targetData && !side && p < 0.97 ? <Tag y={(splitY - 1) / 2} tone="current">Current body</Tag> : null}

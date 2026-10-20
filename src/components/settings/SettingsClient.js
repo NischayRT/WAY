@@ -78,7 +78,7 @@ export default function SettingsClient({ profile, email, initialSection, initial
 
       <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[56px_minmax(0,1fr)] md:gap-6">
         {/* Icon rail that opens over the content on hover (or keyboard focus). */}
-        <div className="sticky top-6 hidden h-[232px] md:block">
+        <div className="sticky top-6 z-40 hidden h-[232px] md:block">
           <nav
             className="group/rail absolute left-0 top-0 z-20 flex w-14 flex-col gap-1 overflow-hidden rounded-2xl border border-transparent p-1 transition-[width,background-color,border-color,box-shadow] duration-200 ease-out hover:w-64 hover:border-way-line hover:bg-way-card hover:shadow-[0_18px_40px_rgba(0,0,0,.45)] focus-within:w-64 focus-within:border-way-line focus-within:bg-way-card"
             aria-label="Settings sections"

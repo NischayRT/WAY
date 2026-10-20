@@ -19,6 +19,10 @@ const BODY_H = 2.0; // RealisticAvatar3D scales every body to 2.0 units tall, ba
 const BODY_BOTTOM = GROUP_Y;
 const BODY_TOP = GROUP_Y + BODY_H;
 
+// The split slice: wide enough for outstretched arms, shallow front to back.
+const SLICE_PLANE = new THREE.PlaneGeometry(1.7, 0.62);
+const SLICE_EDGES = new THREE.EdgesGeometry(SLICE_PLANE);
+
 /** Pill label with a leader line to a dot on the body; anchored in 3D so it tracks the cut. */
 function BodyTag({ position, tone, children }) {
   const goal = tone === 'goal';
@@ -92,12 +96,17 @@ function Stage({ currentData, targetData, progress, sway, pctLabel }) {
         </mesh>
       </group>
 
-      {/* The cut: a thin band wrapped round the body at exactly the split height. */}
+      {/* The cut: a thin flat slice through the body at exactly the split
+          height, a faint glass fill with a crisp border. */}
       {merged && p > 0.01 && p < 0.99 && (
-        <mesh position={[0, splitY, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[0.78, 0.28, 1]}>
-          <torusGeometry args={[1, 0.011, 8, 128]} />
-          <meshBasicMaterial color="#6ee7b7" />
-        </mesh>
+        <group position={[0, splitY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh geometry={SLICE_PLANE}>
+            <meshBasicMaterial color="#34d399" transparent opacity={0.12} side={THREE.DoubleSide} depthWrite={false} />
+          </mesh>
+          <lineSegments geometry={SLICE_EDGES}>
+            <lineBasicMaterial color="#6ee7b7" transparent opacity={0.9} />
+          </lineSegments>
+        </group>
       )}
 
       {showGoalTag && (

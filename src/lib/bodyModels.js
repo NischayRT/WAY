@@ -42,6 +42,15 @@ export const MESH_SLOT = {
 
 export const MODEL_CREDITS = [
   {
+    use: 'Male 3D bodies',
+    title: 'Stylized male Base mesh FREE',
+    author: 'Gostbento',
+    url: 'https://sketchfab.com/3d-models/stylized-male-base-mesh-free-5264bf0ed23045c5843a56d7ff1a923a',
+    license: 'CC BY-NC 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-nc/4.0/',
+    changes: 'split into separate bodies, blended into in-between builds, simplified and rescaled',
+  },
+  {
     use: 'Female 3D bodies',
     title: 'Five female body type models',
     author: 'RawPheasant5745',
@@ -51,7 +60,7 @@ export const MODEL_CREDITS = [
     changes: 'split into separate bodies, simplified and rescaled',
   },
   {
-    use: 'Male and female 3D bodies',
+    use: 'Female 3D bodies',
     title: 'Humans Base Mesh',
     author: 'Neslihan Çakmak',
     url: 'https://sketchfab.com/3d-models/humans-base-mesh-410626cce1454fb4bf01b7f507429a5c',
@@ -60,7 +69,7 @@ export const MODEL_CREDITS = [
     changes: 'split into separate bodies, simplified and rescaled',
   },
   {
-    use: 'Male and female 3D bodies',
+    use: 'Female 3D bodies',
     title: 'Body Types Basemesh',
     author: 'Peter Seifert',
     url: 'https://sketchfab.com/3d-models/body-types-basemesh-read-description-7eb782a9d9a64031a1784d9a19aadf13',

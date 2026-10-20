@@ -37,7 +37,7 @@ function getAnalysis(geometry, sex) {
  * One body, chosen and lightly shaped from the person's numbers:
  *  1. Body TYPE from body fat, FFMI and waist-to-height
  *     (lib/physiqueClassifier.js via current/targetPhysiqueLogic).
- *  2. Which BODY: the library body (lib/bodyLibrary.js, 7 male / 13 female)
+ *  2. Which BODY: the library body (lib/bodyLibrary.js, 8 male / 13 female)
  *     whose own chest, waist, hip and upper-arm proportions are closest to
  *     the person's, preferring bodies tagged for their type.
  *  3. A light FINE-TUNE from the same four measurements (lib/bodyDeform.js),
@@ -100,7 +100,13 @@ export default function RealisticAvatar3D({
       geom.setAttribute('position', new THREE.BufferAttribute(shaped, 3));
     }
 
-    geom.center();
+    // Centre left-right and top-bottom only. Front-to-back each file is
+    // already anchored at the neck; centring the bounding box there would
+    // push a body with a belly backwards, so the goal and current bodies in
+    // the split view would no longer line up.
+    geom.computeBoundingBox();
+    const bb = geom.boundingBox;
+    geom.translate(-(bb.min.x + bb.max.x) / 2, -(bb.min.y + bb.max.y) / 2, 0);
     geom.computeVertexNormals();
     geom.computeBoundingBox();
     return geom;

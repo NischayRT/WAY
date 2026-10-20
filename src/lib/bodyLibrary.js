@@ -3,14 +3,25 @@
  *
  * The 3D body library and how a body is chosen for a person.
  *
- * 20 adult bodies (7 male, 13 female), each its own ~280 KB file in
+ * 21 adult bodies (8 male, 13 female), each its own ~280 KB file in
  * /public/models/bodies/, so only the body on screen is downloaded.
- * Sources (all CC BY 4.0, credited in the Terms via MODEL_CREDITS):
- *   rawpheasant  "Five female body type models" by RawPheasant5745
- *   cakmak       "Humans Base Mesh" by Neslihan Çakmak
- *   seifert      "Body Types Basemesh" by Peter Seifert
+ * Sources (credited in the Terms via MODEL_CREDITS):
+ *   gostbento    "Stylized male Base mesh FREE" by Gostbento (CC BY-NC 4.0)
+ *   rawpheasant  "Five female body type models" by RawPheasant5745 (CC BY 4.0)
+ *   cakmak       "Humans Base Mesh" by Neslihan Çakmak (CC BY 4.0)
+ *   seifert      "Body Types Basemesh" by Peter Seifert (CC BY 4.0)
  * Each was split from its source file, normalised (feet on the floor,
  * 1.75 m), and simplified to 24k triangles.
+ *
+ * MALE bodies all come from one source in ONE pose and share one mesh
+ * (same vertices and triangles), so the goal/current split on Home and
+ * Body Studio joins at the same shoulders, arms and neck whatever the two
+ * bodies are. Five are the source sculpts; m-average and m-muscled are
+ * 50/50 blends of neighbours, m-plus extends the heavy body further along
+ * a smoothed fat direction. They are anchored front-to-back at the neck
+ * (not the bounding box), so a belly doesn't push the body backwards.
+ * The male source is CC BY-NC (non-commercial): replace it before WAY
+ * charges or runs ads.
  *
  * refs = the body's own girths divided by its height, measured offline by
  * cutting the mesh with horizontal planes and taping the trunk outline
@@ -27,13 +38,14 @@
  */
 
 export const BODY_LIBRARY = [
-  { id: 'm-slim', sex: 'male', label: 'Slim', source: 'seifert', types: ['SLIM'], refs: { chest: 0.535, waist: 0.366, hip: 0.408, bicep: 0.158 } },
-  { id: 'm-lean', sex: 'male', label: 'Lean / athletic', source: 'seifert', types: ['LEAN'], refs: { chest: 0.541, waist: 0.344, hip: 0.371, bicep: 0.169 } },
-  { id: 'm-average', sex: 'male', label: 'Average', source: 'cakmak', types: ['LEAN', 'SOFT_BELLY'], refs: { chest: 0.571, waist: 0.43, hip: 0.501, bicep: 0.166 } },
-  { id: 'm-muscled', sex: 'male', label: 'Muscled', source: 'cakmak', types: ['MUSCULAR'], refs: { chest: 0.608, waist: 0.517, hip: 0.583, bicep: 0.208 } },
-  { id: 'm-muscular', sex: 'male', label: 'Very muscular', source: 'seifert', types: ['MUSCULAR'], refs: { chest: 0.547, waist: 0.422, hip: 0.442, bicep: 0.205 } },
-  { id: 'm-heavy', sex: 'male', label: 'Heavy-set', source: 'seifert', types: ['SOFT_BELLY', 'OBESE'], refs: { chest: 0.711, waist: 0.52, hip: 0.52, bicep: 0.168 } },
-  { id: 'm-plus', sex: 'male', label: 'Plus-size', source: 'cakmak', types: ['OBESE'], refs: { chest: 0.722, waist: 0.719, hip: 0.794, bicep: 0.244 } },
+  { id: 'm-slim', sex: 'male', label: 'Slim', source: 'gostbento', types: ['SLIM'], refs: { chest: 0.575, waist: 0.388, hip: 0.513, bicep: 0.185 } },
+  { id: 'm-lean', sex: 'male', label: 'Lean / athletic', source: 'gostbento', types: ['LEAN'], refs: { chest: 0.607, waist: 0.441, hip: 0.554, bicep: 0.236 } },
+  { id: 'm-average', sex: 'male', label: 'Average', source: 'gostbento', types: ['LEAN', 'SOFT_BELLY'], refs: { chest: 0.591, waist: 0.454, hip: 0.552, bicep: 0.215 } },
+  { id: 'm-muscled', sex: 'male', label: 'Muscled', source: 'gostbento', types: ['MUSCULAR', 'LEAN'], refs: { chest: 0.616, waist: 0.442, hip: 0.571, bicep: 0.242 } },
+  { id: 'm-muscular', sex: 'male', label: 'Very muscular', source: 'gostbento', types: ['MUSCULAR'], refs: { chest: 0.627, waist: 0.443, hip: 0.588, bicep: 0.248 } },
+  { id: 'm-soft', sex: 'male', label: 'Soft belly', source: 'gostbento', types: ['SOFT_BELLY'], refs: { chest: 0.576, waist: 0.467, hip: 0.551, bicep: 0.195 } },
+  { id: 'm-heavy', sex: 'male', label: 'Heavy-set', source: 'gostbento', types: ['SOFT_BELLY', 'OBESE'], refs: { chest: 0.647, waist: 0.582, hip: 0.61, bicep: 0.262 } },
+  { id: 'm-plus', sex: 'male', label: 'Plus-size', source: 'gostbento', types: ['OBESE'], refs: { chest: 0.71, waist: 0.678, hip: 0.678, bicep: 0.294 } },
   { id: 'f-slim', sex: 'female', label: 'Slim', source: 'rawpheasant', types: ['SLIM'], refs: { chest: 0.453, waist: 0.258, hip: 0.472, bicep: 0.131 } },
   { id: 'f-slim-tall', sex: 'female', label: 'Slim (tall build)', source: 'seifert', types: ['SLIM'], refs: { chest: 0.371, waist: 0.272, hip: 0.464, bicep: 0.099 } },
   { id: 'f-petite', sex: 'female', label: 'Petite athletic', source: 'seifert', types: ['SLIM', 'LEAN'], refs: { chest: 0.353, waist: 0.248, hip: 0.563, bicep: 0.121 } },
@@ -51,7 +63,7 @@ export const BODY_LIBRARY = [
 
 /** One representative body per type, for the landing-page showcase. */
 const SHOWCASE = {
-  male: { SLIM: 'm-slim', LEAN: 'm-lean', MUSCULAR: 'm-muscled', SOFT_BELLY: 'm-average', OBESE: 'm-plus' },
+  male: { SLIM: 'm-slim', LEAN: 'm-lean', MUSCULAR: 'm-muscular', SOFT_BELLY: 'm-soft', OBESE: 'm-plus' },
   female: { SLIM: 'f-slim', LEAN: 'f-lean', MUSCULAR: 'f-muscular', SOFT_BELLY: 'f-soft', OBESE: 'f-heavy' },
 };
 

@@ -4,12 +4,11 @@ import { resolveDailyTargets } from '@/lib/bmrTdee';
 import { computeMealBreakdown } from '@/lib/mealBreakdown';
 import { recommendFoods } from '@/lib/recommend';
 import { todayLocalDate } from '@/lib/dateUtils';
+import { getAuthUser } from '@/lib/authServer';
 
 export async function GET() {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });

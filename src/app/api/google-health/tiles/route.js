@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { getValidAccessToken, fetchExtraTiles, EXTRA_TILE_FETCHERS } from '@/lib/googleHealth';
 import { todayLocalDate, isValidDateStr } from '@/lib/dateUtils';
+import { getAuthUser } from '@/lib/authServer';
 
 // GET /api/google-health/tiles?date=YYYY-MM-DD&keys=heart,floors,sleep
 //
@@ -10,9 +11,7 @@ import { todayLocalDate, isValidDateStr } from '@/lib/dateUtils';
 // so one missing permission or failed call never blanks the other tiles.
 export async function GET(request) {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { searchParams } = new URL(request.url);

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { resolveDailyTargets } from '@/lib/bmrTdee';
+import { getAuthUser } from '@/lib/authServer';
 
 // GET /api/targets — returns the logged-in user's daily calorie/macro targets
 //
@@ -10,9 +11,7 @@ import { resolveDailyTargets } from '@/lib/bmrTdee';
 export async function GET() {
   const supabase = await createServerSupabaseClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });

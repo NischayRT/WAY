@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { redirect } from 'next/navigation';
 import { todayLocalDate } from '@/lib/dateUtils';
 import ActivityClient from '@/components/activity/ActivityClient';
+import { getAuthUser } from '@/lib/authServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,9 +11,7 @@ const WEIGHT_HISTORY_LIMIT = 730;
 
 export default async function ActivityPage() {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) redirect('/login');
 

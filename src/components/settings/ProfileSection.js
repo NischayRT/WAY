@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabaseClient';
 import { getCurrentUserId } from '@/lib/currentUser';
 import { getDailyTargets, ACTIVITY_MULTIPLIERS } from '@/lib/bmrTdee';
 import { Card, Eyebrow, Toggle, NumField, Dot, fmt, cx } from '@/components/way/ui';
+import { invalidateJson } from '@/components/way/useJson';
 
 export const GOALS = [
   ['lose_weight', 'Lose weight'],
@@ -70,7 +71,7 @@ function Seg({ list, value, onChange, pills = false }) {
 }
 
 /** About you, daily targets (calculated live, or your own) and activity goals. */
-export default function ProfileSection({ profile }) {
+export default function ProfileSection({ profile, onSaved }) {
   const supabase = createClient();
   const router = useRouter();
   const [f, setF] = useState({
@@ -185,8 +186,11 @@ export default function ProfileSection({ profile }) {
     setSaving(false);
     if (upsertError) return setError(upsertError.message);
     setSaved(true);
+    invalidateJson('/api/');
     router.refresh();
     setTimeout(() => setSaved(false), 2200);
+    // Next step after the basics and targets: the body (measurements, 3D, goal).
+    if (onSaved) setTimeout(onSaved, 650);
   };
 
   const basics = [

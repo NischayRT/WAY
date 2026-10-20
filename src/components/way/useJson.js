@@ -2,30 +2,75 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+// Responses kept for this browser tab, keyed by URL: going back to a page
+// shows its last data at once while a fresh copy loads in the background
+// (stale-while-revalidate). Small and short-lived on purpose.
+const cache = new Map(); // url -> { data, error, status, t }
+const MAX_ENTRIES = 80;
+const FRESH_MS = 30 * 1000; // younger than this: don't even refetch
+const inflight = new Map(); // url -> Promise, so two widgets share one request
+
+function remember(url, entry) {
+  cache.delete(url);
+  cache.set(url, entry);
+  if (cache.size > MAX_ENTRIES) cache.delete(cache.keys().next().value);
+}
+
+function load(url) {
+  if (inflight.has(url)) return inflight.get(url);
+  const p = fetch(url)
+    .then(async (res) => {
+      const data = await res.json().catch(() => null);
+      const entry = { data, error: res.ok ? null : data?.error || `Request failed (${res.status})`, status: res.status, t: Date.now() };
+      // Only successful answers are reused; errors are always retried.
+      if (res.ok) remember(url, entry);
+      return entry;
+    })
+    .catch((e) => ({ data: null, error: e.message || 'Network error', status: null, t: Date.now() }))
+    .finally(() => inflight.delete(url));
+  inflight.set(url, p);
+  return p;
+}
+
+/** Drop cached responses whose URL starts with `prefix` (e.g. after a change). */
+export function invalidateJson(prefix = '') {
+  for (const k of [...cache.keys()]) if (k.startsWith(prefix)) cache.delete(k);
+}
+
 /**
  * GET a JSON endpoint and keep the result keyed by its URL, so switching URL
  * shows `loading` straight away without resetting state inside an effect.
- * Pass `null` to skip. Returns { data, error, loading, reload }.
+ * A URL seen earlier in this tab shows its last data immediately and is
+ * refreshed in the background. Pass `null` to skip.
+ * Returns { data, error, status, loading, reload }.
  */
 export function useJson(url) {
-  const [state, setState] = useState({ url: null, data: null, error: null });
+  const [state, setState] = useState(() => (url && cache.has(url) ? { url, ...cache.get(url) } : { url: null, data: null, error: null }));
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     if (!url) return undefined;
-    const ctrl = new AbortController();
-    fetch(url, { signal: ctrl.signal })
-      .then(async (res) => {
-        const data = await res.json().catch(() => null);
-        setState({ url, data, error: res.ok ? null : data?.error || `Request failed (${res.status})`, status: res.status });
-      })
-      .catch((e) => {
-        if (e.name !== 'AbortError') setState({ url, data: null, error: e.message || 'Network error' });
-      });
-    return () => ctrl.abort();
+    let live = true;
+    const hit = cache.get(url);
+    if (hit) {
+      // Show the last answer now (if this hook isn't already on it)...
+      setState((s) => (s.url === url ? s : { url, ...hit }));
+      // ...and skip the network entirely when it is very recent.
+      if (!nonce && Date.now() - hit.t < FRESH_MS) return undefined;
+    }
+    load(url).then((entry) => {
+      if (live) setState({ url, ...entry });
+    });
+    return () => {
+      live = false;
+    };
   }, [url, nonce]);
 
-  const reload = useCallback(() => setNonce((n) => n + 1), []);
+  const reload = useCallback(() => {
+    if (url) cache.delete(url);
+    setNonce((n) => n + 1);
+  }, [url]);
+
   const current = url && state.url === url;
   return {
     data: current ? state.data : null,

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { getValidAccessToken, fetchVitals } from '@/lib/googleHealth';
 import { todayLocalDate, isValidDateStr } from '@/lib/dateUtils';
+import { getAuthUser } from '@/lib/authServer';
 
 // GET /api/google-health/vitals?date=YYYY-MM-DD
 //
@@ -10,9 +11,7 @@ import { todayLocalDate, isValidDateStr } from '@/lib/dateUtils';
 //   { connected, needsPermission?, restingHeartRate, spo2, vo2Max }
 export async function GET(request) {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { searchParams } = new URL(request.url);

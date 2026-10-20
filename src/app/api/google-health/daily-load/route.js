@@ -4,6 +4,7 @@ import { getValidAccessToken, fetchDailyLoadInputs } from '@/lib/googleHealth';
 import { readinessOn } from '@/lib/readiness';
 import { describeDay } from '@/lib/dailyLoad';
 import { todayLocalDate, isValidDateStr, addDays } from '@/lib/dateUtils';
+import { getAuthUser } from '@/lib/authServer';
 
 // GET /api/google-health/daily-load?date=YYYY-MM-DD&days=N
 //
@@ -12,9 +13,7 @@ import { todayLocalDate, isValidDateStr, addDays } from '@/lib/dateUtils';
 // null when the data it needs isn't there, so the UI can hide it.
 export async function GET(request) {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { searchParams } = new URL(request.url);

@@ -5,6 +5,7 @@ import { analyzeCurrentPhysique } from '@/lib/bodyProportions';
 import { computeBodyAge, requirementsFor } from '@/lib/bodyAge';
 import { computeRecovery, sleepConsistencyPct } from '@/lib/readiness';
 import { todayLocalDate, addDays, isValidDateStr } from '@/lib/dateUtils';
+import { getAuthUser } from '@/lib/authServer';
 
 // GET /api/body-age?from=YYYY-MM-DD&to=YYYY-MM-DD
 //
@@ -24,9 +25,7 @@ export async function GET(request) {
   const windowDays = Math.max(BODY_AGE_MIN_DAYS, Math.min(BODY_AGE_MAX_DAYS, spanDays(from, to)));
 
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { data: profile } = await supabase

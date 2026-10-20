@@ -31,7 +31,7 @@ import { addDays } from '@/lib/dateUtils';
 import { snackMealType, groupForMealType } from '@/lib/daily';
 import { portionOf } from '@/lib/portions';
 import { PAGE, Card, Eyebrow, Segmented, Dot, fmt, useToast, useLocalPref, cx } from '@/components/way/ui';
-import { useJson } from '@/components/way/useJson';
+import { useJson, invalidateJson } from '@/components/way/useJson';
 import IngredientPicker from './IngredientPicker';
 import AmountSheet from './AmountSheet';
 
@@ -543,6 +543,7 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
     setTray([]);
     setTrayOpen(false);
     setNonce((x) => x + 1);
+    invalidateJson('/api/recommendations');
     router.refresh();
   };
 

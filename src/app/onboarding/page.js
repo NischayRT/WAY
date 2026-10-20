@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import OnboardingClient from '@/components/onboarding/OnboardingClient';
+import { getAuthUser } from '@/lib/authServer';
 
 // Same reasoning as settings/page.js: never cache this page. It carries
 // a specific user's id down as a prop, and a stale render from a
@@ -9,9 +10,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function OnboardingPage() {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) redirect('/login');
 

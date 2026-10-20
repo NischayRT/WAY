@@ -1,14 +1,13 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import RecipeBuilderClient from '@/components/logging/RecipeBuilderClient';
+import { getAuthUser } from '@/lib/authServer';
 
 export const dynamic = 'force-dynamic';
 
 export default async function RecipePage({ searchParams }) {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) redirect('/login');
 
   const params = await searchParams;

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { isValidDateStr } from '@/lib/dateUtils';
 import { syncFoodLogs, deleteFoodLogPoints, syncWeightLog, backfillGoogleHealth } from '@/lib/googleHealthSync';
+import { getAuthUser } from '@/lib/authServer';
 
 // POST /api/google-health/sync
 //   { action: 'food_upsert', logIds: [...] }   push / replace food logs
@@ -18,9 +19,7 @@ const logIfFailed = (action, result) => {
 // the log itself is already saved in WAY, and the client ignores the result.
 export async function POST(request) {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   let body;

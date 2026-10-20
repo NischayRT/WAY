@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
+import { getAuthUser } from '@/lib/authServer';
 
 export async function POST(request) {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
 
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });

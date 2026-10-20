@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { todayLocalDate } from '@/lib/dateUtils';
 import SettingsClient from '@/components/settings/SettingsClient';
+import { getAuthUser } from '@/lib/authServer';
 
 // Never served from a cached render: it carries one user's profile down as props.
 export const dynamic = 'force-dynamic';
@@ -19,9 +20,7 @@ const GH_ERRORS = {
 
 export default async function SettingsPage({ searchParams }) {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(supabase);
   if (!user) redirect('/login');
 
   const params = await searchParams;

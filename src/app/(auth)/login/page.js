@@ -5,6 +5,7 @@ import { Soup, UtensilsCrossed, Coffee, Wheat, Flame, Leaf, CookingPot, Cookie }
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import LoginForm from '@/components/auth/LoginForm';
 import styles from './login.module.css';
+import { getAuthUser } from '@/lib/authServer';
 
 // Server Component. Everything visual on this page (gradient, icon lanes,
 // wordmark, card) is plain HTML + a CSS module, so it ships in the first
@@ -64,9 +65,7 @@ async function hasSessionCookie() {
 export default async function LoginPage({ searchParams }) {
   if (await hasSessionCookie()) {
     const supabase = await createServerSupabaseClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getAuthUser(supabase);
     if (user) redirect('/home');
   }
 

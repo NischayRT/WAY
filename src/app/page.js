@@ -20,6 +20,7 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { LEGAL } from '@/lib/legal';
 import BodyShowcase from '@/components/landing/BodyShowcase';
 import styles from './landing.module.css';
+import { getAuthUser } from '@/lib/authServer';
 
 // Public homepage. Visitors who are not signed in (including Google's
 // verification reviewers) see what the app is for without logging in;
@@ -78,9 +79,7 @@ function Marquee({ items, variant }) {
 export default async function HomePage() {
   if (await hasSessionCookie()) {
     const supabase = await createServerSupabaseClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getAuthUser(supabase);
     if (user) redirect('/home');
   }
 

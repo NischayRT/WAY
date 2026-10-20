@@ -6,6 +6,7 @@ import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import Canvas from '@/components/body/SafeCanvas';
 import RealisticAvatar3D from './RealisticAvatar3D';
+import SplitSlice from './SplitSlice';
 
 // Bodies are 2 units tall standing on y = 0; the stage lifts them so the
 // figure is centred on the origin (top at +1, feet at -1).
@@ -91,10 +92,7 @@ function Stage({ currentData, targetData, mode, progress, sway, yaw, dragging })
         </group>
       </group>
       {targetData && !side && p > 0.01 && p < 0.99 ? (
-        <mesh position={[0, splitY, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[0.26, 0.17, 1]}>
-          <torusGeometry args={[1, 0.011, 8, 128]} />
-          <meshBasicMaterial color="#6ee7b7" />
-        </mesh>
+        <SplitSlice y={splitY} />
       ) : null}
       {targetData && !side && p > 0.03 ? <Tag y={(TOP + splitY) / 2} tone="goal">Goal body</Tag> : null}
       {targetData && !side && p < 0.97 ? <Tag y={(splitY - 1) / 2} tone="current">Current body</Tag> : null}

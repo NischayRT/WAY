@@ -7,6 +7,7 @@ import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { RotateCw } from 'lucide-react';
 import RealisticAvatar3D from './RealisticAvatar3D';
+import SplitSlice from './SplitSlice';
 
 // One body, two states, split top to bottom. The GOAL body fills the top
 // `progress` share of the figure and the CURRENT body is the remainder below
@@ -18,10 +19,6 @@ const GROUP_Y = -0.95; // stage offset
 const BODY_H = 2.0; // RealisticAvatar3D scales every body to 2.0 units tall, base at the stage origin
 const BODY_BOTTOM = GROUP_Y;
 const BODY_TOP = GROUP_Y + BODY_H;
-
-// The split slice: wide enough for outstretched arms, shallow front to back.
-const SLICE_PLANE = new THREE.PlaneGeometry(1.7, 0.62);
-const SLICE_EDGES = new THREE.EdgesGeometry(SLICE_PLANE);
 
 /** Pill label with a leader line to a dot on the body; anchored in 3D so it tracks the cut. */
 function BodyTag({ position, tone, children }) {
@@ -96,18 +93,8 @@ function Stage({ currentData, targetData, progress, sway, pctLabel }) {
         </mesh>
       </group>
 
-      {/* The cut: a thin flat slice through the body at exactly the split
-          height, a faint glass fill with a crisp border. */}
-      {merged && p > 0.01 && p < 0.99 && (
-        <group position={[0, splitY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <mesh geometry={SLICE_PLANE}>
-            <meshBasicMaterial color="#34d399" transparent opacity={0.12} side={THREE.DoubleSide} depthWrite={false} />
-          </mesh>
-          <lineSegments geometry={SLICE_EDGES}>
-            <lineBasicMaterial color="#6ee7b7" transparent opacity={0.9} />
-          </lineSegments>
-        </group>
-      )}
+      {/* The cut: a thin flat slice through the body at the split height. */}
+      {merged && p > 0.01 && p < 0.99 && <SplitSlice y={splitY} />}
 
       {showGoalTag && (
         <BodyTag position={[-0.02, goalMidY, 0.15]} tone="goal">

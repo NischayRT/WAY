@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RefreshCw, UserPlus, Flame, Swords, Trophy, AtSign, Database, Sparkles, Users } from 'lucide-react';
-import { addDays } from '@/lib/dateUtils';
+import { addDays, todayLocalDate } from '@/lib/dateUtils';
 import {
   FIELDS,
   fmtVal,
@@ -180,8 +180,13 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
   // Quests
   const myCheers = new Map(d.cheers.map((c) => [c.event_key, c]));
   for (const [key, on] of cheerFlip) {
-    if (on && !myCheers.has(key)) myCheers.set(key, { event_key: key, created_at: now.toISOString() });
+    if (on && !myCheers.has(key)) myCheers.set(key, { event_key: key, to_id: key.split(':')[0], created_at: now.toISOString() });
     if (!on) myCheers.delete(key);
+  }
+  // One cheer per person per day (wherever it was given: feed or people list).
+  const cheeredToday = new Map(); // personId -> event_key
+  for (const c of myCheers.values()) {
+    if (todayLocalDate(new Date(c.created_at)) === today) cheeredToday.set(c.to_id || String(c.event_key).split(':')[0], c.event_key);
   }
   const cheeredThisWeek = [...myCheers.values()].filter((c) => String(c.created_at).slice(0, 10) >= ws).length;
   const mine = d.stats.get(userId);
@@ -215,14 +220,18 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
     const u = d.stats.get(id);
     const stepsToday = u?.get('steps')?.get(today);
     const stepsWeek = dailyValue(u?.get('steps'), 'steps', addDays(today, -6), today);
-    const cheerKey = `${id}:cheer:${today}`;
+    // Already cheered today (here or in the feed): the button shows it and
+    // tapping undoes that same cheer.
+    const cheerKey = cheeredToday.get(id) || `${id}:cheer:${today}`;
+    const conns = d.connections.filter((c) => ['active', 'pending'].includes(c.status) && other(c) === id);
     return {
       id,
       person: p,
       rels: [...rels],
+      conns,
       canCheer: !!comp,
       cheerKey,
-      cheered: myCheers.has(cheerKey),
+      cheered: cheeredToday.has(id),
       cheeredYou: cheersIn.filter((c) => c.from_id === id).length,
       line: stepsToday != null ? `${fmtVal(stepsToday)} steps today` : stepsWeek != null ? `${fmtVal(stepsWeek)} steps/day this week` : 'No numbers yet',
     };
@@ -262,6 +271,7 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
     friends,
     cheersInWeek: cheersIn.length,
     myCheerKeys: new Set(myCheers.keys()),
+    cheeredToday,
     badges,
     record,
     duels,
@@ -491,7 +501,9 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   const feed = m.feed.map((e) => {
     const serverMine = d.cheers.some((c) => c.event_key === e.key);
     const mine = m.myCheerKeys.has(e.key);
-    return { ...e, mine, count: Math.max(0, (counts[e.key] || 0) + (mine === serverMine ? 0 : mine ? 1 : -1)) };
+    // Cheered this person today on something else: this one is locked.
+    const locked = !mine && m.cheeredToday.has(e.personId);
+    return { ...e, mine, locked, count: Math.max(0, (counts[e.key] || 0) + (mine === serverMine ? 0 : mine ? 1 : -1)) };
   });
   const model = { ...m, feed };
   const lv = levelOf(m.me.xp || 0);
@@ -514,6 +526,10 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   };
 
   const onCheer = async (e) => {
+    if (!e.mine && m.cheeredToday.has(e.personId)) {
+      showToast(`You already cheered ${displayName(m.person(e.personId))} today`);
+      return;
+    }
     const next = !e.mine;
     setCheerFlip((prev) => new Map(prev).set(e.key, next));
     const { error } = await rpc('toggle_cheer', { p_to: e.personId, p_key: e.key }, null, false);
@@ -546,6 +562,31 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
         setCf(null);
       },
     });
+  // Remove a friend / family member: ends every share and competition between
+  // you (either side can). Duels already running finish on their own.
+  const onRemove = (p) => {
+    const conns = d.connections.filter((c) => ['active', 'pending'].includes(c.status) && (c.owner_id === p.id || c.other_id === p.id));
+    if (!conns.length) return;
+    const kinds = new Set(conns.map((c) => c.kind));
+    setCf({
+      title: `Remove ${displayName(p)}?`,
+      text: `${kinds.has('compete') ? 'You stop competing' : ''}${kinds.has('compete') && kinds.has('share') ? ' and ' : ''}${kinds.has('share') ? `${kinds.has('compete') ? 'all' : 'All'} sharing between you ends` : ''} right away. They aren’t notified, and you can add each other again later.`,
+      cta: 'Remove',
+      run: async () => {
+        for (const c of conns) {
+          const { error } = await d.supabase.rpc('end_connection', { p_id: c.id });
+          if (error) {
+            showToast(error.message, null, 'error');
+            break;
+          }
+        }
+        showToast(`Removed ${displayName(p)}`);
+        setCf(null);
+        d.reload();
+        router.refresh();
+      },
+    });
+  };
   const onUnblock = (p) => rpc('unblock_user', { p_user: p.id }, `Unblocked ${displayName(p)}`);
   const onCopy = async () => {
     try {
@@ -663,7 +704,7 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
 
       <div key={tab} className="way-rise">
         {tab === 'arena' ? (
-          <ArenaTab m={model} metric={metric} setMetric={setMetric} period={period} setPeriod={setPeriod} k={k} onCheer={onCheer} onCheerPerson={onCheerPerson} onClaim={onClaim} onAdd={add} onOpenFamily={() => setTab('family')} />
+          <ArenaTab m={model} metric={metric} setMetric={setMetric} period={period} setPeriod={setPeriod} k={k} onCheer={onCheer} onCheerPerson={onCheerPerson} onClaim={onClaim} onAdd={add} onOpenFamily={() => setTab('family')} onRemove={onRemove} />
         ) : tab === 'duels' ? (
           <DuelsTab
             m={model}
@@ -693,6 +734,7 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
             onAlias={onAlias}
             onBlock={onBlock}
             onUnblock={onUnblock}
+            onRemove={onRemove}
           />
         )}
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { Crown, UserPlus, Swords, Check, PartyPopper, LayoutGrid, ChevronRight } from 'lucide-react';
+import { Crown, UserPlus, UserMinus, Swords, Check, PartyPopper, LayoutGrid, ChevronRight } from 'lucide-react';
 import { FIELDS, COMPETE_KEYS, PERIODS, fmtVal, displayName, relDay } from '@/lib/friends';
 import { Card, Eyebrow, Btn, Segmented, cx } from '@/components/way/ui';
 import { Avatar, FIELD_ICONS, ICONS } from './parts';
@@ -276,7 +276,7 @@ function AllBoards({ m, period, setMetric, k }) {
   );
 }
 
-export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, onCheerPerson, onClaim, onAdd, onOpenFamily }) {
+export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, onCheerPerson, onClaim, onAdd, onOpenFamily, onRemove }) {
   const hasArena = m.competitors.length > 0;
   const shared = COMPETE_KEYS.filter((key) => m.competitors.some((c) => c.fields.includes(key)));
   const all = metric === 'all' || !shared.includes(metric);
@@ -471,7 +471,7 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
           <div className="flex items-center justify-between gap-3 px-4 pb-3 lg:px-6">
             <Eyebrow>Your people · {m.friends.length}</Eyebrow>
             <span className="font-mono text-[11px] font-medium text-way-dim">
-              {m.cheersInWeek ? `${m.cheersInWeek} cheer${m.cheersInWeek === 1 ? '' : 's'} for you this week` : 'Cheer once a day each'}
+              {m.cheersInWeek ? `${m.cheersInWeek} cheer${m.cheersInWeek === 1 ? '' : 's'} for you this week · ` : ''}one cheer a day each
             </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
@@ -514,6 +514,15 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
                     <ChevronRight size={13} />
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => onRemove(f.person)}
+                  aria-label={`Remove ${displayName(f.person)}`}
+                  title={`Remove ${displayName(f.person)}`}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-way-dim transition-colors hover:bg-way-hover hover:text-rose-300"
+                >
+                  <UserMinus size={15} />
+                </button>
               </div>
             ))}
           </div>
@@ -547,7 +556,9 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
                   type="button"
                   onClick={() => onCheer(e)}
                   aria-pressed={e.mine}
-                  className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-[background,color,border-color,transform] duration-200"
+                  aria-disabled={e.locked}
+                  title={e.locked ? `You already cheered ${displayName(p)} today` : e.mine ? 'Cheered · tap to undo' : `Cheer ${displayName(p)}`}
+                  className={cx('flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-[background,color,border-color,transform] duration-200', e.locked && 'cursor-not-allowed opacity-45')}
                   style={
                     e.mine
                       ? { background: 'rgba(250,204,21,.14)', color: '#facc15', borderColor: 'rgba(250,204,21,.4)', transform: 'scale(1.06)' }

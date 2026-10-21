@@ -22,6 +22,7 @@ import {
   Dumbbell,
   Ban,
   Lock,
+  UserMinus,
 } from 'lucide-react';
 import { FIELDS, fmtVal, displayName, relDay } from '@/lib/friends';
 import { Card, Eyebrow, Btn, Dot, cx } from '@/components/way/ui';
@@ -473,7 +474,7 @@ const RULES = [
   [ShieldCheck, 'These rules are enforced by the database, not just this screen.'],
 ];
 
-export function PrivacyTab({ m, copied, onCopy, onChangeName, onBlock, onUnblock, onAlias }) {
+export function PrivacyTab({ m, copied, onCopy, onChangeName, onBlock, onUnblock, onAlias, onRemove }) {
   const connected = m.connectedPeople;
   return (
     <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 lg:gap-5">
@@ -521,6 +522,10 @@ export function PrivacyTab({ m, copied, onCopy, onChangeName, onBlock, onUnblock
               <Btn variant="outline" size="sm" onClick={() => onAlias(p)} className="rounded-[9px] font-normal" title="Only you see nicknames">
                 <Pencil size={12} />
                 <span className="hidden sm:inline">Nickname</span>
+              </Btn>
+              <Btn variant="outline" size="sm" onClick={() => onRemove(p)} className="rounded-[9px]" title="Stop competing / sharing with them">
+                <UserMinus size={12} />
+                <span className="hidden sm:inline">Remove</span>
               </Btn>
               <Btn variant="dangerOutline" size="sm" onClick={() => onBlock(p)} className="rounded-[9px]">
                 <Ban size={12} />

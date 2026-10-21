@@ -649,8 +649,8 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
     <main className={cx(PAGE, 'pb-[calc(190px+env(safe-area-inset-bottom))] md:pb-[130px] lg:pb-10')}>
       <header className="flex items-center justify-between gap-3 px-0.5 md:gap-6">
         <div className="flex items-baseline gap-3.5">
-          <h1 className="font-heading text-[28px] font-bold leading-none tracking-[-0.01em] md:text-[34px]">Log food</h1>
-          <span className="hidden font-mono text-xs font-medium text-way-dim md:inline">
+          <h1 className="whitespace-nowrap font-heading text-[28px] font-bold leading-none tracking-[-0.01em] md:text-[34px]">Log food</h1>
+          <span className="hidden font-mono text-xs font-medium text-way-dim md:inline lg:hidden xl:inline">
             {fmt(before.k)} of {fmt(T.k)} kcal logged {date === today ? 'today' : 'that day'}
           </span>
         </div>
@@ -759,8 +759,10 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
 
           {!ql && tab === 'cook' ? <IngredientPicker supabase={supabase} chosen={have} onChange={setHave} /> : null}
 
-          <Card className="flex flex-col overflow-hidden rounded-[20px] md:rounded-[22px]">
-            <div className="hidden grid-cols-[minmax(0,1fr)_64px_64px_64px_84px_168px] items-center gap-3 border-b border-way-line px-5 py-3 font-mono text-[10px] font-semibold tracking-[0.06em] text-way-dim md:grid">
+          <Card className="@container flex flex-col overflow-hidden rounded-[20px] md:rounded-[22px]">
+            {/* The full table only when the LIST is wide enough (container query),
+                not the screen: beside the meal panel it is much narrower. */}
+            <div className="hidden grid-cols-[minmax(220px,1fr)_60px_60px_60px_72px_minmax(150px,auto)] items-center gap-3 border-b border-way-line px-5 py-3 font-mono text-[10px] font-semibold tracking-[0.06em] text-way-dim @3xl:grid">
               <span>FOOD · PORTION</span>
               <span className="text-right text-way-protein">PROTEIN</span>
               <span className="text-right text-way-carbs">CARBS</span>
@@ -795,14 +797,14 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                     onClick={() => setN(food, 1)}
                     title={`Add ${food.name}`}
                     aria-label={`Add ${food.name}`}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-way-line2 text-way-ink2 md:hidden"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-way-line2 text-way-ink2 @md:hidden"
                   >
                     <Plus size={17} />
                   </button>
                   <button
                     type="button"
                     onClick={() => setN(food, 1)}
-                    className="hidden h-[38px] items-center gap-1.5 whitespace-nowrap rounded-xl border border-way-line2 px-3.5 text-[13px] font-semibold text-way-ink2 transition-colors hover:border-way-line3 hover:bg-way-hover md:flex"
+                    className="hidden h-[38px] items-center gap-1.5 whitespace-nowrap rounded-xl border border-way-line2 px-3.5 text-[13px] font-semibold text-way-ink2 transition-colors hover:border-way-line3 hover:bg-way-hover @md:flex"
                   >
                     <Plus size={14} />
                     Add {qty(food, 1)}
@@ -813,36 +815,49 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                 <div
                   key={food.id}
                   className={cx(
-                    'flex items-center gap-2.5 py-[11px] pl-3.5 pr-3 transition-colors md:grid md:grid-cols-[minmax(0,1fr)_64px_64px_64px_84px_168px] md:gap-3 md:px-5 md:py-3 md:hover:bg-[#121927]',
+                    'flex items-center gap-3 py-3 pl-3.5 pr-3 transition-colors md:px-5 md:py-3.5 md:hover:bg-[#121927] @3xl:grid @3xl:grid-cols-[minmax(220px,1fr)_60px_60px_60px_72px_minmax(150px,auto)] @3xl:gap-3',
                     i && 'border-t border-[#161d2b]',
                     cnt && 'bg-emerald-400/[.04]'
                   )}
                 >
                   <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                    <div className="flex min-w-0 items-center gap-1.5 md:gap-2">
-                      <span className="truncate text-sm font-medium md:text-[15px]">{food.name}</span>
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="line-clamp-2 min-w-0 text-sm font-medium leading-snug [overflow-wrap:anywhere] md:text-[15px] @3xl:line-clamp-1">{food.name}</span>
                       {food.isIngredient ? (
                         <span className="shrink-0 rounded-[5px] border border-sky-400/35 px-1 py-px font-mono text-[10px] font-semibold text-way-carbs">INGREDIENT</span>
                       ) : null}
                       {isMine ? (
                         <span className="shrink-0 rounded-[5px] border border-emerald-400/35 px-1 py-px font-mono text-[10px] font-semibold text-way-protein">
-                          <span className="md:hidden">MINE</span>
-                          <span className="hidden md:inline">MY RECIPE</span>
+                          <span className="@md:hidden">MINE</span>
+                          <span className="hidden @md:inline">MY RECIPE</span>
                         </span>
                       ) : null}
                     </div>
-                    <span className="truncate font-mono text-[11px] font-medium text-way-dim md:hidden">
-                      {qty(food, cnt || 1)} · {fmt(shown.calories)} kcal · P {fmt(shown.protein)}
+                    {/* Narrow list: portion, kcal and macros on one line. */}
+                    <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono text-[11px] font-medium text-way-dim md:text-xs @3xl:hidden">
+                      <span className="whitespace-nowrap">
+                        {qty(food, cnt || 1)}
+                        {grams || / g$/.test(qty(food, cnt || 1)) ? '' : ` · ${fmt(shown.g)} g`}
+                      </span>
+                      <span className="whitespace-nowrap font-semibold text-way-ink2">{fmt(shown.calories)} kcal</span>
+                      <span className="whitespace-nowrap">
+                        <span className="text-way-protein">P</span> {fmt(shown.protein)}
+                        <span className="hidden @md:inline">
+                          {' · '}
+                          <span className="text-way-carbs">C</span> {fmt(shown.carbs)} · <span className="text-way-fat">F</span> {fmt(shown.fat)}
+                        </span>
+                      </span>
+                      {when ? <span className="whitespace-nowrap font-sans">{when}</span> : null}
                     </span>
-                    <div className="hidden min-w-0 items-baseline gap-2.5 md:flex">
+                    <div className="hidden min-w-0 items-baseline gap-2.5 @3xl:flex">
                       <span className="whitespace-nowrap font-mono text-[11px] font-medium text-way-dim">
                         {qty(food, cnt || 1)}
-                        {grams ? '' : ` · ${fmt(shown.g)} g`}
+                        {grams || / g$/.test(qty(food, cnt || 1)) ? '' : ` · ${fmt(shown.g)} g`}
                       </span>
                       {reason ? <span className="truncate text-xs text-way-protein">{reason}</span> : null}
                       {when ? <span className="text-xs text-way-dim">{when}</span> : null}
                     </div>
-                    {reason ? <span className="text-[11px] text-way-protein md:hidden">{reason}</span> : null}
+                    {reason ? <span className="text-[11px] text-way-protein md:text-xs @3xl:hidden">{reason}</span> : null}
                     <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <button type="button" onClick={() => openEditor(food)} className="text-left text-[11px] font-semibold text-way-mute underline decoration-dotted underline-offset-4 hover:text-way-ink md:text-xs">
                         Custom amount
@@ -858,13 +873,13 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                     ) : null}
                   </div>
                   {[shown.protein, shown.carbs, shown.fat].map((v, j) => (
-                    <span key={j} className="hidden text-right font-mono text-[13px] font-medium text-way-ink2 md:block">
+                    <span key={j} className="hidden text-right font-mono text-[13px] font-medium text-way-ink2 @3xl:block">
                       {fmt(v)}
                       <span className="text-way-faint">g</span>
                     </span>
                   ))}
-                  <span className="hidden text-right font-mono text-sm font-semibold md:block">{fmt(shown.calories)}</span>
-                  <div className="flex justify-end">{control}</div>
+                  <span className="hidden text-right font-mono text-sm font-semibold @3xl:block">{fmt(shown.calories)}</span>
+                  <div className="flex shrink-0 justify-end">{control}</div>
                 </div>
               );
             })}

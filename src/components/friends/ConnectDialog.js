@@ -156,7 +156,7 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
                 className="flex items-start gap-2.5 rounded-[14px] border p-3 text-left transition-colors md:flex-col md:gap-1.5 md:p-3.5"
                 style={{ borderColor: on ? m.c : '#253044', background: on ? `${m.c}14` : 'transparent' }}
               >
-                <m.Icon size={18} style={{ color: on ? m.c : '#64748b' }} className="mt-px shrink-0" />
+                <m.Icon size={18} style={{ color: on ? m.c : '#7c8aa0' }} className="mt-px shrink-0" />
                 <span className="flex flex-col gap-0.5">
                   <span className="text-[13px] font-semibold">{m.title}</span>
                   <span className="text-[11px] leading-snug text-way-mute">{m.desc}</span>

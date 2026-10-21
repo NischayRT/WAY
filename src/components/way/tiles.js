@@ -179,8 +179,8 @@ function EditTilesPanel({ onClose, current, onSave, title = 'Edit tiles', subtit
 }
 
 const STYLES = {
-  progress: { border: '#1c2433', bg: '#0f1420', badgeColor: '#94a3b8', badgeBg: 'transparent', subColor: '#64748b' },
-  info: { border: '#1c2433', bg: '#0f1420', badgeColor: '#94a3b8', badgeBg: 'transparent', subColor: '#64748b' },
+  progress: { border: '#1c2433', bg: '#0f1420', badgeColor: '#94a3b8', badgeBg: 'transparent', subColor: '#7c8aa0' },
+  info: { border: '#1c2433', bg: '#0f1420', badgeColor: '#94a3b8', badgeBg: 'transparent', subColor: '#7c8aa0' },
   reached: {
     border: 'rgba(52,211,153,.35)',
     bg: 'linear-gradient(180deg, rgba(52,211,153,.07), rgba(52,211,153,0) 55%), #0f1420',

@@ -101,7 +101,7 @@ export async function GET(request) {
       // access" seemed to do nothing).
       return NextResponse.json(
         { connected: true, eligible: false, requirements, vitals, window: span, sources: data.sourceCounts },
-        { headers: { 'Cache-Control': 'no-store' } }
+        { headers: { 'Cache-Control': 'private, no-cache' } }
       );
     }
 

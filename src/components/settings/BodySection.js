@@ -160,7 +160,7 @@ export default function BodySection({ profile, currentWeightKg, startKg, today, 
   const lenCm = (c) => (cmOnly ? `${Math.round(c)} cm` : `${(Math.round((c / IN) * 2) / 2).toFixed(1)}″`);
   const dlt = (a, b) => {
     const d = (a - b) / (cmOnly ? 1 : IN);
-    if (Math.abs(d) < 0.05) return { d: 'kept', dColor: '#64748b' };
+    if (Math.abs(d) < 0.05) return { d: 'kept', dColor: '#7c8aa0' };
     return { d: `${d <= 0 ? '−' : '+'}${Math.abs(d).toFixed(1)}${cmOnly ? ' cm' : '″'}`, dColor: d <= 0 ? '#6ee7b7' : '#fbbf24' };
   };
   const dims = [
@@ -168,8 +168,8 @@ export default function BodySection({ profile, currentWeightKg, startKg, today, 
     { label: 'Hips', v: lenCm(targetData.hipCm), ...dlt(targetData.hipCm, cm.hip) },
     { label: male ? 'Chest' : 'Bust', v: lenCm(targetData.chestCm), ...dlt(targetData.chestCm, cm.chest) },
     male
-      ? { label: 'V-taper', v: `${(targetData.chestCm / targetData.waistCm).toFixed(2)}×`, d: `was ${(cm.chest / cm.waist).toFixed(2)}×`, dColor: '#64748b' }
-      : { label: 'Waist / hip', v: (targetData.waistCm / targetData.hipCm).toFixed(2), d: `was ${(cm.waist / cm.hip).toFixed(2)}`, dColor: '#64748b' },
+      ? { label: 'V-taper', v: `${(targetData.chestCm / targetData.waistCm).toFixed(2)}×`, d: `was ${(cm.chest / cm.waist).toFixed(2)}×`, dColor: '#7c8aa0' }
+      : { label: 'Waist / hip', v: (targetData.waistCm / targetData.hipCm).toFixed(2), d: `was ${(cm.waist / cm.hip).toFixed(2)}`, dColor: '#7c8aa0' },
   ];
 
   const dw = w - target;
@@ -369,7 +369,7 @@ export default function BodySection({ profile, currentWeightKg, startKg, today, 
                   className="rounded-full border px-[9px] py-1 font-mono text-[10px] font-semibold transition-colors duration-300 lg:text-[11px]"
                   style={{
                     background: isC ? '#cbd5e1' : isG ? 'rgba(16,185,129,.14)' : 'transparent',
-                    color: isC ? '#090d16' : isG ? '#6ee7b7' : '#64748b',
+                    color: isC ? '#090d16' : isG ? '#6ee7b7' : '#7c8aa0',
                     borderColor: isC ? '#cbd5e1' : isG ? 'rgba(52,211,153,.5)' : '#1c2433',
                   }}
                 >

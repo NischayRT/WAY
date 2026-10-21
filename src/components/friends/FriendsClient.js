@@ -131,7 +131,7 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
         viewer: person(conn.other_id),
         views: n ? `Viewed ${n} time${n === 1 ? '' : 's'} this week` : 'Not viewed this week',
         expires: conn.ends_at ? `Ends ${shortDate(conn.ends_at)}` : 'No end date',
-        expColor: left != null && left <= 7 ? '#fbbf24' : '#64748b',
+        expColor: left != null && left <= 7 ? '#fbbf24' : '#7c8aa0',
       };
     });
 
@@ -197,6 +197,37 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
     };
   });
 
+  // Everyone you're connected with, one row each, with a direct cheer for
+  // people you compete with (one cheer per person per day).
+  const cheersIn = (d.cheersIn || []).filter((c) => !blockedIds.has(c.from_id));
+  const relOf = new Map();
+  const addRel = (id, label) => {
+    if (blockedIds.has(id)) return;
+    if (!relOf.has(id)) relOf.set(id, new Set());
+    relOf.get(id).add(label);
+  };
+  for (const c of competitors) addRel(c.id, 'Compete');
+  for (const s of sharesIn) addRel(s.owner.id, 'Shares with you');
+  for (const s of sharesOut) addRel(s.viewer.id, 'You share');
+  const friends = [...relOf].map(([id, rels]) => {
+    const p = person(id);
+    const comp = competitors.find((c) => c.id === id);
+    const u = d.stats.get(id);
+    const stepsToday = u?.get('steps')?.get(today);
+    const stepsWeek = dailyValue(u?.get('steps'), 'steps', addDays(today, -6), today);
+    const cheerKey = `${id}:cheer:${today}`;
+    return {
+      id,
+      person: p,
+      rels: [...rels],
+      canCheer: !!comp,
+      cheerKey,
+      cheered: myCheers.has(cheerKey),
+      cheeredYou: cheersIn.filter((c) => c.from_id === id).length,
+      line: stepsToday != null ? `${fmtVal(stepsToday)} steps today` : stepsWeek != null ? `${fmtVal(stepsWeek)} steps/day this week` : 'No numbers yet',
+    };
+  }).sort((a, b) => Number(b.canCheer) - Number(a.canCheer) || displayName(a.person).localeCompare(displayName(b.person)));
+
   const foodStreak = logStreak(d.foodDays, today);
   const badges = badgesFor({ mine, foodStreak, duelWins: record.w, today });
   const feed = buildFeed({ competitors, stats: d.stats, today });
@@ -228,6 +259,8 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
     season,
     quests,
     feed,
+    friends,
+    cheersInWeek: cheersIn.length,
     myCheerKeys: new Set(myCheers.keys()),
     badges,
     record,
@@ -486,6 +519,7 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
     const { error } = await rpc('toggle_cheer', { p_to: e.personId, p_key: e.key }, null, false);
     if (error) setCheerFlip((prev) => new Map(prev).set(e.key, !next));
   };
+  const onCheerPerson = (f) => onCheer({ key: f.cheerKey, personId: f.id, mine: f.cheered });
   const onClaim = (q) => rpc('claim_quest', { p_quest: q.id }, (xp) => `+${xp || q.xp} XP · ${q.label}`);
   const markSent = (key) => setSent((prev) => new Set(prev).add(key));
   const onNudge = async (x, kind) => {
@@ -629,7 +663,7 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
 
       <div key={tab} className="way-rise">
         {tab === 'arena' ? (
-          <ArenaTab m={model} metric={metric} setMetric={setMetric} period={period} setPeriod={setPeriod} k={k} onCheer={onCheer} onClaim={onClaim} onAdd={add} />
+          <ArenaTab m={model} metric={metric} setMetric={setMetric} period={period} setPeriod={setPeriod} k={k} onCheer={onCheer} onCheerPerson={onCheerPerson} onClaim={onClaim} onAdd={add} onOpenFamily={() => setTab('family')} />
         ) : tab === 'duels' ? (
           <DuelsTab
             m={model}

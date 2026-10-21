@@ -152,6 +152,13 @@ const EVENTS = [
   { type: 'sleep8', field: 'sleep_hours', test: (v) => v >= 8, text: (v) => `slept ${fmtVal(v, 1)} h`, icon: 'moon', bg: '#818cf8' },
 ];
 
+const ACTIVE_DAY = [
+  { field: 'steps', text: (v) => `walked ${fmtVal(v)} steps`, icon: 'footprints' },
+  { field: 'distance_km', text: (v) => `covered ${fmtVal(v, 1)} km`, icon: 'navigation' },
+  { field: 'active_kcal', text: (v) => `burned ${fmtVal(v)} active kcal`, icon: 'flame' },
+  { field: 'floors', text: (v) => `climbed ${fmtVal(v)} floors`, icon: 'building' },
+];
+
 /** Recent wins from competitors' agreed fields (last 7 days), newest first. */
 export function buildFeed({ competitors, stats, today, limit = 8 }) {
   const since = addDays(today, -6);
@@ -167,6 +174,18 @@ export function buildFeed({ competitors, stats, today, limit = 8 }) {
       if (hits.length) {
         const [day, v] = hits[0];
         out.push({ key: `${c.id}:${e.type}:${day}`, personId: c.id, day, text: e.text(v), icon: e.icon, iconBg: e.bg });
+      }
+    }
+    // No milestone this week? Still show their latest active day, so there is
+    // always something to cheer.
+    if (!out.some((x) => x.personId === c.id)) {
+      const active = ACTIVE_DAY.find((a) => c.fields.includes(a.field) && u.get(a.field));
+      if (active) {
+        const days = [...u.get(active.field)].filter(([day, v]) => day >= since && day <= today && v > 0).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+        if (days.length) {
+          const [day, v] = days[0];
+          out.push({ key: `${c.id}:day:${day}`, personId: c.id, day, text: active.text(v), icon: active.icon, iconBg: '#475569' });
+        }
       }
     }
   }

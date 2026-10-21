@@ -18,7 +18,7 @@ function Section({ title, right, className = '' }) {
   );
 }
 
-const moveOf = (r) => (r.move > 0 ? { s: `▲ ${r.move}`, c: '#34d399' } : r.move < 0 ? { s: `▼ ${-r.move}`, c: '#fb7185' } : { s: '', c: '#64748b' });
+const moveOf = (r) => (r.move > 0 ? { s: `▲ ${r.move}`, c: '#34d399' } : r.move < 0 ? { s: `▼ ${-r.move}`, c: '#fb7185' } : { s: '', c: '#7c8aa0' });
 
 /** No competitors yet: no leaderboard at all, just the way in. */
 function EmptyArena({ onAdd }) {
@@ -276,7 +276,7 @@ function AllBoards({ m, period, setMetric, k }) {
   );
 }
 
-export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, onClaim, onAdd }) {
+export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, onCheerPerson, onClaim, onAdd, onOpenFamily }) {
   const hasArena = m.competitors.length > 0;
   const shared = COMPETE_KEYS.filter((key) => m.competitors.some((c) => c.fields.includes(key)));
   const all = metric === 'all' || !shared.includes(metric);
@@ -431,7 +431,7 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
           </div>
           {m.quests.map((q, i) => {
             const Icon = q.claimed ? Check : ICONS[q.icon];
-            const tone = q.claimed ? ['rgba(52,211,153,.14)', '#34d399', '#34d399'] : q.done ? ['rgba(250,204,21,.16)', '#facc15', '#facc15'] : ['#1a2130', '#94a3b8', '#64748b'];
+            const tone = q.claimed ? ['rgba(52,211,153,.14)', '#34d399', '#34d399'] : q.done ? ['rgba(250,204,21,.16)', '#facc15', '#facc15'] : ['#1a2130', '#94a3b8', '#7c8aa0'];
             return (
               <div key={q.id} className={cx('flex items-center gap-3 px-3.5 py-[13px] lg:px-[22px] lg:py-3', (i || true) && i ? 'border-t border-way-line' : 'lg:border-t lg:border-way-line')}>
                 <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] transition-colors lg:h-9 lg:w-9" style={{ background: tone[0], color: tone[1] }}>
@@ -464,6 +464,61 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
           })}
         </Card>
       </div>
+
+      {/* Your people: everyone you're connected with, with a direct cheer */}
+      {m.friends.length ? (
+        <Card className="flex flex-col pb-2 pt-[18px] lg:col-span-12 lg:pt-[22px]">
+          <div className="flex items-center justify-between gap-3 px-4 pb-3 lg:px-6">
+            <Eyebrow>Your people · {m.friends.length}</Eyebrow>
+            <span className="font-mono text-[11px] font-medium text-way-dim">
+              {m.cheersInWeek ? `${m.cheersInWeek} cheer${m.cheersInWeek === 1 ? '' : 's'} for you this week` : 'Cheer once a day each'}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+            {m.friends.map((f) => (
+              <div key={f.id} className="flex items-center gap-3 border-t border-way-line px-4 py-3 lg:px-6">
+                <Avatar person={f.person} size={38} />
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate text-[13px] font-semibold lg:text-sm">
+                    {displayName(f.person)}
+                    {f.person.username ? <span className="font-normal text-way-dim"> @{f.person.username}</span> : null}
+                  </span>
+                  <span className="truncate text-xs text-way-mute">
+                    {f.rels.join(' · ')} · {f.line}
+                    {f.cheeredYou ? <span className="text-way-gold"> · cheered you{f.cheeredYou > 1 ? ` ×${f.cheeredYou}` : ''}</span> : null}
+                  </span>
+                </div>
+                {f.canCheer ? (
+                  <button
+                    type="button"
+                    onClick={() => onCheerPerson(f)}
+                    aria-pressed={f.cheered}
+                    title={f.cheered ? 'Cheered today · tap to undo' : `Cheer ${displayName(f.person)}`}
+                    className="flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-[background,color,border-color,transform] duration-200"
+                    style={
+                      f.cheered
+                        ? { background: 'rgba(250,204,21,.14)', color: '#facc15', borderColor: 'rgba(250,204,21,.4)', transform: 'scale(1.04)' }
+                        : { color: '#cbd5e1', borderColor: '#253044' }
+                    }
+                  >
+                    <PartyPopper size={13} />
+                    {f.cheered ? 'Cheered' : 'Cheer'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onOpenFamily}
+                    className="flex shrink-0 items-center gap-1 rounded-full border border-way-line2 px-3 py-1.5 text-xs font-semibold text-way-ink2 hover:bg-way-hover"
+                  >
+                    View
+                    <ChevronRight size={13} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
 
       {/* Feed */}
       <Card className="flex flex-col pb-2 pt-[18px] lg:col-span-8 lg:pt-[22px]">
@@ -535,7 +590,7 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
                     <Icon size={18} style={{ color: b.got ? b.color : '#475569' }} />
                   </div>
                 </div>
-                <span className="text-center text-[11px] font-semibold" style={{ color: b.got ? '#f1f5f9' : '#64748b' }}>
+                <span className="text-center text-[11px] font-semibold" style={{ color: b.got ? '#f1f5f9' : '#7c8aa0' }}>
                   {b.label}
                 </span>
                 <span className="font-mono text-[10px] font-medium text-way-dim">{b.got ? 'Earned' : b.prog}</span>

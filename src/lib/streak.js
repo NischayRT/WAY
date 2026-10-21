@@ -9,7 +9,7 @@ import { addDays } from './dateUtils';
 
 // Each tier looks a little better than the one before it.
 export const STREAK_TIERS = [
-  { min: 0, key: 'none', name: 'No streak', color: '#64748b', glow: null, next: 1 },
+  { min: 0, key: 'none', name: 'No streak', color: '#7c8aa0', glow: null, next: 1 },
   { min: 1, key: 'spark', name: 'Spark', color: '#fbbf24', glow: null, next: 3 },
   { min: 3, key: 'kindling', name: 'Kindling', color: '#fb923c', glow: 'rgba(251,146,60,.18)', next: 7 },
   { min: 7, key: 'fire', name: 'On fire', color: '#f97316', glow: 'rgba(249,115,22,.26)', next: 14 },

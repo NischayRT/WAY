@@ -241,7 +241,7 @@ export default function StreakClient({ login, food, today, name }) {
                 }}
               >
                 {got ? <TIcon size={20} style={{ color: tier.color, fill: `${tier.color}44` }} /> : <Lock size={18} className="text-way-faint" />}
-                <span className="text-xs font-semibold" style={{ color: got ? '#f1f5f9' : '#64748b' }}>
+                <span className="text-xs font-semibold" style={{ color: got ? '#f1f5f9' : '#7c8aa0' }}>
                   {tier.name}
                 </span>
                 <span className="font-mono text-[10px] text-way-dim">{tier.min}+ days</span>

@@ -27,11 +27,11 @@ import {
 import { createClient } from '@/lib/supabaseClient';
 import { getCachedFoods, peekCachedFoods, getCachedIngredients, invalidateFoodCache } from '@/lib/cache/foodCache';
 import { syncToGoogleHealth } from '@/lib/googleHealthSyncClient';
-import { addDays } from '@/lib/dateUtils';
+import { addDays, APP_TIME_ZONE } from '@/lib/dateUtils';
 import { snackMealType, groupForMealType } from '@/lib/daily';
 import { portionOf } from '@/lib/portions';
 import { PAGE, Card, Eyebrow, Segmented, Dot, fmt, useToast, useLocalPref, cx } from '@/components/way/ui';
-import { useJson, invalidateJson } from '@/components/way/useJson';
+import { recommendFoods } from '@/lib/recommend';
 import IngredientPicker from './IngredientPicker';
 import AmountSheet from './AmountSheet';
 
@@ -44,8 +44,11 @@ const MEALS = [
 const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MAX_RESULTS = 60;
 
+// The hour in the app's time zone, so the server render and the browser agree
+// (the server runs in UTC; a different default meal caused a hydration error).
+const HOUR_FMT = new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: APP_TIME_ZONE });
 function mealByClock(d = new Date()) {
-  const h = d.getHours();
+  const h = Number(HOUR_FMT.format(d));
   return h < 11 ? 'breakfast' : h < 16 ? 'lunch' : h < 19 ? 'snacks' : 'dinner';
 }
 
@@ -154,7 +157,7 @@ function Stepper({ qty, onDec, onInc, onEdit, decIcon = 'minus', tone = 'accent'
   );
 }
 
-export default function LogFoodClient({ userId, today, minDate, initialDate, initialMeal, initialQuery = '', targets }) {
+export default function LogFoodClient({ userId, today, minDate, initialDate, initialMeal, initialQuery = '', targets, goal = 'maintain' }) {
   const supabase = createClient();
   const router = useRouter();
   const [foods, setFoods] = useState(() => peekCachedFoods() ?? []);
@@ -169,6 +172,7 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
   const [trayOpen, setTrayOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dayState, setDayState] = useState({ date: null, logs: [] });
+  const [historyCounts, setHistoryCounts] = useState(() => new Map());
   const [recent, setRecent] = useState([]);
   const [nonce, setNonce] = useState(0);
   const [units, setUnits] = useLocalPref('way.logfood.units', 'portions');
@@ -220,7 +224,7 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
     let live = true;
     supabase
       .from('food_logs')
-      .select('quantity_g, foods (calories_kcal, protein_g, carbs_g, fat_g)')
+      .select('food_id, quantity_g, foods (calories_kcal, protein_g, carbs_g, fat_g)')
       .eq('user_id', userId)
       .eq('logged_at', date)
       .then(({ data }) => live && setDayState({ date, logs: data ?? [] }));
@@ -237,14 +241,21 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
       .from('food_logs')
       .select('food_id, logged_at, meal_type')
       .eq('user_id', userId)
-      .gte('logged_at', addDays(today, -21))
+      .gte('logged_at', addDays(today, -60))
       .order('logged_at', { ascending: false })
-      .limit(200)
+      .limit(500)
       .then(({ data }) => {
         if (!live) return;
+        // How often each food was logged lately: suggestions lean towards
+        // foods you actually eat.
+        const counts = new Map();
+        for (const r of data ?? []) counts.set(r.food_id, (counts.get(r.food_id) ?? 0) + 1);
+        setHistoryCounts(counts);
         const seen = new Set();
         const out = [];
+        const since = addDays(today, -21);
         for (const r of data ?? []) {
+          if (r.logged_at < since) break;
           if (seen.has(r.food_id)) continue;
           seen.add(r.food_id);
           out.push(r);
@@ -301,12 +312,25 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
   }, [haveKey]);
   const dishLoading = !!haveKey && dishRes.key !== haveKey;
 
-  const rec = useJson('/api/recommendations');
   const byId = useMemo(() => new Map(foods.map((f) => [f.id, f])), [foods]);
-  const suggested = useMemo(
-    () => (rec.data?.recommendations || []).map((r) => r.food && (byId.get(r.food.id) || r.food)).filter(Boolean),
-    [rec.data, byId]
-  );
+  // Suggestions are scored right here in the browser (lib/recommend.js) from
+  // data this page already has: the food list, the day's logs, your recent
+  // history and your targets. No request, so they appear as soon as the day
+  // has loaded, and they follow the day you're logging for.
+  const dayReady = dayState.date === date;
+  const rec = { loading: !foods.length || !dayReady };
+  const suggested = useMemo(() => {
+    if (!foods.length || !dayReady) return [];
+    const done = sumLogs(dayState.logs);
+    const remaining = {
+      calories: targets.targetCalories - done.k,
+      protein: targets.proteinG - done.p,
+      carbs: targets.carbsG - done.c,
+      fat: targets.fatG - done.f,
+    };
+    const loggedTodayIds = new Set(dayState.logs.map((l) => l.food_id));
+    return recommendFoods({ remaining, foods, goal, historyCounts, loggedTodayIds, topN: 8 }).map((r) => r.food);
+  }, [foods, dayReady, dayState.logs, targets, goal, historyCounts]);
   const recentFoods = useMemo(
     () => recent.map((r) => ({ food: byId.get(r.food_id), r })).filter((x) => x.food),
     [recent, byId]
@@ -543,7 +567,6 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
     setTray([]);
     setTrayOpen(false);
     setNonce((x) => x + 1);
-    invalidateJson('/api/recommendations');
     router.refresh();
   };
 
@@ -845,7 +868,20 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                 </div>
               );
             })}
-            {!ql && !items.length && foods.length ? (
+            {!ql && !items.length && tab === 'suggested' && rec.loading ? (
+              // Placeholder rows the size of real ones, so the list doesn't jump when suggestions arrive.
+              <div aria-hidden="true">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <div key={i} className={cx('flex items-center gap-3 px-4 py-3.5 md:px-5', i && 'border-t border-way-line')}>
+                    <div className="flex flex-1 flex-col gap-2">
+                      <div className="h-3.5 w-2/5 animate-pulse rounded bg-way-track" />
+                      <div className="h-3 w-3/5 animate-pulse rounded bg-way-track/70" />
+                    </div>
+                    <div className="h-9 w-9 animate-pulse rounded-xl bg-way-track md:w-28" />
+                  </div>
+                ))}
+              </div>
+            ) : !ql && !items.length && foods.length ? (
               <p className="px-5 py-6 text-center text-[13px] text-way-dim">
                 {tab === 'suggested' && rec.loading
                   ? 'Loading suggestions…'

@@ -139,7 +139,7 @@ export default function RecipeBuilderClient({ authorName, starters, initialName 
     ['Protein', v0.p, '#34d399', eP],
     ['Carbs', v0.c, '#60a5fa', eC],
     ['Fat', v0.f, '#a78bfa', eF],
-    ['Fibre', v0.fb, '#64748b', null],
+    ['Fibre', v0.fb, '#7c8aa0', null],
   ];
 
   const sorted = lines.map((l) => ({ name: l.ingredient.name, k: ((l.ingredient.calories_kcal || 0) * (Number(l.g) || 0)) / 100 })).sort((a, b) => b.k - a.k);

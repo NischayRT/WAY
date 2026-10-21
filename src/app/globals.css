@@ -60,8 +60,8 @@ html.dark {
   --color-way-ink: #f1f5f9;
   --color-way-ink2: #cbd5e1;
   --color-way-mute: #94a3b8;
-  --color-way-dim: #64748b;
-  --color-way-faint: #475569;
+  --color-way-dim: #7c8aa0; /* 5.3:1 on cards (WCAG AA); was #64748b */
+  --color-way-faint: #738299; /* 4.7:1 on cards; was #475569 */
   --color-way-kcal: #fbbf24;
   --color-way-protein: #34d399;
   --color-way-carbs: #60a5fa;

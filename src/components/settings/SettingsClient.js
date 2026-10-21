@@ -97,7 +97,7 @@ export default function SettingsClient({ profile, email, initialSection, initial
                     on ? 'border-way-line2 bg-way-track' : 'border-transparent hover:bg-way-hover'
                   )}
                 >
-                  <Icon size={18} className="w-5 shrink-0" style={{ color: on ? '#34d399' : '#64748b' }} />
+                  <Icon size={18} className="w-5 shrink-0" style={{ color: on ? '#34d399' : '#7c8aa0' }} />
                   <span className="flex min-w-0 flex-col gap-0.5 whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-focus-within/rail:opacity-100">
                     <span className={cx('text-sm font-semibold', on ? 'text-way-ink' : 'text-way-ink2')}>{label}</span>
                     <span className="text-[11px] text-way-dim">{hint(key, h)}</span>

@@ -208,7 +208,7 @@ export default function NutritionClient({ days: allDays, targets }) {
             : dev > 0
               ? `${Math.round(dev * 100)}% OVER`
               : `${Math.round(-dev * 100)}% UNDER`,
-    tagColor: d.off === 0 ? '#94a3b8' : d.calories === 0 ? '#64748b' : Math.abs(dev) <= 0.1 ? '#34d399' : dev > 0 ? '#fb7185' : '#fbbf24',
+    tagColor: d.off === 0 ? '#94a3b8' : d.calories === 0 ? '#7c8aa0' : Math.abs(dev) <= 0.1 ? '#34d399' : dev > 0 ? '#fb7185' : '#fbbf24',
     logged: d.calories > 0,
     rows: [
       row('Calories', d.calories, T.kcal, ' kcal', '#fbbf24'),

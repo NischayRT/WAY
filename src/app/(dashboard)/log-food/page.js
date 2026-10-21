@@ -43,6 +43,7 @@ export default async function LogFoodPage({ searchParams }) {
       initialMeal={initialMeal}
       initialQuery={initialQuery}
       targets={targets}
+      goal={profile.goal}
     />
   );
 }

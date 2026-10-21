@@ -39,7 +39,7 @@ export default function AppsSection({ connected, canWrite, syncEnabled: initialS
 
   const state = !connected ? 'off' : canWrite ? 'on' : 'read';
   const status = state === 'on' ? 'Connected · reading and writing' : state === 'read' ? 'Connected · read only' : 'Not connected';
-  const statusColor = state === 'on' ? '#34d399' : state === 'read' ? '#fbbf24' : '#64748b';
+  const statusColor = state === 'on' ? '#34d399' : state === 'read' ? '#fbbf24' : '#7c8aa0';
   const blurb =
     state === 'off'
       ? 'Bring in steps, heart rate, sleep and more from Fitbit or any Google-connected device, and send your meals and weight back to the Google Health app. Unlocks Body Age and Health tiles on Today.'

@@ -23,7 +23,7 @@ export function useFriendsData(userId, today) {
     const ws = weekStart(today);
     const from = addDays(today, -30);
     (async () => {
-      const [people, conns, duels, stats, board, claims, views, nudges, cheers, food, blocks, aliases] = await Promise.all([
+      const [people, conns, duels, stats, board, claims, views, nudges, cheers, food, blocks, aliases, cheersIn] = await Promise.all([
         supabase.rpc('friend_people'),
         supabase.from('connections').select('*').order('created_at', { ascending: false }),
         supabase.from('duels').select('*').order('created_at', { ascending: false }),
@@ -36,6 +36,8 @@ export function useFriendsData(userId, today) {
         supabase.from('food_logs').select('logged_at').eq('user_id', userId).gte('logged_at', from).lte('logged_at', today),
         supabase.from('blocks').select('blocked_id, created_at').eq('blocker_id', userId),
         supabase.from('contact_aliases').select('other_id, alias'),
+        // Cheers you received this week (from people you compete with).
+        supabase.from('cheers').select('from_id, event_key, created_at').eq('to_id', userId).gte('created_at', `${addDays(today, -7)}T00:00:00Z`),
       ]);
       if (!live) return;
       const firstError = [people, conns, duels, stats].map((r) => r.error).find(Boolean);
@@ -54,6 +56,7 @@ export function useFriendsData(userId, today) {
         views: views.data || [],
         nudges: nudges.data || [],
         cheers: cheers.data || [],
+        cheersIn: cheersIn.data || [],
         foodDays: new Set((food.data || []).map((f) => f.logged_at)),
         blocks: blocks.data || [],
         // Missing before the SQL update: just no nicknames.

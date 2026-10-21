@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { getAuthUser } from '@/lib/authServer';
+import { getAuthUser, AUTH_UID_HEADER, AUTH_EMAIL_HEADER } from '@/lib/authServer';
 
 // Routes that must NOT trigger the profile-completeness redirect below:
 // where an incomplete-profile user is supposed to land (/onboarding), pages
@@ -112,7 +112,7 @@ export async function middleware(request) {
   // network call to Supabase before the page can start rendering. This was
   // a big part of the slow first paint on the login page.
   if (isPrefetch || !hasSessionCookie(request)) {
-    return withSecurityHeaders(NextResponse.next());
+    return withSecurityHeaders(NextResponse.next({ request: { headers: forwardHeaders(request, null) } }));
   }
 
   let response = NextResponse.next({ request: { headers: request.headers } });
@@ -134,7 +134,7 @@ export async function middleware(request) {
     }
   );
 
-  const user = await getAuthUser(supabase);
+  const user = await getAuthUser(supabase, { trustMiddleware: false });
 
   const { pathname } = request.nextUrl;
   const isExempt = PROFILE_CHECK_EXEMPT_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -157,7 +157,25 @@ export async function middleware(request) {
     }
   }
 
-  return withSecurityHeaders(response);
+  // Hand the verified user to the page / API route on this same request, so
+  // it doesn't verify the session a second time (lib/authServer.js). Cookies
+  // refreshed above are already in request.headers; copy them onto the reply.
+  const final = NextResponse.next({ request: { headers: forwardHeaders(request, user) } });
+  response.cookies.getAll().forEach((c) => final.cookies.set(c));
+  return withSecurityHeaders(final);
+}
+
+// Request headers for the page with the verified user set, and any copy a
+// client tried to send itself removed first, on every path.
+function forwardHeaders(request, user) {
+  const h = new Headers(request.headers);
+  h.delete(AUTH_UID_HEADER);
+  h.delete(AUTH_EMAIL_HEADER);
+  if (user?.id) {
+    h.set(AUTH_UID_HEADER, user.id);
+    if (user.email) h.set(AUTH_EMAIL_HEADER, user.email);
+  }
+  return h;
 }
 
 const PROFILE_OK_COOKIE = 'way_profile_ok';

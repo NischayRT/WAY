@@ -151,7 +151,7 @@ export default function TodayClient({
         ...m,
         fill: Math.min(100, r * 100),
         barColor: over ? '#fb7185' : '#fbbf24',
-        valColor: over ? '#fb7185' : m.totals.calories === 0 ? '#64748b' : r >= 0.9 ? '#34d399' : '#f1f5f9',
+        valColor: over ? '#fb7185' : m.totals.calories === 0 ? '#7c8aa0' : r >= 0.9 ? '#34d399' : '#f1f5f9',
         countStr: m.items.length ? `${m.items.length} item${m.items.length > 1 ? 's' : ''}` : 'Empty',
       };
     });

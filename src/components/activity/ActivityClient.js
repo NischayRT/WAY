@@ -471,7 +471,7 @@ export default function ActivityClient({ userId, profile, entries, goals, google
       date: p.date === today ? 'Today' : p.date === addDays(today, -1) ? 'Yesterday' : `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dd.getDay()]}, ${dstr(p.date)}`,
       w: f1(p.w),
       d: prev ? `${d <= 0 ? '−' : '+'}${Math.abs(d).toFixed(1)}` : '—',
-      dColor: !prev || Math.abs(d) < 0.05 ? '#64748b' : (d < 0) === wantsLoss ? '#34d399' : '#fb7185',
+      dColor: !prev || Math.abs(d) < 0.05 ? '#7c8aa0' : (d < 0) === wantsLoss ? '#34d399' : '#fb7185',
       avg: f1(mean(win)),
       prog: prog * k,
       left: goalKg != null ? `${Math.abs(p.w - goalKg).toFixed(1)} kg` : '—',

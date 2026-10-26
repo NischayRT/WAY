@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { isValidDateStr } from '@/lib/dateUtils';
 import { syncFoodLogs, deleteFoodLogPoints, syncWeightLog, backfillGoogleHealth } from '@/lib/googleHealthSync';
 import { getAuthUser } from '@/lib/authServer';
+import { rateLimit } from '@/lib/rateLimit';
 
 // POST /api/google-health/sync
 //   { action: 'food_upsert', logIds: [...] }   push / replace food logs
@@ -21,6 +22,8 @@ export async function POST(request) {
   const supabase = await createServerSupabaseClient();
   const user = await getAuthUser(supabase);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const limited = await rateLimit(supabase, 'sync');
+  if (limited) return limited;
 
   let body;
   try {

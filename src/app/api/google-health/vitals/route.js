@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { getValidAccessToken, fetchVitals } from '@/lib/googleHealth';
 import { todayLocalDate, isValidDateStr } from '@/lib/dateUtils';
 import { getAuthUser } from '@/lib/authServer';
+import { rateLimit } from '@/lib/rateLimit';
 
 // GET /api/google-health/vitals?date=YYYY-MM-DD
 //
@@ -13,6 +14,8 @@ export async function GET(request) {
   const supabase = await createServerSupabaseClient();
   const user = await getAuthUser(supabase);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const limited = await rateLimit(supabase, 'google');
+  if (limited) return limited;
 
   const { searchParams } = new URL(request.url);
   const today = todayLocalDate();

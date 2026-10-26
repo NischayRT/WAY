@@ -13,6 +13,7 @@ const SECTIONS = ['profile', 'body', 'apps', 'account'];
 const GH_ERRORS = {
   access_denied: 'Google Health access was not granted.',
   state_mismatch: 'The connection request expired. Please try again.',
+  session_changed: 'You signed in as someone else while connecting. Please connect again.',
   missing_code: 'Google did not complete the connection. Please try again.',
   no_refresh_token: 'Google did not return a refresh token. Disconnect and reconnect.',
   token_exchange_failed: 'Google rejected the connection. Please try again.',

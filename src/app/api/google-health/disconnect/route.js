@@ -16,6 +16,9 @@ export async function POST() {
     .select('refresh_token')
     .eq('user_id', user.id)
     .maybeSingle();
+  // If the token can't be read (or Google doesn't answer) we still forget it,
+  // and tell the app so it can point the user to Google's own permissions page.
+  let revoked = !connection?.refresh_token;
   if (connection?.refresh_token) {
     let token = null;
     try {
@@ -23,7 +26,7 @@ export async function POST() {
     } catch (err) {
       console.error('[google-health/disconnect] decrypt', err?.message);
     }
-    if (token) await revokeGoogleToken(token);
+    if (token) revoked = await revokeGoogleToken(token);
   }
 
   const { error } = await supabase.from('google_health_connections').delete().eq('user_id', user.id);
@@ -32,5 +35,5 @@ export async function POST() {
     return NextResponse.json({ error: 'Could not disconnect' }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, revoked });
 }

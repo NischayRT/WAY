@@ -58,6 +58,9 @@ export async function GET(request) {
     maxAge: 60 * 10,
   };
   response.cookies.set('gh_oauth_state', state, cookieOptions);
+  // Which WAY user started this connect: the callback stores the Google
+  // tokens only if that same user is still the one signed in.
+  response.cookies.set('gh_oauth_owner', user.id, cookieOptions);
   response.cookies.set('gh_return_to', returnTo, cookieOptions);
   // So the callback can tell whether Google actually granted what was asked.
   response.cookies.set('gh_extra', extra.join(','), cookieOptions);

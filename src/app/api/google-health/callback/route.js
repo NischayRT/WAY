@@ -17,6 +17,7 @@ export async function GET(request) {
   const returnedState = searchParams.get('state');
 
   const expectedState = request.cookies.get('gh_oauth_state')?.value;
+  const startedBy = request.cookies.get('gh_oauth_owner')?.value;
   const cookieReturnTo = request.cookies.get('gh_return_to')?.value;
   const returnTo = ALLOWED_RETURN_TO.includes(cookieReturnTo) ? cookieReturnTo : '/settings';
   const requestedExtra = (request.cookies.get('gh_extra')?.value || '')
@@ -29,6 +30,7 @@ export async function GET(request) {
     response.cookies.set('gh_oauth_state', '', { path: COOKIE_PATH, maxAge: 0 });
     response.cookies.set('gh_return_to', '', { path: COOKIE_PATH, maxAge: 0 });
     response.cookies.set('gh_extra', '', { path: COOKIE_PATH, maxAge: 0 });
+    response.cookies.set('gh_oauth_owner', '', { path: COOKIE_PATH, maxAge: 0 });
     return response;
   };
 
@@ -50,6 +52,8 @@ export async function GET(request) {
   const user = await getAuthUser(supabase);
 
   if (!user) return redirectTo('/login');
+  // Someone else signed in on this browser after the connect started.
+  if (!startedBy || startedBy !== user.id) return failure('session_changed');
 
   let writeMissing = false;
   let extraMissing = [];

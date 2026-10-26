@@ -20,7 +20,7 @@ export async function createServerSupabaseClient() {
             );
           } catch {
             // Called from a Server Component during render — this is expected
-            // and safe to ignore, since middleware.js refreshes the session
+            // and safe to ignore, since src/proxy.js refreshes the session
             // on every request instead.
           }
         },

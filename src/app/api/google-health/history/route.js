@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { getValidAccessToken, fetchDailyHistory, fetchExtraHistory } from '@/lib/googleHealth';
 import { todayLocalDate, isValidDateStr, addDays } from '@/lib/dateUtils';
 import { getAuthUser } from '@/lib/authServer';
+import { rateLimit } from '@/lib/rateLimit';
 
 const MAX_SPAN_DAYS = 366;
 
@@ -16,6 +17,8 @@ export async function GET(request) {
   const supabase = await createServerSupabaseClient();
   const user = await getAuthUser(supabase);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const limited = await rateLimit(supabase, 'history');
+  if (limited) return limited;
 
   const { searchParams } = new URL(request.url);
   const today = todayLocalDate();

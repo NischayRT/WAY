@@ -3,8 +3,9 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { getValidAccessToken, fetchDailyMetrics } from '@/lib/googleHealth';
 import { todayLocalDate, isValidDateStr } from '@/lib/dateUtils';
 import { getAuthUser } from '@/lib/authServer';
+import { rateLimit } from '@/lib/rateLimit';
 
-// GET /api/google-health/steps?date=YYYY-MM-DD[&debug=1]
+// GET /api/google-health/steps?date=YYYY-MM-DD
 //
 // Steps and distance for one calendar day. `date` defaults to today in the
 // app's timezone. The dashboard sends the day being viewed, so browsing the
@@ -14,6 +15,10 @@ export async function GET(request) {
   const user = await getAuthUser(supabase);
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const limited = await rateLimit(supabase, 'google');
+
+  if (limited) return limited;
 
   const { searchParams } = new URL(request.url);
   const today = todayLocalDate();

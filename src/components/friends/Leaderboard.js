@@ -1,7 +1,7 @@
 'use client';
 
 import { Crown } from 'lucide-react';
-import { fmtVal, displayName } from '@/lib/friends';
+import { FIELDS, fmtVal, displayName } from '@/lib/friends';
 import { cx } from '@/components/way/ui';
 import { Avatar } from './parts';
 
@@ -82,7 +82,7 @@ export default function Leaderboard({ m, ranked, missing = [], f, k = 1, note, c
                     <span className={cx('max-w-full truncate text-xs font-semibold', !compact && 'lg:text-[15px]')}>{nameOf(r.id)}</span>
                     <span className={cx('font-mono text-xs font-semibold', !compact && 'lg:text-lg')} style={{ color: MEDAL[pi] }}>
                       {fmtVal(r.v, f.dec)}
-                      <span className={cx('hidden text-[11px] text-way-dim', !compact && 'lg:inline')}> {f.unit}</span>
+                      <span className={cx('text-[11px] text-way-dim', f.keepUnit ? 'inline' : 'hidden', !compact && 'lg:inline')}> {f.unit}</span>
                     </span>
                     <span className="h-3 font-mono text-[10px] font-semibold leading-3" style={{ color: mv.c }}>
                       {mv.s}
@@ -119,12 +119,14 @@ export default function Leaderboard({ m, ranked, missing = [], f, k = 1, note, c
             const above = r.v != null && idx > 0 ? ranked[idx - 1] : null;
             const mv = moveOf(r);
             const level = lvl(r.id);
-            const sub = [
-              r.v == null ? 'Hasn’t synced yet' : above ? `${fmtVal(above.v - r.v, f.dec)} ${f.unit} behind ${above.id === m.me.id ? 'You' : displayName(m.person(above.id))}` : null,
-              r.streak >= 2 ? `${r.streak}-day streak` : null,
-            ]
-              .filter(Boolean)
-              .join(' · ');
+            const sub = r.places
+              ? r.places.map((pl) => `${FIELDS[pl.metric]?.label} ${pl.rank ? `#${pl.rank}` : '–'}`).join(' · ')
+              : [
+                  r.v == null ? 'Hasn’t synced yet' : above ? `${fmtVal(above.v - r.v, f.dec)} ${f.unit} behind ${above.id === m.me.id ? 'You' : displayName(m.person(above.id))}` : null,
+                  r.streak >= 2 ? `${r.streak}-day streak` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ');
             return (
               <div
                 key={r.id}
@@ -150,7 +152,7 @@ export default function Leaderboard({ m, ranked, missing = [], f, k = 1, note, c
                   </div>
                 )}
                 <div className="flex w-[72px] shrink-0 flex-col items-end gap-0.5">
-                  <span className={cx('font-mono text-sm font-semibold', r.v == null ? 'text-way-faint' : 'text-way-ink')}>{r.v == null ? 'no data' : fmtVal(r.v, f.dec)}</span>
+                  <span className={cx('font-mono text-sm font-semibold', r.v == null ? 'text-way-faint' : 'text-way-ink')}>{r.v == null ? 'no data' : `${fmtVal(r.v, f.dec)}${f.keepUnit ? ` ${f.unit}` : ''}`}</span>
                   {mv.s ? (
                     <span className="font-mono text-[10px] font-semibold" style={{ color: mv.c }}>
                       {mv.s}

@@ -207,7 +207,7 @@ export function FamilyTab({ m, k, onCheckIn, onManage, onKit, onOpenData, onAlia
 export function InboxTab({ m, onReview, onDecline, onCancel, onRevise }) {
   const describe = (x) => {
     if (x.kind === 'challenge')
-      return { what: `challenged you: ${x.ch.f.label.toLowerCase()} for ${x.ch.len} day${x.ch.len === 1 ? '' : 's'} (${x.ch.span})`, Icon: Swords, c: '#fb7185', fields: [x.item.metric] };
+      return { what: `challenged you for ${x.ch.len} day${x.ch.len === 1 ? '' : 's'} (${x.ch.span})`, Icon: Swords, c: '#fb7185', fields: x.ch.metrics };
     const c = x.item;
     if (c.kind === 'compete') return { what: 'wants to compete with you', Icon: Swords, c: '#fb7185', fields: c.fields };
     if (c.initiated_by === c.owner_id) return { what: `wants to share their data with you${c.ends_at ? '' : ' · no end date'}`, Icon: Share2, c: '#34d399', fields: c.fields };
@@ -292,7 +292,7 @@ export function InboxTab({ m, onReview, onDecline, onCancel, onRevise }) {
           const isCh = x.kind === 'challenge';
           const c = x.item;
           const what = isCh
-            ? `Your ${x.ch.f.label.toLowerCase()} challenge starts ${x.ch.left.replace('Starts ', '')}. Waiting on ${x.to.map(displayName).join(', ')}.`
+            ? `Your challenge starts ${x.ch.left.replace('Starts ', '')}. Waiting on ${x.to.map(displayName).join(', ')}.`
             : c.kind === 'compete'
               ? `You asked ${displayName(x.to)} to compete`
               : c.initiated_by === c.owner_id
@@ -302,7 +302,7 @@ export function InboxTab({ m, onReview, onDecline, onCancel, onRevise }) {
             <Card key={`${x.kind}-${c.id}`} className="flex flex-col gap-3 rounded-[18px] p-3.5 lg:rounded-[20px] lg:px-5 lg:py-[18px]">
               <span className="text-[13px] lg:text-sm">{what}</span>
               <div className="flex flex-wrap gap-1">
-                {(isCh ? [c.metric] : c.fields).map((f) => (
+                {(isCh ? x.ch.metrics : c.fields).map((f) => (
                   <FieldChip key={f} field={f} />
                 ))}
               </div>

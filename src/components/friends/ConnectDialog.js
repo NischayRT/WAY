@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AtSign, Swords, Share2, Eye, Check, Circle, Lock, UserPlus } from 'lucide-react';
 import { FIELDS, FIELD_KEYS, COMPETE_KEYS, FRIEND_LIMIT, FAMILY_LIMIT, displayName } from '@/lib/friends';
-import { CHALLENGE_LENGTHS, MAX_CHALLENGE_DAYS, MAX_CHALLENGE_PEOPLE, dayDiff, shortDay, weekdayDay } from '@/lib/challenges';
+import { CHALLENGE_LENGTHS, MAX_CHALLENGE_DAYS, MAX_CHALLENGE_PEOPLE, MAX_CHALLENGE_STATS, dayDiff, shortDay, weekdayDay } from '@/lib/challenges';
 import { addDays } from '@/lib/dateUtils';
 import { Modal, Btn, Segmented, cx } from '@/components/way/ui';
 import { Avatar } from './parts';
@@ -100,6 +100,7 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
     until: md.until || '',
     people: md.people || [],
     metric: md.metric || 'steps',
+    metrics: md.metrics?.length ? md.metrics : [md.metric || 'steps'],
     label: md.label || '',
     name: md.current || '',
   }));
@@ -194,11 +195,16 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
     const until = s.days === 'date' ? s.until : addDays(tomorrow, s.days - 1);
     const days = until && until >= tomorrow && until <= lastAllowed ? dayDiff(tomorrow, until) + 1 : null;
     const people = s.people.filter((id) => friends.some((p) => p.id === id));
-    valid = people.length > 0 && days != null;
+    const metrics = COMPETE_KEYS.filter((k) => s.metrics.includes(k));
+    const statWords = metrics.map((k) => FIELDS[k].label.toLowerCase());
+    const statList = statWords.length > 1 ? `${statWords.slice(0, -1).join(', ')} and ${statWords[statWords.length - 1]}` : statWords[0] || 'the stats';
+    valid = people.length > 0 && days != null && metrics.length > 0;
     title = 'New challenge';
     cta = people.length ? `Challenge ${people.length} friend${people.length === 1 ? '' : 's'}` : 'Send challenge';
     ctaTone = 'compete';
-    submit = () => run('create_challenge', { p_metric: s.metric, p_people: people, p_days: days }, `Challenge sent to ${people.length} friend${people.length === 1 ? '' : 's'}`);
+    submit = () => run('create_challenge', { p_metrics: metrics, p_people: people, p_days: days }, `Challenge sent to ${people.length} friend${people.length === 1 ? '' : 's'}`);
+    const toggleStat = (k) =>
+      set({ metrics: metrics.includes(k) ? (metrics.length > 1 ? metrics.filter((x) => x !== k) : metrics) : metrics.length >= MAX_CHALLENGE_STATS ? metrics : [...metrics, k] });
     const toggle = (id) =>
       set({ people: people.includes(id) ? people.filter((x) => x !== id) : people.length >= MAX_CHALLENGE_PEOPLE ? people : [...people, id] });
     body = (
@@ -238,19 +244,23 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
             Add a friend by username
           </button>
         ) : null}
-        <span className="text-xs font-semibold text-way-ink2">One stat</span>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-way-ink2">Stats</span>
+          <span className="text-[11px] text-way-dim">{metrics.length > 1 ? 'Each stat gets a podium · most stats won takes it' : 'Pick one or more'}</span>
+        </div>
         <div className="flex flex-wrap gap-1.5">
           {COMPETE_KEYS.map((k) => {
-            const on = s.metric === k;
+            const on = metrics.includes(k);
             return (
               <button
                 key={k}
                 type="button"
                 aria-pressed={on}
-                onClick={() => set({ metric: k })}
-                className="rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors"
+                onClick={() => toggleStat(k)}
+                className="flex items-center gap-[5px] rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors"
                 style={on ? { background: FIELDS[k].color, color: '#090d16', borderColor: FIELDS[k].color } : { color: '#94a3b8', borderColor: '#253044' }}
               >
+                {on ? <Check size={12} /> : <Circle size={12} />}
                 {FIELDS[k].label}
               </button>
             );
@@ -287,7 +297,7 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
             <span className="text-rose-300">Pick a last day between {shortDay(tomorrow)} and {shortDay(lastAllowed)}.</span>
           )}
           <span className="text-way-dim [text-wrap:pretty]">
-            It starts tomorrow. Friends can join until it ends, and every day counts. People who join see each other’s {FIELDS[s.metric].label.toLowerCase()} for these days, nothing else.
+            It starts tomorrow. Friends can join until it ends, and every day counts. People who join see each other’s {statList} for these days, nothing else.
           </span>
         </div>
       </>
@@ -346,7 +356,8 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
   } else if (md.type === 'reviewChallenge') {
     const x = md.x;
     const who = displayName(md.from);
-    const stat = x.f.label.toLowerCase();
+    const words = x.metrics.map((k) => FIELDS[k].label.toLowerCase());
+    const stat = words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}` : words[0];
     title = `${who} challenged you`;
     cta = 'Join challenge';
     ctaTone = 'compete';
@@ -359,7 +370,8 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
     body = (
       <>
         <span className="text-sm text-way-ink2 [text-wrap:pretty]">
-          {x.f.label} for {x.len} day{x.len === 1 ? '' : 's'}: {weekdayDay(x.c.starts_on)} to {weekdayDay(x.c.ends_on)}, ending 11:59 pm.
+          {stat.charAt(0).toUpperCase() + stat.slice(1)} for {x.len} day{x.len === 1 ? '' : 's'}: {weekdayDay(x.c.starts_on)} to {weekdayDay(x.c.ends_on)}, ending 11:59 pm.
+          {x.multi ? ' Each stat gets its own podium; whoever wins the most stats takes it.' : ''}
           {md.others ? ` With ${md.others}.` : ''}
         </span>
         <span className="rounded-xl bg-way-rail px-3 py-2.5 text-xs text-way-dim [text-wrap:pretty]">

@@ -1,45 +1,15 @@
 'use client';
 
-import { Crown, UserPlus, UserMinus, Swords, Check, PartyPopper, LayoutGrid, ChevronRight } from 'lucide-react';
-import { FIELDS, COMPETE_KEYS, PERIODS, fmtVal, displayName, relDay } from '@/lib/friends';
+import { Crown, UserPlus, Swords, Check, LayoutGrid, ChevronRight, Trophy, Plus, Hourglass } from 'lucide-react';
+import { FIELDS, COMPETE_KEYS, PERIODS, FRIEND_LIMIT, fmtVal, displayName } from '@/lib/friends';
 import { Card, Eyebrow, Btn, Segmented, cx } from '@/components/way/ui';
 import { Avatar, FIELD_ICONS, ICONS } from './parts';
 import Leaderboard from './Leaderboard';
-import { LivePanel } from './challenges';
+import { ChallengePanel, ChallengeHistory } from './challenges';
 
 const EASE = 'transition-[width] duration-[900ms] ease-[cubic-bezier(.2,.8,.2,1)]';
 const PERIOD_LABEL = { today: 'today', week: '7 days', month: '30 days' };
 
-function Section({ title, right, className = '' }) {
-  return (
-    <div className={cx('flex items-baseline justify-between gap-3 px-0.5', className)}>
-      <Eyebrow>{title}</Eyebrow>
-      {right ? <span className="font-mono text-[11px] font-medium text-way-dim">{right}</span> : null}
-    </div>
-  );
-}
-
-/** No competitors yet: no leaderboard at all, just the way in. */
-function EmptyArena({ onAdd }) {
-  return (
-    <Card className="relative flex flex-col items-center gap-4 overflow-hidden px-6 py-10 text-center lg:col-span-8 lg:py-16">
-      <div className="pointer-events-none absolute left-1/2 top-[-60px] h-[260px] w-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(250,204,21,.10),transparent_70%)]" />
-      <div className="way-pop relative flex h-16 w-16 items-center justify-center rounded-2xl border border-way-line2 bg-way-rail">
-        <Swords size={28} className="text-way-gold" />
-      </div>
-      <div className="relative flex max-w-[420px] flex-col gap-1.5">
-        <span className="font-heading text-2xl font-bold">Your arena is empty</span>
-        <span className="text-sm text-way-mute [text-wrap:pretty]">
-          Add up to 6 friends to compete with. The leaderboard appears once someone accepts, and you only compare the stats you both agree on.
-        </span>
-      </div>
-      <Btn variant="primary" onClick={onAdd} className="relative">
-        <UserPlus size={14} />
-        Add a friend
-      </Btn>
-    </Card>
-  );
-}
 
 /** Two people: a head-to-head. Sides slide in, the VS pops, the bar tugs. */
 function HeadToHead({ m, ranked, missing, f, k }) {
@@ -152,9 +122,129 @@ function AllBoards({ m, period, setMetric, k }) {
   );
 }
 
-export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, onCheerPerson, onClaim, onAdd, onOpenFamily, onRemove, onOpenChallenge, onNewChallenge, onInvites }) {
-  const hasArena = m.competitors.length > 0;
+/** No friends yet: what the Arena is, and the way in. */
+function ArenaWelcome({ m, onAdd, onOpenFriends }) {
+  const waiting = m.outgoing.filter((x) => x.kind === 'conn' && x.item.kind === 'compete');
+  const slots = Array.from({ length: FRIEND_LIMIT }, (_, i) => waiting[i] || null);
+  return (
+    <Card className="relative flex flex-col gap-6 overflow-hidden px-5 py-8 lg:px-10 lg:py-12">
+      <div className="pointer-events-none absolute left-1/2 top-[-80px] h-[280px] w-[460px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(250,204,21,.10),transparent_70%)]" />
+      <div className="relative flex flex-col items-center gap-2 text-center">
+        <span className="font-heading text-[11px] font-bold tracking-[0.16em] text-way-gold">{waiting.length ? 'ALMOST THERE' : 'THE ARENA'}</span>
+        <span className="font-heading text-2xl font-bold md:text-[28px]">
+          {waiting.length ? `Waiting for ${waiting.map((x) => displayName(x.to)).join(' and ')}` : 'Compete with up to 4 friends'}
+        </span>
+        <span className="max-w-[460px] text-sm text-way-mute [text-wrap:pretty]">
+          {waiting.length
+            ? 'Your invite is in their Inbox. The moment someone accepts, your leaderboard and challenges open here.'
+            : 'Add a friend by their exact username. Once they accept, you race them two ways:'}
+        </span>
+      </div>
+      <div className="relative flex justify-center gap-3">
+        {slots.map((x, i) =>
+          x ? (
+            <div key={i} className="flex flex-col items-center gap-1.5">
+              <Avatar person={x.to} size={52} className="opacity-70" ring="0 0 0 3px #0f1420, 0 0 0 5px rgba(56,189,248,.5)" />
+              <span className="flex items-center gap-1 text-[11px] text-sky-300">
+                <Hourglass size={10} />
+                invited
+              </span>
+            </div>
+          ) : (
+            <button
+              key={i}
+              type="button"
+              onClick={onAdd}
+              aria-label="Add a friend"
+              className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-dashed border-way-line3 text-way-dim transition-colors hover:border-way-dim hover:text-way-ink2"
+            >
+              <Plus size={18} />
+            </button>
+          )
+        )}
+      </div>
+      {!waiting.length ? (
+        <div className="relative grid gap-3 sm:grid-cols-2">
+          {[
+            [Trophy, '#facc15', 'Leaderboard', 'Always on. You and every friend, ranked for today, 7 days or 30 days on the stats you agree on.'],
+            [Swords, '#fb7185', 'Challenges', 'A race with a finish line. Pick friends, stats and a last day. Everyone who joined gets the podium at the end.'],
+          ].map(([Icon, color, title, text]) => (
+            <div key={title} className="flex gap-3 rounded-2xl border border-way-line bg-way-rail p-4">
+              <Icon size={18} style={{ color }} className="mt-0.5 shrink-0" />
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-semibold">{title}</span>
+                <span className="text-xs text-way-mute [text-wrap:pretty]">{text}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div className="relative flex flex-wrap justify-center gap-2">
+        <Btn variant="primary" onClick={onAdd}>
+          <UserPlus size={14} />
+          {waiting.length ? 'Add another friend' : 'Add your first friend'}
+        </Btn>
+        {waiting.length ? (
+          <Btn variant="outline" onClick={onOpenFriends}>
+            Manage invites
+          </Btn>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+/** Friends, but nobody else has numbers yet: no fake "#1 of 1". */
+function WarmingUp({ m, period, k }) {
+  const key = 'steps';
+  const days = PERIOD_LABEL[period];
+  const people = [m.me.id, ...m.competitors.map((c) => c.id)];
+  return (
+    <Card className="flex flex-col overflow-hidden">
+      <div className="flex flex-col gap-1.5 px-5 pb-4 pt-6 lg:px-8 lg:pt-8">
+        <span className="font-heading text-[11px] font-bold tracking-[0.16em] text-sky-300">LEADERBOARD WARMING UP</span>
+        <span className="font-heading text-xl font-bold md:text-2xl">Rankings start when a friend’s numbers arrive</span>
+        <span className="text-[13px] text-way-mute [text-wrap:pretty]">
+          Each person’s numbers come in when they open WAY (at most every 30 minutes). Until then there’s no one to rank against, so nobody is #1 yet.
+        </span>
+      </div>
+      <div className="border-t border-way-line">
+        {people.map((id, i) => {
+          const isMe = id === m.me.id;
+          const v = m.board(key, period).ranked.find((r) => r.id === id)?.v ?? null;
+          return (
+            <div key={id} className={cx('way-in-right flex items-center gap-3 px-5 py-3 lg:px-8', i && 'border-t border-way-line')} style={{ '--d': `${i * 90 * k}ms` }}>
+              <Avatar person={m.person(id)} isMe={isMe} size={34} />
+              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{isMe ? 'You' : displayName(m.person(id))}</span>
+              {v != null ? (
+                <span className="flex items-center gap-2 font-mono text-xs text-way-ink2">
+                  <Check size={13} className="text-way-protein" />
+                  {fmtVal(v)} steps · {days}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs text-way-dim">
+                  <Hourglass size={12} />
+                  waiting for first sync
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * The Arena: everything competitive in one place. The main card is the
+ * always-on leaderboard (or what to do before there is one); the side
+ * column is challenges, worded for the situation you're in.
+ */
+export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onClaim, onAdd, onOpenFriends, panel }) {
+  const hasFriends = m.competitors.length > 0;
   const shared = COMPETE_KEYS.filter((key) => m.competitors.some((c) => c.fields.includes(key)));
+  const othersRanked = shared.some((key) => ['today', 'week', 'month'].some((p) => m.board(key, p).ranked.some((r) => r.id !== m.me.id)));
+  const ready = hasFriends && othersRanked;
   const all = metric === 'all' || !shared.includes(metric);
   const f = all ? null : FIELDS[metric];
   const board = all ? null : m.board(metric, period);
@@ -163,7 +253,7 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
 
   // Your rank (one stat) or standings (all stats)
   let rankCard = null;
-  if (hasArena && !all) {
+  if (ready && !all) {
     const i = ranked.findIndex((r) => r.id === m.me.id);
     const mine = ranked[i];
     const ahead = i > 0 ? ranked[i - 1] : null;
@@ -199,7 +289,7 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
         </div>
       </Card>
     );
-  } else if (hasArena) {
+  } else if (ready) {
     const standings = shared.map((key) => {
       const r = m.board(key, period).ranked;
       return { key, rank: r.findIndex((x) => x.id === m.me.id) + 1, of: r.length };
@@ -264,202 +354,47 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
     />
   );
 
-  return (
-    <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 lg:gap-5">
-      {hasArena ? (
-        <>
-          <div className="flex flex-col gap-3.5 lg:hidden">
-            {chips}
-            {periods}
+  const progress = (
+    <div className={cx('grid grid-cols-1 gap-3.5 lg:gap-5', !m.ch.hasHistory && 'md:grid-cols-2')}>
+        <Card className="flex flex-col overflow-hidden pt-[18px] lg:pb-2 lg:pt-[22px]">
+          <div className="flex items-center justify-between px-4 pb-3 lg:px-[22px]">
+            <Eyebrow>Weekly quests</Eyebrow>
+            <span className="font-mono text-[11px] font-medium text-way-dim">{m.season.left}</span>
           </div>
-          <Card className="relative flex flex-col overflow-hidden lg:col-span-8">
-            <div className="relative z-[1] hidden items-center justify-between gap-4 px-6 pt-[22px] lg:flex">
-              {chips}
-              {periods}
-            </div>
-            <div key={`${metric}-${period}`}>
-              {all ? (
-                <AllBoards m={m} period={period} setMetric={setMetric} k={k} />
-              ) : people <= 2 ? (
-                <HeadToHead m={m} ranked={ranked} missing={board.missing} f={f} k={k} />
-              ) : (
-                <Leaderboard m={m} ranked={ranked} missing={board.missing} f={f} k={k} />
-              )}
-            </div>
-            <div className="hidden border-t border-way-line px-6 pb-4 pt-3 text-[11px] text-way-dim lg:block">
-              Only stats you both agreed on are compared · numbers update when each person opens WAY (at most every 30 min)
-              {f?.agg === 'avg' ? ' · sleep is an average per night' : ''}
-            </div>
-          </Card>
-        </>
-      ) : (
-        <EmptyArena onAdd={onAdd} />
-      )}
-
-      {/* Side column. Below 1024px its cards join the page flow, with the
-          live challenges first: they're the most time-sensitive thing here. */}
-      <div className="contents lg:col-span-4 lg:flex lg:flex-col lg:gap-5">
-        <div className="order-first lg:order-none">
-          <LivePanel m={m} k={k} onOpen={onOpenChallenge} onNew={onNewChallenge} onInvites={onInvites} />
-        </div>
-        {rankCard}
-
-      </div>
-
-      {/* Your people: everyone you're connected with, with a direct cheer */}
-      {m.friends.length ? (
-        <Card className="flex flex-col pb-2 pt-[18px] lg:col-span-12 lg:pt-[22px]">
-          <div className="flex items-center justify-between gap-3 px-4 pb-3 lg:px-6">
-            <Eyebrow>Your people · {m.friends.length}</Eyebrow>
-            <span className="font-mono text-[11px] font-medium text-way-dim">
-              {m.cheersInWeek ? `${m.cheersInWeek} cheer${m.cheersInWeek === 1 ? '' : 's'} for you this week · ` : ''}one cheer a day each
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-            {m.friends.map((f) => (
-              <div key={f.id} className="flex items-center gap-3 border-t border-way-line px-4 py-3 lg:px-6">
-                <Avatar person={f.person} size={38} />
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate text-[13px] font-semibold lg:text-sm">
-                    {displayName(f.person)}
-                    {f.person.username ? <span className="font-normal text-way-dim"> @{f.person.username}</span> : null}
-                  </span>
-                  <span className="truncate text-xs text-way-mute">
-                    {f.rels.join(' · ')} · {f.line}
-                    {f.cheeredYou ? <span className="text-way-gold"> · cheered you{f.cheeredYou > 1 ? ` ×${f.cheeredYou}` : ''}</span> : null}
-                  </span>
+          {m.quests.map((q, i) => {
+            const Icon = q.claimed ? Check : ICONS[q.icon];
+            const tone = q.claimed ? ['rgba(52,211,153,.14)', '#34d399', '#34d399'] : q.done ? ['rgba(250,204,21,.16)', '#facc15', '#facc15'] : ['#1a2130', '#94a3b8', '#7c8aa0'];
+            return (
+              <div key={q.id} className={cx('flex items-center gap-3 px-3.5 py-[13px] lg:px-[22px] lg:py-3', (i || true) && i ? 'border-t border-way-line' : 'lg:border-t lg:border-way-line')}>
+                <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] transition-colors lg:h-9 lg:w-9" style={{ background: tone[0], color: tone[1] }}>
+                  <Icon size={16} />
                 </div>
-                {f.canCheer ? (
+                <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
+                  <div className="flex justify-between gap-1.5">
+                    <span className="text-[13px] font-medium">{q.label}</span>
+                    <span className="whitespace-nowrap font-mono text-[11px] font-semibold text-way-dim">{q.progStr}</span>
+                  </div>
+                  <div className="h-1 overflow-hidden rounded-full bg-way-track">
+                    <div className={cx('h-full', EASE)} style={{ width: `${q.pct * k}%`, background: tone[2] }} />
+                  </div>
+                </div>
+                {q.done && !q.claimed ? (
                   <button
                     type="button"
-                    onClick={() => onCheerPerson(f)}
-                    aria-pressed={f.cheered}
-                    title={f.cheered ? 'Cheered today · tap to undo' : `Cheer ${displayName(f.person)}`}
-                    className="flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-[background,color,border-color,transform] duration-200"
-                    style={
-                      f.cheered
-                        ? { background: 'rgba(250,204,21,.14)', color: '#facc15', borderColor: 'rgba(250,204,21,.4)', transform: 'scale(1.04)' }
-                        : { color: '#cbd5e1', borderColor: '#253044' }
-                    }
+                    onClick={() => onClaim(q)}
+                    className="whitespace-nowrap rounded-[9px] bg-way-gold px-2.5 py-[7px] text-[11px] font-semibold text-[#1a1300] shadow-[0_0_16px_rgba(250,204,21,.4)]"
                   >
-                    <PartyPopper size={13} />
-                    {f.cheered ? 'Cheered' : 'Cheer'}
+                    Claim {q.xp}
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={onOpenFamily}
-                    className="flex shrink-0 items-center gap-1 rounded-full border border-way-line2 px-3 py-1.5 text-xs font-semibold text-way-ink2 hover:bg-way-hover"
-                  >
-                    View
-                    <ChevronRight size={13} />
-                  </button>
+                  <span className={cx('w-[62px] text-right font-mono text-[11px] font-semibold', q.claimed ? 'text-way-protein' : 'text-way-dim')}>
+                    {q.claimed ? 'Claimed' : `+${q.xp} XP`}
+                  </span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => onRemove(f.person)}
-                  aria-label={`Remove ${displayName(f.person)}`}
-                  title={`Remove ${displayName(f.person)}`}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-way-dim transition-colors hover:bg-way-hover hover:text-rose-300"
-                >
-                  <UserMinus size={15} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </Card>
-      ) : null}
-
-      {/* Feed */}
-      <Card className="flex flex-col pb-2 pt-[18px] lg:col-span-8 lg:pt-[22px]">
-        <div className="flex items-center justify-between px-4 pb-3 lg:px-6">
-          <Eyebrow>Live feed</Eyebrow>
-          <span className="font-mono text-[11px] font-medium text-way-dim">Competitors only · no private data</span>
-        </div>
-        {m.feed.length ? (
-          m.feed.map((e) => {
-            const p = m.person(e.personId);
-            const Icon = ICONS[e.icon] || PartyPopper;
-            return (
-              <div key={e.key} className="flex items-center gap-3 border-t border-way-line px-4 py-3 lg:gap-3.5 lg:px-6">
-                <Avatar person={p} size={36}>
-                  <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-way-card" style={{ background: e.iconBg }}>
-                    <Icon size={10} className="text-way-page" />
-                  </span>
-                </Avatar>
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="text-[13px] lg:text-sm">
-                    <strong className="font-semibold">{displayName(p)}</strong> {e.text}
-                  </span>
-                  <span className="font-mono text-[11px] font-medium text-way-dim">{relDay(e.day, m.today)}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onCheer(e)}
-                  aria-pressed={e.mine}
-                  aria-disabled={e.locked}
-                  title={e.locked ? `You already cheered ${displayName(p)} today` : e.mine ? 'Cheered · tap to undo' : `Cheer ${displayName(p)}`}
-                  className={cx('flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-[background,color,border-color,transform] duration-200', e.locked && 'cursor-not-allowed opacity-45')}
-                  style={
-                    e.mine
-                      ? { background: 'rgba(250,204,21,.14)', color: '#facc15', borderColor: 'rgba(250,204,21,.4)', transform: 'scale(1.06)' }
-                      : { color: '#94a3b8', borderColor: '#253044' }
-                  }
-                >
-                  <PartyPopper size={13} />
-                  {e.count}
-                </button>
               </div>
             );
-          })
-        ) : (
-          <p className="border-t border-way-line px-6 py-6 text-center text-[13px] text-way-dim">
-            Wins from people you compete with show up here: 10k-step days, big climbs, long nights of sleep.
-          </p>
-        )}
-      </Card>
-
-      <div className="flex flex-col gap-3.5 lg:col-span-4 lg:gap-5">
-        <Section title="Weekly quests" right={m.season.left} className="lg:hidden" />
-          <Card className="flex flex-col overflow-hidden lg:pb-2 lg:pt-[22px]">
-            <div className="hidden items-center justify-between px-[22px] pb-3 lg:flex">
-              <Eyebrow>Weekly quests</Eyebrow>
-              <span className="font-mono text-[11px] font-medium text-way-dim">{m.season.left}</span>
-            </div>
-            {m.quests.map((q, i) => {
-              const Icon = q.claimed ? Check : ICONS[q.icon];
-              const tone = q.claimed ? ['rgba(52,211,153,.14)', '#34d399', '#34d399'] : q.done ? ['rgba(250,204,21,.16)', '#facc15', '#facc15'] : ['#1a2130', '#94a3b8', '#7c8aa0'];
-              return (
-                <div key={q.id} className={cx('flex items-center gap-3 px-3.5 py-[13px] lg:px-[22px] lg:py-3', (i || true) && i ? 'border-t border-way-line' : 'lg:border-t lg:border-way-line')}>
-                  <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] transition-colors lg:h-9 lg:w-9" style={{ background: tone[0], color: tone[1] }}>
-                    <Icon size={16} />
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
-                    <div className="flex justify-between gap-1.5">
-                      <span className="text-[13px] font-medium">{q.label}</span>
-                      <span className="whitespace-nowrap font-mono text-[11px] font-semibold text-way-dim">{q.progStr}</span>
-                    </div>
-                    <div className="h-1 overflow-hidden rounded-full bg-way-track">
-                      <div className={cx('h-full', EASE)} style={{ width: `${q.pct * k}%`, background: tone[2] }} />
-                    </div>
-                  </div>
-                  {q.done && !q.claimed ? (
-                    <button
-                      type="button"
-                      onClick={() => onClaim(q)}
-                      className="whitespace-nowrap rounded-[9px] bg-way-gold px-2.5 py-[7px] text-[11px] font-semibold text-[#1a1300] shadow-[0_0_16px_rgba(250,204,21,.4)]"
-                    >
-                      Claim {q.xp}
-                    </button>
-                  ) : (
-                    <span className={cx('w-[62px] text-right font-mono text-[11px] font-semibold', q.claimed ? 'text-way-protein' : 'text-way-dim')}>
-                      {q.claimed ? 'Claimed' : `+${q.xp} XP`}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </Card>
+          })}
+        </Card>
 
         {/* Badges */}
         <Card className="flex flex-col gap-4 p-[18px] lg:p-[22px]">
@@ -493,8 +428,57 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
           })}
         </div>
         </Card>
+    </div>
+  );
+  return (
+    <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 lg:items-start lg:gap-5">
+      {/* Main column: the leaderboard (or what comes before it), then history.
+          Below 1024px both columns dissolve into one flow. */}
+      <div className="contents lg:col-span-8 lg:flex lg:flex-col lg:gap-5">
+      {!hasFriends ? (
+        <ArenaWelcome m={m} onAdd={onAdd} onOpenFriends={onOpenFriends} />
+      ) : !ready ? (
+        <WarmingUp m={m} period={period} k={k} />
+      ) : (
+        <>
+          <div className="flex flex-col gap-3.5 lg:hidden">
+            {chips}
+            {periods}
+          </div>
+          <Card className="relative flex flex-col overflow-hidden">
+            <div className="relative z-[1] hidden items-center justify-between gap-4 px-6 pt-[22px] lg:flex">
+              {chips}
+              {periods}
+            </div>
+            <div key={`${metric}-${period}`}>
+              {all ? (
+                <AllBoards m={m} period={period} setMetric={setMetric} k={k} />
+              ) : people <= 2 ? (
+                <HeadToHead m={m} ranked={ranked} missing={board.missing} f={f} k={k} />
+              ) : (
+                <Leaderboard m={m} ranked={ranked} missing={board.missing} f={f} k={k} />
+              )}
+            </div>
+            <div className="hidden border-t border-way-line px-6 pb-4 pt-3 text-[11px] text-way-dim lg:block">
+              Leaderboard · always on · only stats you both agreed on are compared · numbers update when each person opens WAY (at most every 30 min)
+              {f?.agg === 'avg' ? ' · sleep is an average per night' : ''}
+            </div>
+          </Card>
+        </>
+      )}
+
+        {m.ch.hasHistory ? <ChallengeHistory m={m} onOpen={panel.onOpen} /> : progress}
       </div>
+      {/* Side column. Below 1024px its cards join the page flow, with
+          challenges first: they're the most time-sensitive thing here. */}
+      <div className="contents lg:col-span-4 lg:flex lg:flex-col lg:gap-5">
+        <div className={cx(m.ch.invites.length || m.ch.state === 'live' ? 'order-first' : '', 'lg:order-none')}>
+          <ChallengePanel m={m} k={k} onAddFriend={onAdd} {...panel} />
+        </div>
+        {rankCard}
+        {m.ch.hasHistory ? progress : null}
+      </div>
+
     </div>
   );
 }
-

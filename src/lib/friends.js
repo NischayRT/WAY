@@ -47,7 +47,7 @@ export function avatarOf(person, isMe) {
 }
 /** Your private nickname for them first, then their first name, then @username. */
 export const displayName = (p) => (p?.alias && p.alias.trim()) || (p?.full_name && p.full_name.trim()) || (p?.username ? `@${p.username}` : 'Someone');
-export const FRIEND_LIMIT = 6;
+export const FRIEND_LIMIT = 4;
 export const FAMILY_LIMIT = 3;
 export const initialOf = (p) => (displayName(p).replace('@', '').charAt(0) || '?').toUpperCase();
 

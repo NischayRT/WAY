@@ -27,12 +27,13 @@ import ConnectDialog from './ConnectDialog';
 import { Avatar } from './parts';
 import { FamilyTab, InboxTab, PrivacyTab } from './tabs';
 import { ArenaTab } from './arena';
-import { ChallengesTab, ChallengeSheet } from './challenges';
+import { ChallengeSheet } from './challenges';
+import { FriendsTab } from './friendsTab';
 import { buildChallenges } from '@/lib/challenges';
 
 const TABS = [
   { key: 'arena', label: 'Arena' },
-  { key: 'challenges', label: 'Challenges' },
+  { key: 'friends', label: 'Friends' },
   { key: 'family', label: 'Family' },
   { key: 'inbox', label: 'Inbox' },
   { key: 'privacy', label: 'Privacy' },
@@ -232,6 +233,7 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
 
   const stepsBoard = buildBoard({ meId: userId, competitors, stats: d.stats, metric: 'steps', period: 'week', today });
   const seasonRank = stepsBoard.ranked.findIndex((r) => r.id === userId) + 1;
+  const othersRankedSteps = stepsBoard.ranked.some((r) => r.id !== userId);
 
   return {
     me,
@@ -262,7 +264,7 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
     canRename,
     renameHint: canRename ? 'You can change it once every 30 days.' : `You can change it again in ${waitDays} day${waitDays === 1 ? '' : 's'}.`,
     foodStreak,
-    seasonRank: seasonRank > 0 ? `#${seasonRank} of ${stepsBoard.ranked.length}` : '—',
+    seasonRank: seasonRank > 0 && othersRankedSteps ? `#${seasonRank} of ${stepsBoard.ranked.length}` : othersRankedSteps ? '—' : 'Waiting on friends',
   };
 }
 
@@ -391,7 +393,7 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   const d = useFriendsData(userId, today);
   const k = useMounted() ? 1 : 0;
   const [toast, showToast] = useToast();
-  const startTab = initialTab === 'duels' ? 'challenges' : initialTab;
+  const startTab = initialTab === 'duels' || initialTab === 'challenges' ? 'arena' : initialTab;
   const [tab, setTab] = useState(TABS.some((t) => t.key === startTab) ? startTab : 'arena');
   const [sheet, setSheet] = useState(null); // challenge id open in the detail / results sheet
   const [shownResult, setShownResult] = useState(null);
@@ -546,11 +548,14 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   const friendsToChallenge = () => m.competitors.map((c) => m.person(c.id));
   const newChallenge = (preset = {}) =>
     setMd({ type: 'challenge', friends: friendsToChallenge(), today, counts: { friends: m.friendCount, family: m.familyCount }, ...preset });
+  const friendIds = () => new Set(m.competitors.map((c) => c.id));
   const onRematch = (x) => {
     setSheet(null);
-    const ids = new Set(m.competitors.map((c) => c.id));
-    newChallenge({ people: x.joined.filter((id) => id !== userId && ids.has(id)), metric: x.metric, days: [1, 3, 7, 14, 30].includes(x.len) ? x.len : 7 });
+    const ids = friendIds();
+    newChallenge({ people: x.joined.filter((id) => id !== userId && ids.has(id)).slice(0, 4), metrics: x.metrics, days: [1, 3, 7, 14, 30].includes(x.len) ? x.len : 7 });
   };
+  const onPreset = (p) => newChallenge({ people: m.competitors.slice(0, 4).map((c) => c.id), metrics: p.metrics, days: p.days });
+  const onChallengeFriend = (person) => newChallenge({ people: [person.id] });
   const onLeave = (x) =>
     setCf({
       title: 'Leave this challenge?',
@@ -633,9 +638,13 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   const sheetX = sheet ? m.ch.all.find((x) => x.id === sheet) : null;
   const chips = [
     { Icon: Flame, label: 'Log streak', v: `${m.foodStreak} day${m.foodStreak === 1 ? '' : 's'}`, c: '#fb923c' },
-    { Icon: Swords, label: 'Challenges won', v: `${m.ch.record.wins} won · ${m.ch.record.podiums} top 3`, c: '#fb7185' },
-    { Icon: Trophy, label: 'Steps this week', v: m.seasonRank, c: '#facc15' },
-    { Icon: Users, label: 'Friends · Family', v: `${m.friendCount}/${FRIEND_LIMIT} · ${m.familyCount}/${FAMILY_LIMIT}`, c: '#60a5fa' },
+    m.ch.record.played
+      ? { Icon: Swords, label: 'Challenges', v: `${m.ch.record.wins} won · ${m.ch.record.podiums} top 3`, c: '#fb7185' }
+      : m.ch.running.length
+        ? { Icon: Swords, label: 'Challenges', v: m.ch.live.length ? `${m.ch.live.length} live now` : 'Starting soon', c: '#fb7185' }
+        : { Icon: Swords, label: 'Challenges', v: m.competitors.length ? 'None yet' : 'Need a friend', c: '#fb7185' },
+    { Icon: Trophy, label: 'Steps this week', v: m.competitors.length ? m.seasonRank : 'Just you', c: '#facc15' },
+    { Icon: Users, label: 'Friends · Family', v: `${m.competitors.length}/${FRIEND_LIMIT} · ${m.sharesIn.length + m.sharesOut.length ? m.familyCount : 0}/${FAMILY_LIMIT}`, c: '#60a5fa' },
   ];
 
   return (
@@ -732,18 +741,33 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
             period={period}
             setPeriod={setPeriod}
             k={k}
-            onCheer={onCheer}
-            onCheerPerson={onCheerPerson}
             onClaim={onClaim}
             onAdd={add}
-            onOpenFamily={() => setTab('family')}
-            onRemove={onRemove}
-            onOpenChallenge={(x) => setSheet(x.id)}
-            onNewChallenge={() => newChallenge()}
-            onInvites={() => setTab('challenges')}
+            onOpenFriends={() => setTab('friends')}
+            panel={{
+              onOpen: (x) => setSheet(x.id),
+              onNew: () => newChallenge(),
+              onPreset,
+              onReview: reviewChallenge,
+              onDecline: declineChallenge,
+              onRematch,
+            }}
           />
-        ) : tab === 'challenges' ? (
-          <ChallengesTab m={model} k={k} onOpen={(x) => setSheet(x.id)} onNew={() => newChallenge()} onReview={reviewChallenge} onDecline={declineChallenge} />
+        ) : tab === 'friends' ? (
+          <FriendsTab
+            m={model}
+            k={k}
+            copied={copied}
+            onCopy={onCopy}
+            onAdd={add}
+            onCheer={onCheer}
+            onCheerPerson={onCheerPerson}
+            onChallenge={onChallengeFriend}
+            onRemove={onRemove}
+            onReview={onReview}
+            onDecline={onDecline}
+            onCancel={onCancel}
+          />
         ) : tab === 'family' ? (
           <FamilyTab
             m={model}

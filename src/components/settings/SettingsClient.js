@@ -15,7 +15,7 @@ const SECS = [
   ['profile', 'Profile & targets', 'Profile', UserRound, 'Basics, goal, daily targets'],
   ['body', 'Body', 'Body', PersonStanding, '3D body, measurements, goal'],
   ['apps', 'Connected apps', 'Apps', Link2, null],
-  ['account', 'Account', 'Account', CircleUserRound, 'Sign out, delete, legal'],
+  ['account', 'Account', 'Account', CircleUserRound, 'Sign out, your data, legal'],
 ];
 
 export default function SettingsClient({ profile, email, initialSection, initialBodyTab, googleHealth, currentWeightKg, startKg, today, banner }) {

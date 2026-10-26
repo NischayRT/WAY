@@ -200,15 +200,15 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="7. How long we keep it, and how to delete it">
+      <Section id="delete" title="7. How long we keep it, and how to delete it">
         <p>
           We keep your information for as long as you have an account. You are in control of deletion:
         </p>
         <UL
           items={[
-            'Delete account (Settings → Delete account) permanently erases your profile, food logs and weight logs, revokes our access to Google Health, and deletes the stored Google tokens.',
+            'To delete your account, email us from the address you sign in with. We permanently erase your profile, food and weight logs, friends and activity data, custom dishes (dishes other people already logged are kept for them without your name), the stored Google tokens and your sign-in record, normally within 30 days.',
             'Disconnect (Settings → Connected Apps) removes Google Health access and our stored Google tokens without deleting your account.',
-            'To also remove your sign-in record held by our authentication provider, or to request deletion of anything else, email us at the address below and we will act on it within a reasonable time, normally within 30 days.',
+            'You can delete any custom dish you created at any time from Log food → My recipes.',
           ]}
         />
         <p>

@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { getValidAccessToken, fetchDailyHistory, fetchExtraHistory } from '@/lib/googleHealth';
 import { todayLocalDate, addDays } from '@/lib/dateUtils';
 import { getAuthUser } from '@/lib/authServer';
+import { getAdminClient } from '@/lib/supabaseAdmin';
 
 // POST /api/friends/sync[?force=1]
 //
@@ -12,6 +13,10 @@ import { getAuthUser } from '@/lib/authServer';
 // sleep and resting heart rate come from Google Health when connected;
 // calories and protein from food_logs; weight from weight_logs.
 // Runs at most every 30 minutes unless forced.
+//
+// Browsers can't write daily_stats (see supabase/security-fixes-2026-10.sql),
+// so the write uses the server-only service-role client, always scoped to the
+// verified user.
 const WINDOW = 31;
 const FRESH_MS = 30 * 60 * 1000;
 
@@ -19,8 +24,16 @@ const round = (v, dp = 0) => (v == null || !Number.isFinite(Number(v)) ? null : 
 
 export async function POST(request) {
   const supabase = await createServerSupabaseClient();
-  const user = await getAuthUser(supabase);
+  // Verify the session token itself here (not the middleware header): the
+  // service-role write below has no RLS behind it.
+  const user = await getAuthUser(supabase, { trustMiddleware: false });
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const admin = getAdminClient();
+  if (!admin) {
+    console.error('[friends/sync] SUPABASE_SERVICE_ROLE_KEY is not set');
+    return NextResponse.json({ error: 'Friends sharing isn’t set up on the server yet.', setup: true }, { status: 503 });
+  }
 
   const force = new URL(request.url).searchParams.get('force') === '1';
   const today = todayLocalDate();
@@ -99,14 +112,14 @@ export async function POST(request) {
     .map((r) => ({ ...Object.fromEntries(KEYS.map((k) => [k, r[k] ?? null])), user_id: r.user_id, day: r.day, updated_at: now }));
 
   if (payload.length) {
-    const { error } = await supabase.from('daily_stats').upsert(payload, { onConflict: 'user_id,day' });
+    const { error } = await admin.from('daily_stats').upsert(payload, { onConflict: 'user_id,day' });
     if (error) {
       console.error('[friends/sync] upsert', error.message);
       return NextResponse.json({ error: 'Could not update' }, { status: 500 });
     }
   }
   // Keep only the window friends can see.
-  await supabase.from('daily_stats').delete().eq('user_id', user.id).lt('day', from);
+  await admin.from('daily_stats').delete().eq('user_id', user.id).lt('day', from);
 
   return NextResponse.json({ updated: payload.length, google, updatedAt: now });
 }

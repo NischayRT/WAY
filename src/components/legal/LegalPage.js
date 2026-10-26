@@ -2,9 +2,9 @@ import Link from 'next/link';
 import AppHeader from '@/components/layout/AppHeader';
 import { LEGAL } from '@/lib/legal';
 
-export function Section({ title, children }) {
+export function Section({ id, title, children }) {
   return (
-    <section className="space-y-3">
+    <section id={id} className="scroll-mt-6 space-y-3">
       <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
       <div className="space-y-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{children}</div>
     </section>

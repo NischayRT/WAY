@@ -55,7 +55,7 @@ export async function GET() {
       .eq('logged_at', today),
     sharedFoodsCached(supabase),
     // Foods people added themselves (yours, and any shared by others) — small.
-    supabase.from('foods').select(FOOD_COLS).not('created_by', 'is', null),
+    supabase.from('foods').select(FOOD_COLS).not('created_by', 'is', null).is('archived_at', null).limit(2000),
     // Personalisation: how often you logged each food in the last 6 months.
     supabase.from('food_logs').select('food_id').eq('user_id', user.id).gte('logged_at', addDays(today, -180)),
   ]);

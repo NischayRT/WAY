@@ -182,6 +182,8 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
   const [recipeIds, setRecipeIds] = useState(() => new Set()); // foods that have an ingredient list
   const [editing, setEditing] = useState(null); // { food, grams }
   const [toastNode, toast] = useToast();
+  const [armed, setArmed] = useState(null); // dish id waiting for a second tap to delete
+  const [deleting, setDeleting] = useState(null);
   const grams = units === 'grams';
 
   useEffect(() => {
@@ -426,7 +428,12 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
       else if (nm.includes(ql)) contains.push(f);
       if (starts.length >= MAX_RESULTS * 3) break;
     }
-    const names = new Set(foods.map((f) => f.name.toLowerCase()));
+    // Built-in foods first, then yours, then other people's dishes.
+    const rank = (f) => (!f.created_by ? 0 : f.created_by === userId ? 1 : 2);
+    starts.sort((a, b) => rank(a) - rank(b));
+    contains.sort((a, b) => rank(a) - rank(b));
+    // Only a built-in food with the same name hides an ingredient.
+    const names = new Set(foods.filter((f) => !f.created_by).map((f) => f.name.toLowerCase()));
     const ingStarts = [];
     const ingContains = [];
     for (const i of ingredients) {
@@ -436,7 +443,7 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
       else if (nm.includes(ql)) ingContains.push(ingredientAsFood(i));
     }
     return [...starts, ...ingStarts, ...contains, ...ingContains];
-  }, [foods, ingredients, ql]);
+  }, [foods, ingredients, ql, userId]);
   const results = useMemo(() => allResults.filter(kindOk).slice(0, MAX_RESULTS), [allResults, kind]); // eslint-disable-line react-hooks/exhaustive-deps
   const kindCounts = useMemo(() => {
     const ing = allResults.filter(isIng).length;
@@ -568,6 +575,28 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
     setTrayOpen(false);
     setNonce((x) => x + 1);
     router.refresh();
+  };
+
+  // Delete one of your own dishes (the database checks it is yours). A dish
+  // someone has logged is archived instead: hidden here, kept for their logs.
+  const deleteDish = async (food) => {
+    if (armed !== food.id) {
+      setArmed(food.id);
+      setTimeout(() => setArmed((a) => (a === food.id ? null : a)), 4000);
+      return;
+    }
+    setArmed(null);
+    setDeleting(food.id);
+    const { data, error } = await supabase.rpc('delete_my_food', { p_food_id: food.id });
+    setDeleting(null);
+    if (error) {
+      toast(error.message || 'Couldn’t delete that dish', X, 'error');
+      return;
+    }
+    setTray((t) => t.filter((x) => x.food.id !== food.id));
+    invalidateFoodCache();
+    getCachedFoods(supabase).then(setFoods).catch(() => {});
+    toast(data === 'archived' ? `${food.name} removed · kept in logs that use it` : `${food.name} deleted`, Check);
   };
 
   const tabs = [
@@ -832,6 +861,11 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                           <span className="hidden @md:inline">MY RECIPE</span>
                         </span>
                       ) : null}
+                      {food.created_by && !isMine ? (
+                        <span className="shrink-0 truncate rounded-[5px] border border-way-line2 px-1 py-px font-mono text-[10px] font-semibold text-way-mute">
+                          BY {(food.author_name || 'A MEMBER').toUpperCase()}
+                        </span>
+                      ) : null}
                     </div>
                     {/* Narrow list: portion, kcal and macros on one line. */}
                     <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono text-[11px] font-medium text-way-dim md:text-xs @3xl:hidden">
@@ -866,6 +900,24 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
                         <button type="button" onClick={() => openEditor(food)} className="text-left text-[11px] font-semibold text-way-carbs underline decoration-dotted underline-offset-4 hover:text-sky-300 md:text-xs">
                           Ingredients
                         </button>
+                      ) : null}
+                      {isMine && typeof food.id === 'number' ? (
+                        <>
+                          <Link href={`/log-food/recipe?edit=${food.id}`} className="text-[11px] font-semibold text-way-mute underline decoration-dotted underline-offset-4 hover:text-way-ink md:text-xs">
+                            Edit
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => deleteDish(food)}
+                            disabled={deleting === food.id}
+                            className={cx(
+                              'text-left text-[11px] font-semibold underline decoration-dotted underline-offset-4 md:text-xs',
+                              armed === food.id ? 'text-rose-300' : 'text-way-mute hover:text-rose-300'
+                            )}
+                          >
+                            {deleting === food.id ? 'Deleting…' : armed === food.id ? 'Tap again to delete' : 'Delete'}
+                          </button>
+                        </>
                       ) : null}
                     </span>
                     {uses ? (

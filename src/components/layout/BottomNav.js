@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabaseClient';
+import { invalidateJson } from '@/components/way/useJson';
 import {
   Home,
   TrendingUp,
@@ -61,6 +62,7 @@ export default function BottomNav() {
   const handleLogout = async () => {
     setLoggingOut(true);
     await supabase.auth.signOut();
+    invalidateJson();
     router.push('/login');
     router.refresh();
   };

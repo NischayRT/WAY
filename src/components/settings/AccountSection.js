@@ -3,52 +3,23 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LogOut, Trash2 } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { createClient } from '@/lib/supabaseClient';
-import { getCurrentUserId } from '@/lib/currentUser';
 import { MODEL_CREDITS } from '@/lib/bodyModels';
 import { Card, Eyebrow, Btn } from '@/components/way/ui';
+import { invalidateJson } from '@/components/way/useJson';
 
-/** Sign out, delete everything, legal links and the 3D model credits (CC BY 4.0 requires them). */
+/** Sign out, how to delete your data, legal links and the 3D model credits (CC BY 4.0 requires them). */
 export default function AccountSection({ name, email }) {
   const supabase = createClient();
   const router = useRouter();
-  const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(null);
-  const [error, setError] = useState(null);
   const display = (name || '').trim() || 'WAY member';
 
   const logout = async () => {
     setBusy('logout');
     await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
-  };
-
-  const remove = async () => {
-    setBusy('delete');
-    setError(null);
-    let userId;
-    try {
-      userId = await getCurrentUserId(supabase);
-    } catch (e) {
-      setBusy(null);
-      return setError(e.message);
-    }
-    // Revoke Google Health access and delete the stored tokens (best effort).
-    await fetch('/api/google-health/disconnect', { method: 'POST' }).catch(() => {});
-    for (const [table, col, label] of [
-      ['food_logs', 'user_id', 'food logs'],
-      ['weight_logs', 'user_id', 'weight logs'],
-      ['profiles', 'id', 'profile'],
-    ]) {
-      const { error: e } = await supabase.from(table).delete().eq(col, userId);
-      if (e) {
-        setBusy(null);
-        return setError(`Could not remove your ${label}: ${e.message}`);
-      }
-    }
-    await supabase.auth.signOut();
+    invalidateJson();
     router.push('/login');
     router.refresh();
   };
@@ -72,31 +43,15 @@ export default function AccountSection({ name, email }) {
         </Btn>
       </Card>
 
-      <Card className="flex flex-col gap-3 border-rose-400/25 p-[18px] md:gap-3.5 md:p-[26px]">
-        <Eyebrow className="text-way-over">Delete account</Eyebrow>
+      <Card className="flex flex-col gap-3 p-[18px] md:gap-3.5 md:p-[26px]">
+        <Eyebrow>Delete your data</Eyebrow>
         <span className="text-xs leading-normal text-way-mute md:text-[13px]">
-          Erases your profile, every food log and every weight log, and revokes Google Health access. This can&apos;t be undone.
+          To delete your account and everything in it, email us from {email || 'your sign-in address'} and we&apos;ll erase it,
+          normally within 30 days. To stop Google Health access right away, disconnect it under Connected apps.
         </span>
-        {!confirm ? (
-          <Btn variant="dangerOutline" onClick={() => setConfirm(true)} className="h-11 md:self-start">
-            <Trash2 size={14} />
-            Delete account
-          </Btn>
-        ) : (
-          <div className="flex flex-col gap-2.5 rounded-[14px] border border-rose-400/35 bg-rose-400/7 p-3.5 md:p-4">
-            <span className="text-[13px] font-semibold text-rose-200 md:text-sm">Delete everything for {email}?</span>
-            <span className="text-xs text-way-mute">You can sign in again later, but you&apos;ll start from onboarding.</span>
-            <div className="flex gap-2">
-              <Btn variant="outline" onClick={() => setConfirm(false)} className="flex-1 rounded-[10px] font-medium md:order-2 md:flex-none">
-                Cancel
-              </Btn>
-              <Btn variant="danger" onClick={remove} disabled={busy === 'delete'} className="flex-1 rounded-[10px] md:order-1 md:flex-none">
-                {busy === 'delete' ? 'Deleting…' : 'Yes, delete'}
-              </Btn>
-            </div>
-          </div>
-        )}
-        {error ? <p className="text-[13px] text-rose-300">{error}</p> : null}
+        <Link href="/privacy#delete" className="text-xs font-semibold text-way-protein hover:text-emerald-300 md:text-[13px]">
+          How deletion works
+        </Link>
       </Card>
 
       <section className="flex flex-col gap-2 px-1 pt-1 md:col-span-2 md:gap-2.5">

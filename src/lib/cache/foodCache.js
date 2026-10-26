@@ -51,6 +51,10 @@ async function loadFoods(supabase) {
   const { data, error } = await supabase
     .from('foods')
     .select('id, name, region, category, calories_kcal, protein_g, carbs_g, fat_g, created_by, author_name, source, serving_size_g')
+    // Deleted (archived) dishes stay only for the logs that use them.
+    .is('archived_at', null)
+    // Built-in foods first, so other people's dishes can never crowd them out.
+    .order('created_by', { ascending: true, nullsFirst: true })
     .order('id', { ascending: false });
   if (error) throw error;
   return data ?? [];

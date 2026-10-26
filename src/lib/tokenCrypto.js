@@ -57,7 +57,9 @@ export function decryptToken(stored) {
   const k = key();
   if (!k) throw new Error('Encrypted token found but TOKEN_ENCRYPTION_KEY is not set.');
   const [iv, tag, ct] = stored.slice(PREFIX.length).split(':');
-  const decipher = createDecipheriv('aes-256-gcm', k, Buffer.from(iv, 'base64url'));
-  decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+  const tagBuf = Buffer.from(tag ?? '', 'base64url');
+  if (tagBuf.length !== 16) throw new Error('Malformed encrypted token.');
+  const decipher = createDecipheriv('aes-256-gcm', k, Buffer.from(iv, 'base64url'), { authTagLength: 16 });
+  decipher.setAuthTag(tagBuf);
   return Buffer.concat([decipher.update(Buffer.from(ct, 'base64url')), decipher.final()]).toString('utf8');
 }

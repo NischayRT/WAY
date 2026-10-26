@@ -20,17 +20,23 @@ const FAT_RE = /\b(oil|ghee|butter|vanaspati|dalda)\b/i;
  * per-100 g values (water lost or absorbed is accounted for), and servings
  * give a per-plate number that logs in one tap.
  */
-export default function RecipeBuilderClient({ authorName, starters, initialName = '' }) {
+export default function RecipeBuilderClient({ authorName, starters, initialName = '', editing = null }) {
   const supabase = createClient();
   const [ingredients, setIngredients] = useState(() => peekCachedIngredients() ?? []);
-  const [name, setName] = useState(initialName);
+  const [name, setName] = useState(editing?.name ?? initialName);
   const [starter, setStarter] = useState(null);
   const [sq, setSq] = useState(''); // similar-dish search
-  const [method, setMethod] = useState('curry');
-  const [cls, setCls] = useState('main');
+  const [method, setMethod] = useState(editing?.cooking_method || 'curry');
+  const [cls, setCls] = useState(editing?.dish_class || 'main');
   const [lines, setLines] = useState([]); // [{ ingredient, g }]
-  const [finalG, setFinalG] = useState('');
-  const [servings, setServings] = useState(4);
+  const [finalG, setFinalG] = useState(editing?.final_weight_g ? String(Math.round(Number(editing.final_weight_g))) : '');
+  const [servings, setServings] = useState(() =>
+    editing?.final_weight_g && editing?.serving_size_g
+      ? Math.max(1, Math.round(Number(editing.final_weight_g) / Number(editing.serving_size_g)))
+      : 4
+  );
+  const [editId, setEditId] = useState(editing?.id ?? null); // set when editing one of your dishes
+  const [editNote, setEditNote] = useState(null);
   const [iq, setIq] = useState('');
   const [basis, setBasis] = useState('serving');
   const [saving, setSaving] = useState(false);
@@ -47,6 +53,15 @@ export default function RecipeBuilderClient({ authorName, starters, initialName 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Editing: fill in the dish's recipe lines once the ingredient list is here.
+  const [linesLoaded, setLinesLoaded] = useState(!editing?.lines?.length);
+  useEffect(() => {
+    if (linesLoaded || !ingredients.length) return;
+    const byId = new Map(ingredients.map((i) => [i.id, i]));
+    setLines(editing.lines.map((l) => ({ ingredient: byId.get(l.ingredient_id), g: Number(l.quantity_g) })).filter((l) => l.ingredient));
+    setLinesLoaded(true);
+  }, [ingredients, linesLoaded, editing]);
 
   const touch = () => {
     setSaved(null);
@@ -190,6 +205,28 @@ export default function RecipeBuilderClient({ authorName, starters, initialName 
       created_by: userId,
       author_name: authorName || null,
     };
+    if (editId) {
+      // Only your own dish; the database checks it again. If someone else has
+      // logged the old version, it is kept for them and this becomes a new one.
+      const { created_by: _c, author_name: _a, source: _s, category: _g, ...food } = row;
+      const { data: newId, error: upErr } = await supabase.rpc('update_my_food', {
+        p_food_id: editId,
+        p_food: { ...food, serving_size_g: Math.round(servingG) },
+        p_lines: lines.map((l) => ({ ingredient_id: l.ingredient.id, quantity_g: Number(l.g) || 0 })),
+      });
+      setSaving(false);
+      if (upErr) {
+        setError(upErr.message);
+        return;
+      }
+      if (newId && newId !== editId) {
+        setEditNote('Others had logged the earlier version, so it stays as it was for them. Your logs now use this one.');
+        setEditId(newId);
+      }
+      invalidateFoodCache();
+      setSaved(name.trim());
+      return;
+    }
     const ins = await supabase
       .from('foods')
       .insert({ ...row, serving_size_g: Math.round(servingG) })
@@ -270,7 +307,7 @@ export default function RecipeBuilderClient({ authorName, starters, initialName 
             <span className="hidden md:inline">Log food</span>
           </Link>
           <div className="flex min-w-0 flex-col gap-px md:flex-row md:items-baseline md:gap-3.5">
-            <h1 className="font-heading text-xl font-bold leading-none md:text-[34px] md:tracking-[-0.01em]">New recipe</h1>
+            <h1 className="font-heading text-xl font-bold leading-none md:text-[34px] md:tracking-[-0.01em]">{editId ? 'Edit recipe' : 'New recipe'}</h1>
             <span className="truncate font-mono text-[10px] font-medium text-way-dim md:text-xs">{c.metaStr}</span>
           </div>
         </div>
@@ -293,6 +330,7 @@ export default function RecipeBuilderClient({ authorName, starters, initialName 
               <span className="flex-1">
                 <span className="md:hidden">Saved to My recipes.</span>
                 <span className="hidden md:inline">“{saved}” is saved to My recipes and shows up in search.</span>
+                {editNote ? <span className="mt-1 block text-xs font-normal text-way-ink2">{editNote}</span> : null}
               </span>
               <Link href={logHref} className="font-semibold">
                 Log a serving<span className="hidden md:inline"> now</span> →

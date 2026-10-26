@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { House, TrendingUp, Plus, Activity, Users, Settings, Ellipsis, LogOut, UserRound } from 'lucide-react';
 import { createClient } from '@/lib/supabaseClient';
 import { cx } from './ui';
+import { invalidateJson } from './useJson';
 
 const NAV = [
   { href: '/home', label: 'Today', Icon: House },
@@ -50,6 +51,7 @@ export function MoreMenu({ placement = 'right', className = '' }) {
   const logout = async () => {
     setBusy(true);
     await createClient().auth.signOut();
+    invalidateJson();
     router.push('/login');
     router.refresh();
   };

@@ -4,8 +4,9 @@ import { Crown, UserPlus, UserMinus, Swords, Check, PartyPopper, LayoutGrid, Che
 import { FIELDS, COMPETE_KEYS, PERIODS, fmtVal, displayName, relDay } from '@/lib/friends';
 import { Card, Eyebrow, Btn, Segmented, cx } from '@/components/way/ui';
 import { Avatar, FIELD_ICONS, ICONS } from './parts';
+import Leaderboard from './Leaderboard';
+import { LivePanel } from './challenges';
 
-const MEDAL = ['#facc15', '#cbd5e1', '#d97706'];
 const EASE = 'transition-[width] duration-[900ms] ease-[cubic-bezier(.2,.8,.2,1)]';
 const PERIOD_LABEL = { today: 'today', week: '7 days', month: '30 days' };
 
@@ -18,8 +19,6 @@ function Section({ title, right, className = '' }) {
   );
 }
 
-const moveOf = (r) => (r.move > 0 ? { s: `▲ ${r.move}`, c: '#34d399' } : r.move < 0 ? { s: `▼ ${-r.move}`, c: '#fb7185' } : { s: '', c: '#7c8aa0' });
-
 /** No competitors yet: no leaderboard at all, just the way in. */
 function EmptyArena({ onAdd }) {
   return (
@@ -31,7 +30,7 @@ function EmptyArena({ onAdd }) {
       <div className="relative flex max-w-[420px] flex-col gap-1.5">
         <span className="font-heading text-2xl font-bold">Your arena is empty</span>
         <span className="text-sm text-way-mute [text-wrap:pretty]">
-          Add up to 3 friends to compete with. The leaderboard appears once someone accepts, and you only compare the stats you both agree on.
+          Add up to 6 friends to compete with. The leaderboard appears once someone accepts, and you only compare the stats you both agree on.
         </span>
       </div>
       <Btn variant="primary" onClick={onAdd} className="relative">
@@ -95,108 +94,9 @@ function HeadToHead({ m, ranked, missing, f, k }) {
   );
 }
 
-/** Three or four people: a podium. Columns rise one by one; with four, a light sweeps it and the fourth slides in below. */
-function Podium({ m, ranked, missing, f, k }) {
-  const four = ranked.length + missing.length >= 4;
-  const podium = [1, 0, 2].map((i) => ranked[i] || null);
-  const rest = [...ranked.slice(3), ...missing.map((id) => ({ id, v: null }))];
-  const max = ranked[0]?.v || 1;
-  return (
-    <>
-      <div className="relative overflow-hidden px-3 pt-[22px] lg:px-[60px] lg:pt-8">
-        <div className="pointer-events-none absolute left-1/2 top-[-40px] h-[200px] w-[260px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(250,204,21,.14),rgba(250,204,21,0)_70%)] lg:h-[340px] lg:w-[520px]" />
-        {four ? <div className="way-sweep pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent)]" /> : null}
-        <div className="relative grid grid-cols-3 items-end gap-2 lg:gap-[18px]">
-          {podium.map((r, slot) => {
-            const pi = [1, 0, 2][slot];
-            const first = pi === 0;
-            const p = r ? m.person(r.id) : null;
-            const mv = r ? moveOf(r) : null;
-            // Third rises first, then second, then the winner.
-            const delay = [350, 700, 0][slot];
-            const hM = (first ? 92 : pi === 1 ? 70 : 52) + 12;
-            const hD = (first ? 150 : pi === 1 ? 112 : 84) + 20;
-            return (
-              <div key={slot} className="flex min-w-0 flex-col items-center gap-2 lg:gap-2.5">
-                {r ? (
-                  <div className="way-drop flex min-w-0 max-w-full flex-col items-center gap-2" style={{ '--d': `${delay + 450}ms` }}>
-                    {first ? <Crown size={22} className="text-way-gold" /> : null}
-                    <Avatar person={p} isMe={r.id === m.me.id} size={first ? 54 : 44} className="lg:hidden" ring={`0 0 0 3px #0f1420, 0 0 0 5px ${MEDAL[pi]}`} />
-                    <Avatar
-                      person={p}
-                      isMe={r.id === m.me.id}
-                      size={first ? 84 : 68}
-                      className="hidden lg:flex"
-                      ring={`0 0 0 4px #0f1420, 0 0 0 6px ${MEDAL[pi]}, 0 0 30px ${first ? 'rgba(250,204,21,.35)' : 'transparent'}`}
-                    />
-                    <span className="max-w-full truncate text-xs font-semibold lg:text-[15px]">{r.id === m.me.id ? 'You' : displayName(p)}</span>
-                    <span className="font-mono text-xs font-semibold lg:text-lg" style={{ color: MEDAL[pi] }}>
-                      {fmtVal(r.v, f.dec)}
-                      <span className="hidden text-[11px] text-way-dim lg:inline"> {f.unit}</span>
-                    </span>
-                    <span className="hidden font-mono text-[10px] font-semibold lg:block" style={{ color: mv.c }}>
-                      {mv.s}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="h-11 w-11 rounded-full border border-dashed border-way-line2 lg:h-[68px] lg:w-[68px]" />
-                )}
-                <div
-                  className="way-column flex w-full items-start justify-center rounded-t-[10px] border border-b-0 pt-2 lg:rounded-t-[14px] lg:pt-3 lg:[height:var(--hd)]"
-                  style={{
-                    height: hM,
-                    '--hd': `${hD}px`,
-                    '--d': `${delay}ms`,
-                    background: first ? 'linear-gradient(180deg, rgba(250,204,21,.18), rgba(250,204,21,.03))' : 'linear-gradient(180deg, rgba(148,163,184,.12), rgba(148,163,184,.02))',
-                    borderColor: first ? 'rgba(250,204,21,.35)' : '#253044',
-                  }}
-                >
-                  <span className="font-brand text-[30px] leading-none lg:text-[54px]" style={{ color: MEDAL[pi] }}>
-                    {pi + 1}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      {rest.length ? (
-        <div className="border-t border-way-line2">
-          {rest.map((r, i) => {
-            const p = m.person(r.id);
-            const isMe = r.id === m.me.id;
-            const above = r.v != null ? ranked[r.rank - 2] : null;
-            return (
-              <div
-                key={r.id}
-                className={cx('way-in-right flex items-center gap-3 px-4 py-3 lg:px-6', i && 'border-t border-way-line', isMe && 'bg-emerald-500/7')}
-                style={{ '--d': `${1300 + i * 120}ms` }}
-              >
-                <span className="w-6 font-mono text-[13px] font-semibold text-way-dim">{r.v == null ? '–' : String(r.rank).padStart(2, '0')}</span>
-                <Avatar person={p} isMe={isMe} size={32} />
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="truncate text-[13px] font-semibold">{isMe ? 'You' : displayName(p)}</span>
-                  <div className="h-[4px] overflow-hidden rounded-full bg-way-track">
-                    <div className={cx('h-full rounded-full', EASE)} style={{ width: `${r.v == null ? 0 : (r.v / max) * 100 * k}%`, background: isMe ? '#34d399' : f.color }} />
-                  </div>
-                  <span className="text-[11px] text-way-dim">
-                    {r.v == null ? 'Hasn’t synced yet' : `${fmtVal(above.v - r.v, f.dec)} ${f.unit} behind ${above.id === m.me.id ? 'you' : displayName(m.person(above.id))}`}
-                  </span>
-                </div>
-                <span className={cx('font-mono text-sm font-semibold', r.v == null ? 'text-way-faint' : 'text-way-ink')}>{r.v == null ? 'no data' : fmtVal(r.v, f.dec)}</span>
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-/** Every stat at once, plus live duels. Tap a stat to open its board. */
+/** Every stat at once. Tap a stat to open its board. */
 function AllBoards({ m, period, setMetric, k }) {
   const keys = COMPETE_KEYS.filter((key) => m.competitors.some((c) => c.fields.includes(key)));
-  const live = m.duels.filter((d) => !d.finished);
   return (
     <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:p-5">
       {keys.map((key, ki) => {
@@ -248,35 +148,11 @@ function AllBoards({ m, period, setMetric, k }) {
           </button>
         );
       })}
-      {live.length ? (
-        <div className="way-rise flex flex-col gap-2.5 rounded-[18px] border border-rose-400/25 bg-way-rail p-4 sm:col-span-2" style={{ '--d': `${keys.length * 80}ms` }}>
-          <span className="flex items-center gap-2 text-[13px] font-semibold text-way-over">
-            <Swords size={15} />
-            Live duels
-          </span>
-          {live.map((d) => {
-            const f = FIELDS[d.duel.metric];
-            const lead = d.you >= d.theirs;
-            return (
-              <div key={d.duel.id} className="flex items-center gap-2.5 text-[13px]">
-                <Avatar person={d.them} size={22} />
-                <span className="min-w-0 flex-1 truncate">
-                  vs {displayName(d.them)} · <span className="text-way-dim">{f.label}</span>
-                </span>
-                <span className="font-mono text-xs" style={{ color: d.you === d.theirs ? '#94a3b8' : lead ? '#34d399' : '#fb7185' }}>
-                  {fmtVal(d.you, f.dec)} – {fmtVal(d.theirs, f.dec)}
-                </span>
-                <span className="font-mono text-[11px] text-way-dim">{d.left}</span>
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
     </div>
   );
 }
 
-export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, onCheerPerson, onClaim, onAdd, onOpenFamily, onRemove }) {
+export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, onCheerPerson, onClaim, onAdd, onOpenFamily, onRemove, onOpenChallenge, onNewChallenge, onInvites }) {
   const hasArena = m.competitors.length > 0;
   const shared = COMPETE_KEYS.filter((key) => m.competitors.some((c) => c.fields.includes(key)));
   const all = metric === 'all' || !shared.includes(metric);
@@ -407,7 +283,7 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
               ) : people <= 2 ? (
                 <HeadToHead m={m} ranked={ranked} missing={board.missing} f={f} k={k} />
               ) : (
-                <Podium m={m} ranked={ranked} missing={board.missing} f={f} k={k} />
+                <Leaderboard m={m} ranked={ranked} missing={board.missing} f={f} k={k} />
               )}
             </div>
             <div className="hidden border-t border-way-line px-6 pb-4 pt-3 text-[11px] text-way-dim lg:block">
@@ -420,49 +296,14 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
         <EmptyArena onAdd={onAdd} />
       )}
 
-      <div className="flex flex-col gap-3.5 lg:col-span-4 lg:gap-5">
+      {/* Side column. Below 1024px its cards join the page flow, with the
+          live challenges first: they're the most time-sensitive thing here. */}
+      <div className="contents lg:col-span-4 lg:flex lg:flex-col lg:gap-5">
+        <div className="order-first lg:order-none">
+          <LivePanel m={m} k={k} onOpen={onOpenChallenge} onNew={onNewChallenge} onInvites={onInvites} />
+        </div>
         {rankCard}
 
-        <Section title="Weekly quests" right={m.season.left} className="lg:hidden" />
-        <Card className="flex flex-col overflow-hidden lg:pb-2 lg:pt-[22px]">
-          <div className="hidden items-center justify-between px-[22px] pb-3 lg:flex">
-            <Eyebrow>Weekly quests</Eyebrow>
-            <span className="font-mono text-[11px] font-medium text-way-dim">{m.season.left}</span>
-          </div>
-          {m.quests.map((q, i) => {
-            const Icon = q.claimed ? Check : ICONS[q.icon];
-            const tone = q.claimed ? ['rgba(52,211,153,.14)', '#34d399', '#34d399'] : q.done ? ['rgba(250,204,21,.16)', '#facc15', '#facc15'] : ['#1a2130', '#94a3b8', '#7c8aa0'];
-            return (
-              <div key={q.id} className={cx('flex items-center gap-3 px-3.5 py-[13px] lg:px-[22px] lg:py-3', (i || true) && i ? 'border-t border-way-line' : 'lg:border-t lg:border-way-line')}>
-                <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] transition-colors lg:h-9 lg:w-9" style={{ background: tone[0], color: tone[1] }}>
-                  <Icon size={16} />
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
-                  <div className="flex justify-between gap-1.5">
-                    <span className="text-[13px] font-medium">{q.label}</span>
-                    <span className="whitespace-nowrap font-mono text-[11px] font-semibold text-way-dim">{q.progStr}</span>
-                  </div>
-                  <div className="h-1 overflow-hidden rounded-full bg-way-track">
-                    <div className={cx('h-full', EASE)} style={{ width: `${q.pct * k}%`, background: tone[2] }} />
-                  </div>
-                </div>
-                {q.done && !q.claimed ? (
-                  <button
-                    type="button"
-                    onClick={() => onClaim(q)}
-                    className="whitespace-nowrap rounded-[9px] bg-way-gold px-2.5 py-[7px] text-[11px] font-semibold text-[#1a1300] shadow-[0_0_16px_rgba(250,204,21,.4)]"
-                  >
-                    Claim {q.xp}
-                  </button>
-                ) : (
-                  <span className={cx('w-[62px] text-right font-mono text-[11px] font-semibold', q.claimed ? 'text-way-protein' : 'text-way-dim')}>
-                    {q.claimed ? 'Claimed' : `+${q.xp} XP`}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </Card>
       </div>
 
       {/* Your people: everyone you're connected with, with a direct cheer */}
@@ -578,8 +419,50 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
         )}
       </Card>
 
-      {/* Badges */}
-      <Card className="flex flex-col gap-4 p-[18px] lg:col-span-4 lg:p-[22px]">
+      <div className="flex flex-col gap-3.5 lg:col-span-4 lg:gap-5">
+        <Section title="Weekly quests" right={m.season.left} className="lg:hidden" />
+          <Card className="flex flex-col overflow-hidden lg:pb-2 lg:pt-[22px]">
+            <div className="hidden items-center justify-between px-[22px] pb-3 lg:flex">
+              <Eyebrow>Weekly quests</Eyebrow>
+              <span className="font-mono text-[11px] font-medium text-way-dim">{m.season.left}</span>
+            </div>
+            {m.quests.map((q, i) => {
+              const Icon = q.claimed ? Check : ICONS[q.icon];
+              const tone = q.claimed ? ['rgba(52,211,153,.14)', '#34d399', '#34d399'] : q.done ? ['rgba(250,204,21,.16)', '#facc15', '#facc15'] : ['#1a2130', '#94a3b8', '#7c8aa0'];
+              return (
+                <div key={q.id} className={cx('flex items-center gap-3 px-3.5 py-[13px] lg:px-[22px] lg:py-3', (i || true) && i ? 'border-t border-way-line' : 'lg:border-t lg:border-way-line')}>
+                  <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] transition-colors lg:h-9 lg:w-9" style={{ background: tone[0], color: tone[1] }}>
+                    <Icon size={16} />
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
+                    <div className="flex justify-between gap-1.5">
+                      <span className="text-[13px] font-medium">{q.label}</span>
+                      <span className="whitespace-nowrap font-mono text-[11px] font-semibold text-way-dim">{q.progStr}</span>
+                    </div>
+                    <div className="h-1 overflow-hidden rounded-full bg-way-track">
+                      <div className={cx('h-full', EASE)} style={{ width: `${q.pct * k}%`, background: tone[2] }} />
+                    </div>
+                  </div>
+                  {q.done && !q.claimed ? (
+                    <button
+                      type="button"
+                      onClick={() => onClaim(q)}
+                      className="whitespace-nowrap rounded-[9px] bg-way-gold px-2.5 py-[7px] text-[11px] font-semibold text-[#1a1300] shadow-[0_0_16px_rgba(250,204,21,.4)]"
+                    >
+                      Claim {q.xp}
+                    </button>
+                  ) : (
+                    <span className={cx('w-[62px] text-right font-mono text-[11px] font-semibold', q.claimed ? 'text-way-protein' : 'text-way-dim')}>
+                      {q.claimed ? 'Claimed' : `+${q.xp} XP`}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </Card>
+
+        {/* Badges */}
+        <Card className="flex flex-col gap-4 p-[18px] lg:p-[22px]">
         <div className="flex items-center justify-between">
           <Eyebrow>Badges</Eyebrow>
           <span className="font-mono text-[11px] font-medium text-way-dim">
@@ -609,7 +492,8 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onCheer, 
             );
           })}
         </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

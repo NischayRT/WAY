@@ -10,6 +10,8 @@ import {
   displayName,
   levelOf,
   seasonInfo,
+  FRIEND_LIMIT,
+  FAMILY_LIMIT,
   buildBoard,
   buildFeed,
   QUESTS,
@@ -23,12 +25,14 @@ import PageSkeleton from '@/components/way/PageSkeleton';
 import { useFriendsData } from './useFriendsData';
 import ConnectDialog from './ConnectDialog';
 import { Avatar } from './parts';
-import { DuelsTab, FamilyTab, InboxTab, PrivacyTab } from './tabs';
+import { FamilyTab, InboxTab, PrivacyTab } from './tabs';
 import { ArenaTab } from './arena';
+import { ChallengesTab, ChallengeSheet } from './challenges';
+import { buildChallenges } from '@/lib/challenges';
 
 const TABS = [
   { key: 'arena', label: 'Arena' },
-  { key: 'duels', label: 'Duels' },
+  { key: 'challenges', label: 'Challenges' },
   { key: 'family', label: 'Family' },
   { key: 'inbox', label: 'Inbox' },
   { key: 'privacy', label: 'Privacy' },
@@ -135,47 +139,18 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
       };
     });
 
+  // Challenges
+  const ch = buildChallenges({ challenges: d.challenges, members: d.members, board: d.board, results: d.results, meId: userId, today, now, blockedIds });
+
   // Pending invites both ways
   const incoming = [
-    ...d.duels.filter((x) => x.status === 'pending' && x.opponent_id === userId).map((item) => ({ kind: 'duel', item, from: person(item.challenger_id) })),
+    ...ch.invites.map((x) => ({ kind: 'challenge', item: x.c, ch: x, from: person(x.creatorId) })),
     ...d.connections.filter((c) => c.status === 'pending' && c.initiated_by !== userId).map((item) => ({ kind: 'conn', item, from: person(other(item)) })),
   ].sort((a, b) => (a.item.created_at < b.item.created_at ? 1 : -1));
   const outgoing = [
-    ...d.duels.filter((x) => x.status === 'pending' && x.challenger_id === userId).map((item) => ({ kind: 'duel', item, to: person(item.opponent_id) })),
+    ...ch.running.filter((x) => x.isCreator && x.phase === 'upcoming' && x.invited.length).map((x) => ({ kind: 'challenge', item: x.c, ch: x, to: x.invited.map(person) })),
     ...d.connections.filter((c) => c.status === 'pending' && c.initiated_by === userId).map((item) => ({ kind: 'conn', item, to: person(other(item)) })),
   ].sort((a, b) => (a.item.created_at < b.item.created_at ? 1 : -1));
-
-  // Duels
-  const totals = new Map(d.duelBoard.map((r) => [`${r.duel_id}:${r.user_id}`, Number(r.total) || 0]));
-  const allDuels = d.duels
-    .filter((x) => x.status === 'active')
-    .map((duel) => {
-      const themId = duel.challenger_id === userId ? duel.opponent_id : duel.challenger_id;
-      const finished = duel.ends_on < today;
-      const started = duel.starts_on <= today;
-      const len = daysBetween(duel.starts_on, duel.ends_on) + 1;
-      const left = finished ? 'Ended' : !started ? `Starts ${shortDate(duel.starts_on)}` : `${daysBetween(today, duel.ends_on) + 1}d left`;
-      return {
-        duel,
-        them: person(themId),
-        you: totals.get(`${duel.id}:${userId}`) || 0,
-        theirs: totals.get(`${duel.id}:${themId}`) || 0,
-        finished,
-        started,
-        span: `${len} days`,
-        left,
-        nudged: sent.has(`duel:${duel.id}`),
-      };
-    });
-  const record = { w: 0, l: 0, d: 0 };
-  for (const x of allDuels.filter((x) => x.finished)) {
-    if (x.you > x.theirs) record.w += 1;
-    else if (x.you < x.theirs) record.l += 1;
-    else record.d += 1;
-  }
-  const duels = allDuels
-    .filter((x) => !x.finished || x.duel.ends_on >= addDays(today, -7))
-    .sort((a, b) => Number(a.finished) - Number(b.finished) || (a.duel.ends_on < b.duel.ends_on ? -1 : 1));
 
   // Quests
   const myCheers = new Map(d.cheers.map((c) => [c.event_key, c]));
@@ -238,12 +213,12 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
   }).sort((a, b) => Number(b.canCheer) - Number(a.canCheer) || displayName(a.person).localeCompare(displayName(b.person)));
 
   const foodStreak = logStreak(d.foodDays, today);
-  const badges = badgesFor({ mine, foodStreak, duelWins: record.w, today });
+  const badges = badgesFor({ mine, foodStreak, challengeWins: ch.record.wins, today });
   const feed = buildFeed({ competitors, stats: d.stats, today });
 
   const connectedIds = new Set([
     ...d.connections.filter((c) => c.status === 'active').map(other),
-    ...d.duels.filter((x) => x.status === 'active' || x.status === 'pending').map((x) => (x.challenger_id === userId ? x.opponent_id : x.challenger_id)),
+    ...ch.running.flatMap((x) => x.joined).filter((id) => id !== userId),
   ]);
   const connectedPeople = [...connectedIds].filter((id) => !blockedIds.has(id)).map(person);
   const circle = (kind) =>
@@ -273,8 +248,7 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
     myCheerKeys: new Set(myCheers.keys()),
     cheeredToday,
     badges,
-    record,
-    duels,
+    ch,
     incoming,
     outgoing,
     nudges: d.nudges.filter((n) => !blockedIds.has(n.from_id)).slice(0, 8),
@@ -417,7 +391,10 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   const d = useFriendsData(userId, today);
   const k = useMounted() ? 1 : 0;
   const [toast, showToast] = useToast();
-  const [tab, setTab] = useState(TABS.some((t) => t.key === initialTab) ? initialTab : 'arena');
+  const startTab = initialTab === 'duels' ? 'challenges' : initialTab;
+  const [tab, setTab] = useState(TABS.some((t) => t.key === startTab) ? startTab : 'arena');
+  const [sheet, setSheet] = useState(null); // challenge id open in the detail / results sheet
+  const [shownResult, setShownResult] = useState(null);
   const [metric, setMetric] = useState('all');
   const [period, setPeriod] = useState('week');
   const [md, setMd] = useState(null);
@@ -433,7 +410,7 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   const m = useMemo(
     () => (ready ? buildModel({ d, userId, profile, today, cheerFlip, sent }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ready, d.people, d.connections, d.duels, d.stats, d.duelBoard, d.claims, d.views, d.nudges, d.cheers, d.foodDays, d.blocks, d.aliases, userId, profile, today, cheerFlip, sent]
+    [ready, d.people, d.connections, d.challenges, d.members, d.board, d.results, d.stats, d.claims, d.views, d.nudges, d.cheers, d.foodDays, d.blocks, d.aliases, userId, profile, today, cheerFlip, sent]
   );
 
   // Cheer totals for the events in the feed.
@@ -457,7 +434,7 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   }, [tab, hasSharesIn, recordViews]);
 
   // Keys 1-5 switch tabs, like a game menu.
-  const dialogOpen = !!(md || cf || openData || aliasFor);
+  const dialogOpen = !!(md || cf || openData || aliasFor || sheet);
   useEffect(() => {
     const onKey = (e) => {
       if (dialogOpen || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -468,6 +445,15 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [dialogOpen]);
+
+  // A challenge you were in has ended: show its podium once, then remember.
+  const unseenId = m?.ch.unseen?.id ?? null;
+  useEffect(() => {
+    if (!unseenId || shownResult === unseenId || md || cf) return;
+    setShownResult(unseenId);
+    setSheet(unseenId);
+    supabase.rpc('mark_challenge_seen', { p_id: unseenId }).then(() => null, () => null);
+  }, [unseenId, shownResult, md, cf, supabase]);
 
   if (d.loading) return <PageSkeleton variant="split" />;
 
@@ -481,8 +467,9 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
           <span className="text-[13px] text-way-mute [text-wrap:pretty]">
             {d.setup ? (
               <>
-                Run <code className="rounded bg-way-track px-1.5 py-0.5 font-mono text-xs text-way-ink2">supabase/add-friends.sql</code> in the Supabase SQL
-                editor, then reload this page.
+                Run <code className="rounded bg-way-track px-1.5 py-0.5 font-mono text-xs text-way-ink2">supabase/add-friends.sql</code> and then{' '}
+                <code className="rounded bg-way-track px-1.5 py-0.5 font-mono text-xs text-way-ink2">supabase/challenges-2026-10.sql</code> in the Supabase SQL editor,
+                then reload this page.
               </>
             ) : (
               d.error
@@ -538,24 +525,58 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   const onCheerPerson = (f) => onCheer({ key: f.cheerKey, personId: f.id, mine: f.cheered });
   const onClaim = (q) => rpc('claim_quest', { p_quest: q.id }, (xp) => `+${xp || q.xp} XP · ${q.label}`);
   const markSent = (key) => setSent((prev) => new Set(prev).add(key));
-  const onNudge = async (x, kind) => {
-    const { error } = await rpc('send_nudge', { p_to: x.them.id, p_kind: kind, p_duel: x.duel.id }, kind === 'taunt' ? 'Taunt sent' : 'Rally sent', false);
-    if (!error || /duplicate|unique/i.test(error.message)) markSent(`duel:${x.duel.id}`);
+  const onNudge = async (x, to, kind, key) => {
+    const { error } = await rpc('send_nudge', { p_to: to, p_kind: kind, p_duel: null, p_challenge: x.id }, kind === 'taunt' ? 'Taunt sent' : 'Rally sent', false);
+    if (!error || /duplicate|unique/i.test(error.message)) markSent(key);
   };
   const onCheckIn = async (s) => {
-    const { error } = await rpc('send_nudge', { p_to: s.owner.id, p_kind: 'check_in', p_duel: null }, `Checked in on ${displayName(s.owner)}`, false);
+    const { error } = await rpc('send_nudge', { p_to: s.owner.id, p_kind: 'check_in', p_duel: null, p_challenge: null }, `Checked in on ${displayName(s.owner)}`, false);
     if (!error || /duplicate|unique/i.test(error.message)) markSent(`share:${s.conn.id}`);
   };
-  const onReview = (x) => setMd(x.kind === 'duel' ? { type: 'reviewDuel', duel: x.item, from: x.from } : { type: 'review', conn: x.item, from: x.from });
-  const onDecline = (x) =>
-    x.kind === 'duel'
-      ? rpc('respond_duel', { p_id: x.item.id, p_accept: false }, 'Declined')
-      : rpc('respond_connection', { p_id: x.item.id, p_accept: false }, 'Declined');
-  const onCancel = (x) => (x.kind === 'duel' ? rpc('cancel_duel', { p_id: x.item.id }, 'Challenge cancelled') : rpc('end_connection', { p_id: x.item.id }, 'Invite cancelled'));
+  const othersIn = (x) => {
+    const ids = [...x.joined, ...x.invited].filter((id) => id !== userId && id !== x.creatorId);
+    return ids.length ? ids.map((id) => displayName(m.person(id))).join(', ') : '';
+  };
+  const reviewChallenge = (x) => setMd({ type: 'reviewChallenge', x, from: m.person(x.creatorId), others: othersIn(x) });
+  const declineChallenge = (x) => rpc('respond_challenge', { p_id: x.id, p_join: false }, 'Declined');
+  const onReview = (x) => (x.kind === 'challenge' ? reviewChallenge(x.ch) : setMd({ type: 'review', conn: x.item, from: x.from }));
+  const onDecline = (x) => (x.kind === 'challenge' ? declineChallenge(x.ch) : rpc('respond_connection', { p_id: x.item.id, p_accept: false }, 'Declined'));
+  const onCancel = (x) =>
+    x.kind === 'challenge' ? rpc('cancel_challenge', { p_id: x.item.id }, 'Challenge called off') : rpc('end_connection', { p_id: x.item.id }, 'Invite cancelled');
+  const friendsToChallenge = () => m.competitors.map((c) => m.person(c.id));
+  const newChallenge = (preset = {}) =>
+    setMd({ type: 'challenge', friends: friendsToChallenge(), today, counts: { friends: m.friendCount, family: m.familyCount }, ...preset });
+  const onRematch = (x) => {
+    setSheet(null);
+    const ids = new Set(m.competitors.map((c) => c.id));
+    newChallenge({ people: x.joined.filter((id) => id !== userId && ids.has(id)), metric: x.metric, days: [1, 3, 7, 14, 30].includes(x.len) ? x.len : 7 });
+  };
+  const onLeave = (x) =>
+    setCf({
+      title: 'Leave this challenge?',
+      text: 'Your numbers come off the board right away, and you can’t rejoin this one.',
+      cta: 'Leave',
+      run: async () => {
+        await rpc('leave_challenge', { p_id: x.id }, 'You left the challenge');
+        setCf(null);
+        setSheet(null);
+      },
+    });
+  const onCallOff = (x) =>
+    setCf({
+      title: 'Call off this challenge?',
+      text: 'It hasn’t started yet. Everyone invited stops seeing it.',
+      cta: 'Call it off',
+      run: async () => {
+        await rpc('cancel_challenge', { p_id: x.id }, 'Challenge called off');
+        setCf(null);
+        setSheet(null);
+      },
+    });
   const onBlock = (p) =>
     setCf({
       title: `Block ${displayName(p)}?`,
-      text: 'This ends every share, competition and duel with them. They can’t send you anything new, and they won’t be told.',
+      text: 'This ends every share and competition with them, declines challenge invites between you, and hides each of you from the other’s boards. They can’t send you anything new, and they won’t be told.',
       cta: 'Block',
       run: async () => {
         await rpc('block_user', { p_user: p.id }, `Blocked ${displayName(p)}`);
@@ -563,7 +584,7 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
       },
     });
   // Remove a friend / family member: ends every share and competition between
-  // you (either side can). Duels already running finish on their own.
+  // you (either side can). Challenges already running finish on their own.
   const onRemove = (p) => {
     const conns = d.connections.filter((c) => ['active', 'pending'].includes(c.status) && (c.owner_id === p.id || c.other_id === p.id));
     if (!conns.length) return;
@@ -605,16 +626,16 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   };
   const circle = { friends: m.friendCount, family: m.familyCount };
   const add = () => setMd({ type: 'add', counts: circle });
-  const onRevise = (x) =>
-    setMd(x.kind === 'duel' ? { type: 'reviseDuel', duel: x.item, from: x.from } : { type: 'revise', conn: x.item, from: x.from });
+  const onRevise = (x) => setMd({ type: 'revise', conn: x.item, from: x.from });
   const onAlias = (p) => setAliasFor(p);
 
   const inboxCount = m.incoming.length;
+  const sheetX = sheet ? m.ch.all.find((x) => x.id === sheet) : null;
   const chips = [
     { Icon: Flame, label: 'Log streak', v: `${m.foodStreak} day${m.foodStreak === 1 ? '' : 's'}`, c: '#fb923c' },
-    { Icon: Swords, label: 'Duel record', v: `${m.record.w}–${m.record.l}${m.record.d ? `–${m.record.d}` : ''}`, c: '#fb7185' },
+    { Icon: Swords, label: 'Challenges won', v: `${m.ch.record.wins} won · ${m.ch.record.podiums} top 3`, c: '#fb7185' },
     { Icon: Trophy, label: 'Steps this week', v: m.seasonRank, c: '#facc15' },
-    { Icon: Users, label: 'Friends · Family', v: `${m.friendCount}/3 · ${m.familyCount}/3`, c: '#60a5fa' },
+    { Icon: Users, label: 'Friends · Family', v: `${m.friendCount}/${FRIEND_LIMIT} · ${m.familyCount}/${FAMILY_LIMIT}`, c: '#60a5fa' },
   ];
 
   return (
@@ -704,15 +725,25 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
 
       <div key={tab} className="way-rise">
         {tab === 'arena' ? (
-          <ArenaTab m={model} metric={metric} setMetric={setMetric} period={period} setPeriod={setPeriod} k={k} onCheer={onCheer} onCheerPerson={onCheerPerson} onClaim={onClaim} onAdd={add} onOpenFamily={() => setTab('family')} onRemove={onRemove} />
-        ) : tab === 'duels' ? (
-          <DuelsTab
+          <ArenaTab
             m={model}
+            metric={metric}
+            setMetric={setMetric}
+            period={period}
+            setPeriod={setPeriod}
             k={k}
-            onNudge={onNudge}
-            onNewDuel={() => setMd({ type: 'duel', suggest: m.competitors.map((c) => m.person(c.id)).filter((p) => p.username) })}
-            onReviewDuel={onReview}
+            onCheer={onCheer}
+            onCheerPerson={onCheerPerson}
+            onClaim={onClaim}
+            onAdd={add}
+            onOpenFamily={() => setTab('family')}
+            onRemove={onRemove}
+            onOpenChallenge={(x) => setSheet(x.id)}
+            onNewChallenge={() => newChallenge()}
+            onInvites={() => setTab('challenges')}
           />
+        ) : tab === 'challenges' ? (
+          <ChallengesTab m={model} k={k} onOpen={(x) => setSheet(x.id)} onNew={() => newChallenge()} onReview={reviewChallenge} onDecline={declineChallenge} />
         ) : tab === 'family' ? (
           <FamilyTab
             m={model}
@@ -753,7 +784,20 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
           </div>
         </Modal>
       ) : null}
-      {md ? <ConnectDialog key={JSON.stringify([md.type, md.conn?.id, md.duel?.id, md.mode])} md={md} meId={userId} supabase={d.supabase} onClose={() => setMd(null)} onDone={done} onSwitch={setMd} /> : null}
+      {sheetX ? (
+        <ChallengeSheet
+          m={model}
+          x={sheetX}
+          k={k}
+          sent={sent}
+          onClose={() => setSheet(null)}
+          onNudge={onNudge}
+          onLeave={onLeave}
+          onCancel={onCallOff}
+          onRematch={onRematch}
+        />
+      ) : null}
+      {md ? <ConnectDialog key={JSON.stringify([md.type, md.conn?.id, md.x?.id, md.mode])} md={md} meId={userId} supabase={d.supabase} onClose={() => setMd(null)} onDone={done} onSwitch={setMd} /> : null}
       {cf ? <ConfirmDialog cf={cf} onClose={() => setCf(null)} /> : null}
       {aliasFor ? (
         <AliasDialog

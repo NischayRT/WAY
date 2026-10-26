@@ -47,7 +47,7 @@ export function avatarOf(person, isMe) {
 }
 /** Your private nickname for them first, then their first name, then @username. */
 export const displayName = (p) => (p?.alias && p.alias.trim()) || (p?.full_name && p.full_name.trim()) || (p?.username ? `@${p.username}` : 'Someone');
-export const FRIEND_LIMIT = 3;
+export const FRIEND_LIMIT = 6;
 export const FAMILY_LIMIT = 3;
 export const initialOf = (p) => (displayName(p).replace('@', '').charAt(0) || '?').toUpperCase();
 
@@ -228,7 +228,7 @@ export function logStreak(foodDays, today) {
   return n;
 }
 
-export function badgesFor({ mine, foodStreak, duelWins, today }) {
+export function badgesFor({ mine, foodStreak, challengeWins = 0, today }) {
   const last = (field, days) => [...(mine?.get(field) || new Map())].filter(([d]) => d > addDays(today, -days) && d <= today);
   const steps7 = last('steps', 7).filter(([, v]) => v >= 10000).length;
   const km30 = last('distance_km', 30).reduce((a, [, v]) => a + v, 0);
@@ -236,7 +236,7 @@ export function badgesFor({ mine, foodStreak, duelWins, today }) {
   const sleep30 = last('sleep_hours', 30).filter(([, v]) => v >= 7).length;
   return [
     { id: '10k', label: '10k Club', icon: 'footprints', color: '#60a5fa', p: steps7 / 7, prog: `${steps7}/7 days` },
-    { id: 'duelist', label: 'Duelist', icon: 'swords', color: '#fb7185', p: duelWins / 5, prog: `${duelWins}/5 wins` },
+    { id: 'duelist', label: 'Challenger', icon: 'swords', color: '#fb7185', p: challengeWins / 5, prog: `${challengeWins}/5 wins` },
     { id: 'streak', label: 'Streak 30', icon: 'flame', color: '#fb923c', p: foodStreak / 30, prog: `${Math.min(foodStreak, 30)}/30` },
     { id: 'century', label: 'Century', icon: 'navigation', color: '#34d399', p: km30 / 100, prog: `${Math.round(km30)}/100 km` },
     { id: 'climber', label: 'Climber', icon: 'building', color: '#f59e0b', p: floors30 / 150, prog: `${Math.round(floors30)}/150` },

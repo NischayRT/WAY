@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { addDays } from '@/lib/dateUtils';
 import { indexStats, weekStart } from '@/lib/friends';
+import { indexBoard } from '@/lib/challenges';
 
 const isMissingSetup = (e) => !!e && (e.code === '42P01' || e.code === 'PGRST202' || e.code === 'PGRST205' || /does not exist|schema cache/i.test(e.message || ''));
 
 /**
  * Everything the Friends screen needs. Every read goes through RLS or the
- * friend_* functions in supabase/add-friends.sql, so only what this user is
+ * friend_* functions in supabase/add-friends.sql and challenges-2026-10.sql, so only what this user is
  * allowed to see ever arrives here.
  */
 export function useFriendsData(userId, today) {
@@ -23,12 +24,17 @@ export function useFriendsData(userId, today) {
     const ws = weekStart(today);
     const from = addDays(today, -30);
     (async () => {
-      const [people, conns, duels, stats, board, claims, views, nudges, cheers, food, blocks, aliases, cheersIn] = await Promise.all([
+      // Lock results of challenges that ended two or more days ago (cheap; no-op
+      // before supabase/challenges-2026-10.sql has been run).
+      await supabase.rpc('finalize_my_challenges').then(() => null, () => null);
+      const [people, conns, challenges, members, stats, board, results, claims, views, nudges, cheers, food, blocks, aliases, cheersIn] = await Promise.all([
         supabase.rpc('friend_people'),
         supabase.from('connections').select('*').order('created_at', { ascending: false }),
-        supabase.from('duels').select('*').order('created_at', { ascending: false }),
+        supabase.from('challenges').select('*').order('created_at', { ascending: false }).limit(200),
+        supabase.from('challenge_members').select('challenge_id, user_id, status, invited_at, responded_at, result_seen'),
         supabase.rpc('friend_stats', { p_from: from, p_to: today }),
-        supabase.rpc('duel_board'),
+        supabase.rpc('challenge_board'),
+        supabase.rpc('challenge_results'),
         supabase.from('quest_claims').select('quest_id, xp, week_start').eq('user_id', userId).eq('week_start', ws),
         supabase.from('share_views').select('viewer_id, fields, viewed_at').eq('owner_id', userId).order('viewed_at', { ascending: false }).limit(50),
         supabase.from('nudges').select('*').eq('to_id', userId).order('created_at', { ascending: false }).limit(20),
@@ -40,7 +46,7 @@ export function useFriendsData(userId, today) {
         supabase.from('cheers').select('from_id, event_key, created_at').eq('to_id', userId).gte('created_at', `${addDays(today, -7)}T00:00:00Z`),
       ]);
       if (!live) return;
-      const firstError = [people, conns, duels, stats].map((r) => r.error).find(Boolean);
+      const firstError = [people, conns, challenges, members, stats].map((r) => r.error).find(Boolean);
       if (firstError) {
         setState({ loading: false, setup: isMissingSetup(firstError), error: firstError.message });
         return;
@@ -49,9 +55,11 @@ export function useFriendsData(userId, today) {
         loading: false,
         people: new Map((people.data || []).map((p) => [p.id, p])),
         connections: conns.data || [],
-        duels: duels.data || [],
+        challenges: challenges.data || [],
+        members: members.data || [],
         stats: indexStats(stats.data || []),
-        duelBoard: board.data || [],
+        board: indexBoard(board.data || []),
+        results: results.data || [],
         claims: new Set((claims.data || []).map((c) => c.quest_id)),
         views: views.data || [],
         nudges: nudges.data || [],

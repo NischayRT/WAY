@@ -32,7 +32,8 @@ src/
 │   ├── today/               # Home dashboard (TodayClient, ScoreCard, BodyAgeCard, StreakCard…)
 │   ├── logging/             # LogFoodClient (search, Suggested/Recent/My recipes, edit/delete own
 │   │                        #   dishes), RecipeBuilderClient (new + edit), AmountSheet, IngredientPicker
-│   ├── friends/             # Friends: arena, duels, family sharing, inbox, privacy
+│   ├── friends/             # Friends: arena (+ live challenges panel), challenges, family, inbox, privacy;
+│   │                        #   Leaderboard.js is the shared podium board
 │   ├── activity/, nutrition/, streak/, weight/, settings/, onboarding/, landing/, legal/
 │   ├── body/                # 3D viewers and studio
 │   ├── way/                 # Design system (ui.js, WayNav, useJson cache, tiles)
@@ -47,7 +48,7 @@ src/
     ├── googleHealth.js, googleHealthSync.js, googleHealthSyncClient.js, strava.js
     ├── cache/foodCache.js   # Per-tab foods/ingredients cache (built-in first, archived hidden)
     ├── portions.js, recipeNutrition.js, recommend.js, mealBreakdown.js, daily.js
-    ├── friends.js, streak.js, dailyLoad.js, readiness.js, bodyAge.js
+    ├── friends.js, challenges.js (timed challenges), streak.js, dailyLoad.js, readiness.js, bodyAge.js
     ├── body*.js, physiqueClassifier.js, current/targetPhysiqueLogic.js, goal*.js, planner.js
     └── bmrTdee.js, dateUtils.js, weekStatus.js, weightTimeline.js, ui.js, legal.js
 supabase/                    # Hand-run SQL (order in section 5)
@@ -62,7 +63,8 @@ templates/                   # CSV templates for the generators
 - **SECURITY DEFINER functions** must derive the actor from `auth.uid()`, check the caller's relationship to every row they touch (and blocks), set `search_path = public`, and be granted to `authenticated` only. Internal helpers are revoked from `authenticated`.
 - **Service-role key** (`SUPABASE_SERVICE_ROLE_KEY`) is used only in `lib/supabaseAdmin.js`, only from route handlers, and only for writes the browser must not make (today: `daily_stats`). Every query is scoped to the verified user. Never import it from client code; never give it a `NEXT_PUBLIC_` prefix.
 - **Custom dishes.** Only the creator may edit or delete (`update_my_food`, `delete_my_food`). A dish someone else has logged is never changed in place: edits make a new version, deletes archive (`archived_at`). Triggers enforce this for direct API writes too. Max 150 active dishes per person.
-- **Data others see** (`daily_stats`, XP, duels) comes only from the server sync, never from browser writes.
+- **Data others see** (`daily_stats`, XP, challenges) comes only from the server sync, never from browser writes.
+- **Challenges** (`challenges`, `challenge_members`): only friends can be invited (1–6), only people who joined see each other's numbers, and only the challenge stat for its days (`challenge_board()`); never across a block. Results lock 2 days after the end (`finalize_my_challenges()`) and are read through `challenge_results()`; the final columns aren't selectable. Duels are retired (functions revoked, table kept as history). Friends limit is 6, family 3.
 - **Usernames** change only through `set_username()` (30-day rule).
 - **CSRF.** Non-GET `/api/*` requests from another site are refused, and API bodies must be JSON.
 - **Headers.** One source of truth in `lib/securityHeaders.mjs`; applied by both the proxy and `next.config.mjs`.
@@ -84,7 +86,7 @@ templates/                   # CSV templates for the generators
 ## 5. Database (`supabase/`)
 
 Run in this order on a new project (each file is safe to re-run unless noted):
-`schema.sql` → `add-weight-tracking.sql` → `add-custom-foods.sql` → `share-custom-foods.sql` → `add-food-log-update-policy.sql` → `expand-meal-categories.sql` → `add-recipe-system.sql` → `add-ingredient-logging.sql` → `security-hardening.sql` → `add-friends.sql` → `cheer-once-a-day.sql` → `security-fixes-2026-10.sql` → `security-followups-2026-10.sql`.
+`schema.sql` → `add-weight-tracking.sql` → `add-custom-foods.sql` → `share-custom-foods.sql` → `add-food-log-update-policy.sql` → `expand-meal-categories.sql` → `add-recipe-system.sql` → `add-ingredient-logging.sql` → `security-hardening.sql` → `add-friends.sql` → `cheer-once-a-day.sql` → `security-fixes-2026-10.sql` → `security-followups-2026-10.sql` → `challenges-2026-10.sql`.
 Seed data: `seed-dummy-foods.sql`, `seed-ingredients.sql` or `generated-ingredients.sql` (pick one; both insert ingredients), `seed-dish-recipes.sql`. `reset-foods.sql` is destructive.
 `google_health_connections` and `strava_connections` were created in the dashboard; `security-hardening.sql` adds their RLS.
 

@@ -39,151 +39,6 @@ function Empty({ icon: Icon, title, text, action }) {
   );
 }
 
-/* ================================ DUELS ================================ */
-
-export function DuelsTab({ m, k, onNudge, onNewDuel, onReviewDuel }) {
-  const r = m.record;
-  const total = r.w + r.l + r.d;
-  const pending = m.incoming.find((x) => x.kind === 'duel');
-  const record = [
-    { v: `${r.w} – ${r.l} – ${r.d}`, short: `${r.w}–${r.l}`, label: 'Wins – losses – draws', color: '#f1f5f9' },
-    { v: total ? `${Math.round((r.w / total) * 100)}%` : '—', label: 'Win rate', color: '#34d399' },
-    { v: String(m.duels.filter((d) => !d.finished).length), label: 'Live duels', color: '#facc15' },
-  ];
-  return (
-    <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 lg:gap-5">
-      <div className="grid grid-cols-3 gap-2 lg:col-span-12 lg:gap-0 lg:rounded-[22px] lg:border lg:border-way-line lg:bg-way-card">
-        {record.map((x, i) => (
-          <div
-            key={x.label}
-            className={cx(
-              'flex flex-col items-center gap-0.5 rounded-2xl border border-way-line bg-way-card p-3 lg:items-start lg:gap-1 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-6 lg:py-5',
-              i && 'lg:border-l lg:border-way-line'
-            )}
-          >
-            <span className="order-2 text-[11px] text-way-dim lg:order-1 lg:text-xs">{x.label}</span>
-            <span className="order-1 font-mono text-xl font-semibold lg:order-2 lg:text-[26px]" style={{ color: x.color }}>
-              <span className="lg:hidden">{x.short || x.v}</span>
-              <span className="hidden lg:inline">{x.v}</span>
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {m.duels.map((d) => {
-        const mf = FIELDS[d.duel.metric];
-        const Icon = FIELD_ICONS[d.duel.metric];
-        const lead = d.you >= d.theirs;
-        const diff = Math.abs(d.you - d.theirs);
-        const share = d.you + d.theirs ? (50 + ((d.you - d.theirs) / (d.you + d.theirs)) * 250) * k + (1 - k) * 50 : 50;
-        const tie = d.you === d.theirs;
-        return (
-          <Card
-            key={d.duel.id}
-            className="flex flex-col gap-3.5 p-4 transition-transform lg:col-span-4 lg:gap-5 lg:p-6 lg:hover:-translate-y-0.5"
-            style={{ borderColor: tie ? '#253044' : lead ? 'rgba(52,211,153,.35)' : 'rgba(251,113,133,.3)' }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-[7px] text-xs text-way-mute lg:gap-2 lg:text-[13px]">
-                <Icon size={15} style={{ color: mf.color }} />
-                {mf.label} · {d.span}
-              </div>
-              <span className="flex items-center gap-[5px] rounded-full bg-way-track px-[9px] py-1 font-mono text-[11px] font-semibold text-way-ink2">
-                <Timer size={12} />
-                {d.left}
-              </span>
-            </div>
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2.5 lg:gap-3">
-              <div className="flex flex-col gap-0.5 lg:items-center lg:gap-2">
-                <Avatar person={m.me} isMe size={56} className="hidden lg:flex" ring={lead && !tie ? '0 0 0 3px #0f1420, 0 0 0 5px #34d399' : undefined} />
-                <span className="text-xs text-way-mute lg:text-[13px]">You</span>
-                <span className="font-mono text-lg font-semibold lg:text-[22px]" style={{ color: lead && !tie ? '#34d399' : '#f1f5f9' }}>
-                  {fmtVal(d.you, mf.dec)}
-                </span>
-              </div>
-              <span className="font-heading text-[13px] font-bold tracking-[0.12em] text-way-faint lg:text-lg">VS</span>
-              <div className="flex flex-col items-end gap-0.5 lg:items-center lg:gap-2">
-                <Avatar person={d.them} size={56} className="hidden lg:flex" ring={!lead && !tie ? '0 0 0 3px #0f1420, 0 0 0 5px #fb7185' : undefined} />
-                <span className="text-xs text-way-mute lg:text-[13px]">{displayName(d.them)}</span>
-                <span className="font-mono text-lg font-semibold lg:text-[22px]" style={{ color: !lead && !tie ? '#fb7185' : '#f1f5f9' }}>
-                  {fmtVal(d.theirs, mf.dec)}
-                </span>
-              </div>
-            </div>
-            <div className="relative h-2.5 overflow-hidden rounded-[5px] bg-[#3b1d27] lg:h-3 lg:rounded-md">
-              <div
-                className="absolute inset-y-0 left-0 bg-[linear-gradient(90deg,#10b981,#34d399)] transition-[width] duration-1000 ease-[cubic-bezier(.2,.8,.2,1)]"
-                style={{ width: `${Math.max(0, Math.min(100, share))}%` }}
-              />
-              <div className="absolute -bottom-0.5 -top-0.5 left-1/2 w-0.5 bg-way-page" />
-            </div>
-            <div className="flex items-center justify-between gap-2.5">
-              <span className="text-xs lg:text-[13px]" style={{ color: tie ? '#94a3b8' : lead ? '#6ee7b7' : '#fda4af' }}>
-                {d.finished
-                  ? tie
-                    ? 'Finished in a draw'
-                    : lead
-                      ? 'You won'
-                      : `${displayName(d.them)} won`
-                  : !d.started
-                    ? 'Starts tomorrow'
-                    : tie
-                      ? 'All square'
-                      : lead
-                        ? `You lead by ${fmtVal(diff, mf.dec)} ${mf.unit}`
-                        : `${displayName(d.them)} leads by ${fmtVal(diff, mf.dec)} ${mf.unit}`}
-              </span>
-              {!d.finished && d.started ? (
-                <button
-                  type="button"
-                  onClick={() => onNudge(d, lead ? 'taunt' : 'rally')}
-                  disabled={d.nudged}
-                  className="flex shrink-0 items-center gap-1.5 rounded-[9px] border border-way-line2 px-[11px] py-[7px] text-xs text-way-ink2 disabled:opacity-60"
-                >
-                  {d.nudged ? <Check size={13} /> : lead ? <Smile size={13} /> : <Megaphone size={13} />}
-                  {d.nudged ? 'Sent' : lead ? 'Taunt' : 'Rally'}
-                </button>
-              ) : null}
-            </div>
-          </Card>
-        );
-      })}
-      {!m.duels.length ? (
-        <div className="lg:col-span-12">
-          <Empty icon={Swords} title="No duels yet" text="Challenge someone to a few days of steps, distance, burn, floors or sleep." />
-        </div>
-      ) : null}
-
-      {pending ? (
-        <Card className="flex flex-col gap-3 border-rose-400/35 p-4 md:flex-row md:items-center md:gap-[18px] md:p-6 lg:col-span-6">
-          <Avatar person={pending.from} size={52} className="hidden md:flex" />
-          <div className="flex flex-1 flex-col gap-1">
-            <span className="font-heading text-[11px] font-bold tracking-[0.14em] text-way-over">CHALLENGE WAITING</span>
-            <span className="text-sm md:text-[15px]">
-              <strong className="font-semibold">{displayName(pending.from)}</strong> challenged you to a {FIELDS[pending.item.metric].label.toLowerCase()} duel
-            </span>
-          </div>
-          <button type="button" onClick={() => onReviewDuel(pending)} className="rounded-xl bg-way-over px-[18px] py-3 text-[13px] font-semibold text-[#1a0508]">
-            Review
-          </button>
-        </Card>
-      ) : null}
-      <button
-        type="button"
-        onClick={onNewDuel}
-        className={cx(
-          'flex items-center justify-center gap-2 rounded-[22px] border border-dashed border-way-line3 p-[18px] text-sm font-semibold text-way-ink2 transition-colors hover:border-way-dim hover:bg-way-card lg:gap-3 lg:p-6 lg:text-base',
-          pending ? 'lg:col-span-6' : 'lg:col-span-12'
-        )}
-      >
-        <Swords size={18} />
-        Start a new duel
-        <span className="hidden text-[13px] font-normal text-way-dim lg:inline">· pick a person, a stat and a deadline</span>
-      </button>
-    </div>
-  );
-}
-
 /* ================================ FAMILY ================================ */
 
 const KITS = [
@@ -351,7 +206,8 @@ export function FamilyTab({ m, k, onCheckIn, onManage, onKit, onOpenData, onAlia
 
 export function InboxTab({ m, onReview, onDecline, onCancel, onRevise }) {
   const describe = (x) => {
-    if (x.kind === 'duel') return { what: `challenged you to a ${FIELDS[x.item.metric].label.toLowerCase()} duel`, Icon: Swords, c: '#fb7185', fields: [x.item.metric] };
+    if (x.kind === 'challenge')
+      return { what: `challenged you: ${x.ch.f.label.toLowerCase()} for ${x.ch.len} day${x.ch.len === 1 ? '' : 's'} (${x.ch.span})`, Icon: Swords, c: '#fb7185', fields: [x.item.metric] };
     const c = x.item;
     if (c.kind === 'compete') return { what: 'wants to compete with you', Icon: Swords, c: '#fb7185', fields: c.fields };
     if (c.initiated_by === c.owner_id) return { what: `wants to share their data with you${c.ends_at ? '' : ' · no end date'}`, Icon: Share2, c: '#34d399', fields: c.fields };
@@ -391,18 +247,20 @@ export function InboxTab({ m, onReview, onDecline, onCancel, onRevise }) {
                 <Btn variant="outline" onClick={() => onDecline(x)} className="flex-1 rounded-[10px] font-normal lg:flex-none">
                   Decline
                 </Btn>
-                <Btn variant="outline" onClick={() => onRevise(x)} className="flex-1 rounded-[10px] lg:flex-none">
-                  <Pencil size={12} />
-                  Revise
-                </Btn>
+                {x.kind === 'challenge' ? null : (
+                  <Btn variant="outline" onClick={() => onRevise(x)} className="flex-1 rounded-[10px] lg:flex-none">
+                    <Pencil size={12} />
+                    Revise
+                  </Btn>
+                )}
                 <Btn variant="primary" onClick={() => onReview(x)} className="flex-[1.4] rounded-[10px] lg:flex-none">
-                  Accept…
+                  {x.kind === 'challenge' ? 'Review…' : 'Accept…'}
                 </Btn>
               </div>
             </Card>
           );
         })}
-        {!m.incoming.length ? <Empty title="Nothing waiting" text="Invites, share requests and duel challenges land here." /> : null}
+        {!m.incoming.length ? <Empty title="Nothing waiting" text="Invites, share requests and challenges land here." /> : null}
 
         {m.nudges.length ? (
           <>
@@ -431,10 +289,10 @@ export function InboxTab({ m, onReview, onDecline, onCancel, onRevise }) {
       <section className="flex flex-col gap-3.5 lg:col-span-4">
         <Eyebrow className="px-0.5 pt-1 lg:p-0">You sent</Eyebrow>
         {m.outgoing.map((x) => {
-          const isDuel = x.kind === 'duel';
+          const isCh = x.kind === 'challenge';
           const c = x.item;
-          const what = isDuel
-            ? `You challenged ${displayName(x.to)} to a ${FIELDS[c.metric].label.toLowerCase()} duel`
+          const what = isCh
+            ? `Your ${x.ch.f.label.toLowerCase()} challenge starts ${x.ch.left.replace('Starts ', '')}. Waiting on ${x.to.map(displayName).join(', ')}.`
             : c.kind === 'compete'
               ? `You asked ${displayName(x.to)} to compete`
               : c.initiated_by === c.owner_id
@@ -444,14 +302,14 @@ export function InboxTab({ m, onReview, onDecline, onCancel, onRevise }) {
             <Card key={`${x.kind}-${c.id}`} className="flex flex-col gap-3 rounded-[18px] p-3.5 lg:rounded-[20px] lg:px-5 lg:py-[18px]">
               <span className="text-[13px] lg:text-sm">{what}</span>
               <div className="flex flex-wrap gap-1">
-                {(isDuel ? [c.metric] : c.fields).map((f) => (
+                {(isCh ? [c.metric] : c.fields).map((f) => (
                   <FieldChip key={f} field={f} />
                 ))}
               </div>
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[10px] font-medium text-way-dim lg:text-[11px]">Sent {relDay(String(c.created_at).slice(0, 10), m.today)}</span>
                 <Btn variant="outline" size="sm" onClick={() => onCancel(x)} className="rounded-[9px]">
-                  Cancel
+                  {isCh ? 'Call off' : 'Cancel'}
                 </Btn>
               </div>
             </Card>
@@ -469,7 +327,7 @@ export function InboxTab({ m, onReview, onDecline, onCancel, onRevise }) {
 const RULES = [
   [SearchX, 'No search or browsing. People need your exact username, and see only that until you accept.'],
   [ListChecks, 'Nothing is shared without your OK, item by item. Competing compares only what you both agree on.'],
-  [Database, 'Only daily totals are read (the last 31 days), and only the agreed items. Stop sharing and access ends at once.'],
+  [Database, 'Only daily totals are read (the last 31 days), and only the agreed items. A challenge shows its one stat, for its days, to the people who joined. Stop sharing and access ends at once.'],
   [TimerReset, 'Set an end date, remove items, stop any time, or block someone.'],
   [ShieldCheck, 'These rules are enforced by the database, not just this screen.'],
 ];

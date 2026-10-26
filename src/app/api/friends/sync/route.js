@@ -19,6 +19,9 @@ import { rateLimit } from '@/lib/rateLimit';
 // so the write uses the server-only service-role client, always scoped to the
 // verified user.
 const WINDOW = 31;
+// Kept a little longer than friends can browse, so a 30-day challenge still
+// has all its days when its results lock two days after it ends.
+const KEEP_DAYS = 45;
 const FRESH_MS = 30 * 60 * 1000;
 
 const round = (v, dp = 0) => (v == null || !Number.isFinite(Number(v)) ? null : Math.round(Number(v) * 10 ** dp) / 10 ** dp);
@@ -123,8 +126,8 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Could not update' }, { status: 500 });
     }
   }
-  // Keep only the window friends can see.
-  await admin.from('daily_stats').delete().eq('user_id', user.id).lt('day', from);
+  // Drop days older than any challenge can still need.
+  await admin.from('daily_stats').delete().eq('user_id', user.id).lt('day', addDays(today, -(KEEP_DAYS - 1)));
 
   return NextResponse.json({ updated: payload.length, google, updatedAt: now });
 }

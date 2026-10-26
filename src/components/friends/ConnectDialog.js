@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { AtSign, Swords, Share2, Eye, Check, Circle, Lock } from 'lucide-react';
+import { AtSign, Swords, Share2, Eye, Check, Circle, Lock, UserPlus } from 'lucide-react';
 import { FIELDS, FIELD_KEYS, COMPETE_KEYS, FRIEND_LIMIT, FAMILY_LIMIT, displayName } from '@/lib/friends';
+import { CHALLENGE_LENGTHS, MAX_CHALLENGE_DAYS, MAX_CHALLENGE_PEOPLE, dayDiff, shortDay, weekdayDay } from '@/lib/challenges';
+import { addDays } from '@/lib/dateUtils';
 import { Modal, Btn, Segmented, cx } from '@/components/way/ui';
+import { Avatar } from './parts';
 
 const MODES = [
   { key: 'compete', title: 'Compete', desc: 'Rank each other. You both agree what counts.', Icon: Swords, c: '#fb7185' },
@@ -15,11 +18,6 @@ const DURATIONS = [
   { value: 30, label: '30 days' },
   { value: 90, label: '90 days' },
   { value: 0, label: 'No end' },
-];
-const DUEL_LENGTHS = [
-  { value: 3, label: '3 days' },
-  { value: 7, label: '7 days' },
-  { value: 14, label: '14 days' },
 ];
 const cleanName = (v) => v.toLowerCase().replace(/[^a-z0-9_.@]/g, '').slice(0, 21);
 
@@ -87,18 +85,21 @@ function UsernameInput({ value, onChange, hint = true }) {
 
 /**
  * One dialog for every Friends action that needs input. `md` describes it:
- *  { type: 'add', mode, fields, days, label } · { type: 'duel', username?, metric, days }
- *  { type: 'review', conn, from } · { type: 'reviewDuel', duel, from }
+ *  { type: 'add', mode, fields, days, label }
+ *  { type: 'challenge', friends, people?, metric?, days?, today, counts }
+ *  { type: 'review', conn, from } · { type: 'reviewChallenge', x, from, others }
  *  { type: 'manage', conn, to } · { type: 'username', current }
- *  { type: 'revise', conn, from } · { type: 'reviseDuel', duel, from }  (answer with new terms)
+ *  { type: 'revise', conn, from }  (answer with new terms)
  */
 export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onSwitch }) {
   const [s, setS] = useState(() => ({
     username: md.username || '',
     mode: md.mode || 'compete',
     fields: md.fields || (md.conn ? md.conn.fields : ['steps', 'distance_km', 'active_kcal']),
-    days: md.days ?? (md.duel ? Math.round((new Date(md.duel.ends_on) - new Date(md.duel.starts_on)) / 86400000) + 1 : 30),
-    metric: md.metric || md.duel?.metric || 'steps',
+    days: md.days ?? 30,
+    until: md.until || '',
+    people: md.people || [],
+    metric: md.metric || 'steps',
     label: md.label || '',
     name: md.current || '',
   }));
@@ -186,31 +187,58 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
         </div>
       </>
     );
-  } else if (md.type === 'duel') {
-    valid = s.username.replace('@', '').length >= 3;
-    title = 'New duel';
-    cta = 'Send challenge';
+  } else if (md.type === 'challenge') {
+    const friends = md.friends || [];
+    const tomorrow = addDays(md.today, 1);
+    const lastAllowed = addDays(tomorrow, MAX_CHALLENGE_DAYS - 1);
+    const until = s.days === 'date' ? s.until : addDays(tomorrow, s.days - 1);
+    const days = until && until >= tomorrow && until <= lastAllowed ? dayDiff(tomorrow, until) + 1 : null;
+    const people = s.people.filter((id) => friends.some((p) => p.id === id));
+    valid = people.length > 0 && days != null;
+    title = 'New challenge';
+    cta = people.length ? `Challenge ${people.length} friend${people.length === 1 ? '' : 's'}` : 'Send challenge';
     ctaTone = 'compete';
-    const u = s.username.replace(/^@/, '');
-    submit = () => run('send_duel', { p_username: u, p_metric: s.metric, p_days: s.days }, `Challenge sent to @${u}`);
+    submit = () => run('create_challenge', { p_metric: s.metric, p_people: people, p_days: days }, `Challenge sent to ${people.length} friend${people.length === 1 ? '' : 's'}`);
+    const toggle = (id) =>
+      set({ people: people.includes(id) ? people.filter((x) => x !== id) : people.length >= MAX_CHALLENGE_PEOPLE ? people : [...people, id] });
     body = (
       <>
-        <UsernameInput value={s.username} onChange={(v) => set({ username: v })} hint={false} />
-        {md.suggest?.length ? (
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-way-ink2">Who</span>
+          <span className="font-mono text-[11px] text-way-dim">
+            {people.length}/{Math.min(MAX_CHALLENGE_PEOPLE, friends.length || MAX_CHALLENGE_PEOPLE)}
+          </span>
+        </div>
+        {friends.length ? (
           <div className="flex flex-wrap gap-1.5">
-            {md.suggest.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => set({ username: p.username })}
-                className={cx('rounded-full border px-2.5 py-1 text-xs', s.username === p.username ? 'border-way-ink text-way-ink' : 'border-way-line2 text-way-mute')}
-              >
-                @{p.username}
-              </button>
-            ))}
+            {friends.map((p) => {
+              const on = people.includes(p.id);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggle(p.id)}
+                  className="flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-xs font-semibold transition-colors"
+                  style={on ? { background: 'rgba(251,113,133,.14)', color: '#fecdd3', borderColor: 'rgba(251,113,133,.6)' } : { color: '#94a3b8', borderColor: '#253044' }}
+                >
+                  <Avatar person={p} size={24} />
+                  {displayName(p)}
+                  {on ? <Check size={12} /> : null}
+                </button>
+              );
+            })}
           </div>
+        ) : (
+          <span className="rounded-xl bg-way-rail px-3 py-2.5 text-xs text-way-mute">You can challenge people you compete with. Add a friend first.</span>
+        )}
+        {onSwitch && (md.counts?.friends ?? 0) < FRIEND_LIMIT ? (
+          <button type="button" onClick={() => onSwitch({ type: 'add', mode: 'compete', counts: md.counts })} className="flex items-center gap-1.5 self-start text-xs font-semibold text-way-protein">
+            <UserPlus size={13} />
+            Add a friend by username
+          </button>
         ) : null}
-        <span className="text-xs font-semibold text-way-ink2">Duel on</span>
+        <span className="text-xs font-semibold text-way-ink2">One stat</span>
         <div className="flex flex-wrap gap-1.5">
           {COMPETE_KEYS.map((k) => {
             const on = s.metric === k;
@@ -228,11 +256,40 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
             );
           })}
         </div>
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-          <span className="text-xs text-way-mute">How long</span>
-          <Segmented stretch size="sm" className="flex-1 rounded-xl bg-way-rail p-[3px]" value={s.days} onChange={(v) => set({ days: v })} options={DUEL_LENGTHS} />
+        <span className="text-xs font-semibold text-way-ink2">How long</span>
+        <Segmented
+          stretch
+          size="sm"
+          className="rounded-xl bg-way-rail p-[3px]"
+          value={s.days}
+          onChange={(v) => set({ days: v, until: v === 'date' ? s.until || addDays(tomorrow, 9) : s.until })}
+          options={[...CHALLENGE_LENGTHS.map((n) => ({ value: n, label: n === 1 ? '1 day' : `${n}d` })), { value: 'date', label: 'Date' }]}
+        />
+        {s.days === 'date' ? (
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-way-line2 bg-way-rail px-3 py-2 text-xs text-way-mute">
+            Last day
+            <input
+              type="date"
+              value={s.until || ''}
+              min={tomorrow}
+              max={lastAllowed}
+              onChange={(e) => set({ until: e.target.value })}
+              className="bg-transparent font-mono text-[13px] text-way-ink outline-none [color-scheme:dark]"
+            />
+          </label>
+        ) : null}
+        <div className="flex flex-col gap-1 rounded-xl bg-way-rail px-3 py-2.5 text-xs">
+          {days != null ? (
+            <span className="text-way-ink2">
+              {days} day{days === 1 ? '' : 's'}: {weekdayDay(tomorrow)} to {weekdayDay(until)}, ending 11:59 pm.
+            </span>
+          ) : (
+            <span className="text-rose-300">Pick a last day between {shortDay(tomorrow)} and {shortDay(lastAllowed)}.</span>
+          )}
+          <span className="text-way-dim [text-wrap:pretty]">
+            It starts tomorrow. Friends can join until it ends, and every day counts. People who join see each other’s {FIELDS[s.metric].label.toLowerCase()} for these days, nothing else.
+          </span>
         </div>
-        <span className="text-[11px] text-way-dim">It starts the day after they accept. Only this stat, for these days, is compared.</span>
       </>
     );
   } else if (md.type === 'review') {
@@ -286,31 +343,29 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
         ) : null}
       </>
     );
-  } else if (md.type === 'reviewDuel') {
-    const d = md.duel;
+  } else if (md.type === 'reviewChallenge') {
+    const x = md.x;
     const who = displayName(md.from);
-    const len = Math.round((new Date(d.ends_on) - new Date(d.starts_on)) / 86400000) + 1;
+    const stat = x.f.label.toLowerCase();
     title = `${who} challenged you`;
-    cta = 'Accept duel';
+    cta = 'Join challenge';
     ctaTone = 'compete';
-    submit = () => run('respond_duel', { p_id: d.id, p_accept: true }, `Duel accepted. Beat ${who}!`);
+    submit = () => run('respond_challenge', { p_id: x.id, p_join: true }, `You're in. Beat them at ${stat}!`);
     secondary = (
-      <span className="flex gap-2">
-        <Btn variant="outline" onClick={() => run('respond_duel', { p_id: d.id, p_accept: false }, `Declined ${who}`)} disabled={busy}>
-          Decline
-        </Btn>
-        {onSwitch ? (
-          <Btn variant="outline" onClick={() => onSwitch({ type: 'reviseDuel', duel: d, from: md.from })} disabled={busy}>
-            Revise
-          </Btn>
-        ) : null}
-      </span>
+      <Btn variant="outline" onClick={() => run('respond_challenge', { p_id: x.id, p_join: false }, `Declined ${who}`)} disabled={busy}>
+        Decline
+      </Btn>
     );
     body = (
-      <span className="text-sm text-way-ink2 [text-wrap:pretty]">
-        A {len}-day {FIELDS[d.metric].label.toLowerCase()} duel, starting tomorrow. Only your {FIELDS[d.metric].label.toLowerCase()} for those days is
-        compared.
-      </span>
+      <>
+        <span className="text-sm text-way-ink2 [text-wrap:pretty]">
+          {x.f.label} for {x.len} day{x.len === 1 ? '' : 's'}: {weekdayDay(x.c.starts_on)} to {weekdayDay(x.c.ends_on)}, ending 11:59 pm.
+          {md.others ? ` With ${md.others}.` : ''}
+        </span>
+        <span className="rounded-xl bg-way-rail px-3 py-2.5 text-xs text-way-dim [text-wrap:pretty]">
+          Everyone who joins sees your daily {stat} for these days, and nothing else. Joining late is fine: every day counts. You can leave any time.
+        </span>
+      </>
     );
   } else if (md.type === 'revise') {
     const c = md.conn;
@@ -355,41 +410,6 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
             <SensitiveWarning fields={fields} />
           </>
         ) : null}
-      </>
-    );
-  } else if (md.type === 'reviseDuel') {
-    const d = md.duel;
-    const who = displayName(md.from);
-    title = `Counter ${who}’s challenge`;
-    cta = 'Send counter-challenge';
-    ctaTone = 'compete';
-    submit = () => run('revise_duel', { p_id: d.id, p_metric: s.metric, p_days: s.days }, `Counter-challenge sent to ${who}`);
-    body = (
-      <>
-        <span className="text-[13px] text-way-mute [text-wrap:pretty]">
-          They proposed {FIELDS[d.metric].label.toLowerCase()}. Pick the stat and length you want; it goes back to them to accept.
-        </span>
-        <div className="flex flex-wrap gap-1.5">
-          {COMPETE_KEYS.map((k) => {
-            const on = s.metric === k;
-            return (
-              <button
-                key={k}
-                type="button"
-                aria-pressed={on}
-                onClick={() => set({ metric: k })}
-                className="rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors"
-                style={on ? { background: FIELDS[k].color, color: '#090d16', borderColor: FIELDS[k].color } : { color: '#94a3b8', borderColor: '#253044' }}
-              >
-                {FIELDS[k].label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-          <span className="text-xs text-way-mute">How long</span>
-          <Segmented stretch size="sm" className="flex-1 rounded-xl bg-way-rail p-[3px]" value={s.days} onChange={(v) => set({ days: v })} options={DUEL_LENGTHS} />
-        </div>
       </>
     );
   } else if (md.type === 'manage') {

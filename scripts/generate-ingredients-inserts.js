@@ -19,28 +19,12 @@ if (!csvPath) {
   process.exit(1);
 }
 
-const raw = fs.readFileSync(csvPath, 'utf-8').trim();
-const [headerLine, ...lines] = raw.split('\n');
-const headers = headerLine.split(',').map((h) => h.trim());
+const { readCsv, text, num, run } = require('./csvSql');
 
-function escape(val) {
-  if (val === '' || val === undefined) return 'null';
-  return `'${val.replace(/'/g, "''")}'`;
-}
-
-function numOrNull(val) {
-  if (val === '' || val === undefined) return 'null';
-  return val;
-}
-
-const rows = lines
-  .filter((l) => l.trim().length > 0)
-  .map((line) => {
-    const cells = line.split(',').map((c) => c.trim());
-    const row = Object.fromEntries(headers.map((h, i) => [h, cells[i]]));
-    return `  (${escape(row.name)}, ${escape(row.category)}, ${numOrNull(row.calories_kcal)}, ${numOrNull(row.protein_g)}, ${numOrNull(row.carbs_g)}, ${numOrNull(row.fat_g)}, ${numOrNull(row.fiber_g)}, ${escape(row.source || 'community_estimated')})`;
-  });
-
-const sql = `insert into ingredients (name, category, calories_kcal, protein_g, carbs_g, fat_g, fiber_g, source)\nvalues\n${rows.join(',\n')};\n`;
-
-console.log(sql);
+run(() => {
+  const rows = readCsv(fs.readFileSync(csvPath, 'utf-8')).map(
+    (r) =>
+      `  (${text(r.name)}, ${text(r.category)}, ${num(r.calories_kcal, r, 'calories_kcal')}, ${num(r.protein_g, r, 'protein_g')}, ${num(r.carbs_g, r, 'carbs_g')}, ${num(r.fat_g, r, 'fat_g')}, ${num(r.fiber_g, r, 'fiber_g')}, ${text(r.source || 'community_estimated')})`
+  );
+  return `insert into ingredients (name, category, calories_kcal, protein_g, carbs_g, fat_g, fiber_g, source)\nvalues\n${rows.join(',\n')};\n`;
+});

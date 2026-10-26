@@ -4,6 +4,7 @@ import { getValidAccessToken, fetchDailyHistory, fetchExtraHistory } from '@/lib
 import { todayLocalDate, addDays } from '@/lib/dateUtils';
 import { getAuthUser } from '@/lib/authServer';
 import { getAdminClient } from '@/lib/supabaseAdmin';
+import { rateLimit } from '@/lib/rateLimit';
 
 // POST /api/friends/sync[?force=1]
 //
@@ -24,7 +25,7 @@ const round = (v, dp = 0) => (v == null || !Number.isFinite(Number(v)) ? null : 
 
 export async function POST(request) {
   const supabase = await createServerSupabaseClient();
-  // Verify the session token itself here (not the middleware header): the
+  // Verify the session token itself here (not the proxy header): the
   // service-role write below has no RLS behind it.
   const user = await getAuthUser(supabase, { trustMiddleware: false });
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -53,6 +54,10 @@ export async function POST(request) {
   if (!force && latest && Date.now() - new Date(latest.updated_at).getTime() < FRESH_MS) {
     return NextResponse.json({ skipped: 'fresh', updatedAt: latest.updated_at });
   }
+
+  // Only syncs that will actually go to Google count against the limit.
+  const limited = await rateLimit(supabase, 'friends');
+  if (limited) return limited;
 
   const rows = new Map();
   const row = (day) => {

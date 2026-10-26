@@ -1,59 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { getAuthUser, AUTH_UID_HEADER, AUTH_EMAIL_HEADER } from '@/lib/authServer';
+import { getAuthUser, signIdentity, AUTH_UID_HEADER, AUTH_EMAIL_HEADER, AUTH_SIG_HEADER } from '@/lib/authServer';
+import { SECURITY_HEADERS } from '@/lib/securityHeaders.mjs';
+
+// Next.js 16 runs this file before every matched request (it replaced
+// middleware.js). It refreshes the Supabase session, sends people without a
+// profile to onboarding, hands the verified user to the page (signed, see
+// lib/authServer.js), guards the JSON API against cross-site writes and sets
+// the browser security headers.
 
 // Routes that must NOT trigger the profile-completeness redirect below:
 // where an incomplete-profile user is supposed to land (/onboarding), pages
 // that need no profile (/login, /auth/*, legal pages), and JSON APIs.
 const PROFILE_CHECK_EXEMPT_PREFIXES = ['/onboarding', '/login', '/auth', '/api', '/privacy', '/terms'];
-
-// Browser security headers for every page and API response.
-//
-// Content-Security-Policy: only this site's own scripts may run, the page
-// may only talk to this site and our Supabase project, it can't be framed
-// (clickjacking), plugins/<object> are off, and <base>/<form> can't be
-// pointed elsewhere. 'unsafe-inline' for scripts is still needed by Next.js'
-// inline bootstrap on static pages; everything else is locked down.
-const SUPABASE_ORIGIN = (() => {
-  try {
-    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin;
-  } catch {
-    return '';
-  }
-})();
-const SUPABASE_WS = SUPABASE_ORIGIN.replace(/^http/, 'ws');
-const isDev = process.env.NODE_ENV !== 'production';
-
-const CSP = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' data:",
-  // blob:/data: — the 3D body models decode their textures from blob URLs
-  `connect-src 'self' blob: data: ${SUPABASE_ORIGIN} ${SUPABASE_WS}`.trim(),
-  "worker-src 'self' blob:",
-  "media-src 'self' blob: data:",
-  "manifest-src 'self'",
-  "frame-src 'none'",
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  `form-action 'self' https://accounts.google.com ${SUPABASE_ORIGIN}`.trim(),
-  ...(isDev ? [] : ['upgrade-insecure-requests']),
-].join('; ');
-
-const SECURITY_HEADERS = {
-  'Content-Security-Policy': CSP,
-  'X-Frame-Options': 'DENY',
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()',
-  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
-  'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
-  'Cross-Origin-Resource-Policy': 'same-origin',
-  'X-DNS-Prefetch-Control': 'off',
-};
 
 function withSecurityHeaders(response) {
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) response.headers.set(k, v);
@@ -81,6 +40,19 @@ function isCrossSiteWrite(request) {
   }
 }
 
+// API writes that carry a body must send it as JSON. A plain HTML form on
+// another site can only send form or text bodies, so this closes the door on
+// "simple" cross-site posts even for browsers that don't send Origin.
+function isNonJsonApiBody(request) {
+  if (SAFE_METHODS.has(request.method)) return false;
+  if (!request.nextUrl.pathname.startsWith('/api/')) return false;
+  const length = Number(request.headers.get('content-length') || 0);
+  const chunked = !!request.headers.get('transfer-encoding');
+  if (!length && !chunked) return false; // no body (e.g. POST /api/friends/sync)
+  const type = (request.headers.get('content-type') || '').toLowerCase();
+  return !type.startsWith('application/json');
+}
+
 // Supabase keeps the session in cookies named sb-<project>-auth-token
 // (sometimes chunked .0/.1). No such cookie = signed out, so there is no
 // session to refresh and no profile to check.
@@ -88,9 +60,12 @@ function hasSessionCookie(request) {
   return request.cookies.getAll().some((c) => c.name.startsWith('sb-') && c.name.includes('-auth-token'));
 }
 
-export async function middleware(request) {
+export async function proxy(request) {
   if (isCrossSiteWrite(request)) {
     return withSecurityHeaders(NextResponse.json({ error: 'Forbidden' }, { status: 403 }));
+  }
+  if (isNonJsonApiBody(request)) {
+    return withSecurityHeaders(NextResponse.json({ error: 'Send JSON' }, { status: 415 }));
   }
 
   // Supabase falls back to the Site URL root (/?code=...) when the return
@@ -171,9 +146,12 @@ function forwardHeaders(request, user) {
   const h = new Headers(request.headers);
   h.delete(AUTH_UID_HEADER);
   h.delete(AUTH_EMAIL_HEADER);
+  h.delete(AUTH_SIG_HEADER);
   if (user?.id) {
     h.set(AUTH_UID_HEADER, user.id);
     if (user.email) h.set(AUTH_EMAIL_HEADER, user.email);
+    const sig = signIdentity(user.id, user.email ?? null);
+    if (sig) h.set(AUTH_SIG_HEADER, sig);
   }
   return h;
 }

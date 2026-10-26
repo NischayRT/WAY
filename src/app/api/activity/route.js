@@ -6,6 +6,7 @@ import { getValidAccessToken, fetchDailyMetrics } from '@/lib/googleHealth';
 import { getValidStravaAccessToken, fetchStravaDailyMetrics } from '@/lib/strava';
 import { isValidDateStr, todayLocalDate } from '@/lib/dateUtils';
 import { getAuthUser } from '@/lib/authServer';
+import { rateLimit } from '@/lib/rateLimit';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -17,6 +18,10 @@ export async function GET(request) {
   const user = await getAuthUser(supabase);
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const limited = await rateLimit(supabase, 'google');
+
+  if (limited) return limited;
 
   try {
     // 1. Check Google Health Connection

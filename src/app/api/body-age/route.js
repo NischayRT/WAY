@@ -6,6 +6,7 @@ import { computeBodyAge, requirementsFor } from '@/lib/bodyAge';
 import { computeRecovery, sleepConsistencyPct } from '@/lib/readiness';
 import { todayLocalDate, addDays, isValidDateStr } from '@/lib/dateUtils';
 import { getAuthUser } from '@/lib/authServer';
+import { rateLimit } from '@/lib/rateLimit';
 
 // GET /api/body-age?from=YYYY-MM-DD&to=YYYY-MM-DD
 //
@@ -27,6 +28,8 @@ export async function GET(request) {
   const supabase = await createServerSupabaseClient();
   const user = await getAuthUser(supabase);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const limited = await rateLimit(supabase, 'google');
+  if (limited) return limited;
 
   const { data: profile } = await supabase
     .from('profiles')

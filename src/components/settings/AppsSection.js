@@ -86,6 +86,9 @@ export default function AppsSection({ connected, canWrite, syncEnabled: initialS
       const res = await fetch('/api/google-health/disconnect', { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not disconnect.');
+      if (data.revoked === false) {
+        setError('Disconnected. Google didn’t confirm the access was removed, so also remove WAY at myaccount.google.com/permissions.');
+      }
       router.refresh();
     } catch (e) {
       setError(e.message);

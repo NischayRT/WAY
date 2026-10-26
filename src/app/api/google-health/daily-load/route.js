@@ -5,6 +5,7 @@ import { readinessOn } from '@/lib/readiness';
 import { describeDay } from '@/lib/dailyLoad';
 import { todayLocalDate, isValidDateStr, addDays } from '@/lib/dateUtils';
 import { getAuthUser } from '@/lib/authServer';
+import { rateLimit } from '@/lib/rateLimit';
 
 // GET /api/google-health/daily-load?date=YYYY-MM-DD&days=N
 //
@@ -15,6 +16,8 @@ export async function GET(request) {
   const supabase = await createServerSupabaseClient();
   const user = await getAuthUser(supabase);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const limited = await rateLimit(supabase, 'google');
+  if (limited) return limited;
 
   const { searchParams } = new URL(request.url);
   const today = todayLocalDate();

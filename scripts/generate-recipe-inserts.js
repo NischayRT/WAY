@@ -33,60 +33,17 @@ if (!csvPath) {
   process.exit(1);
 }
 
-function parseCsvLine(line) {
-  const cells = [];
-  let current = '';
-  let inQuotes = false;
+const { readCsv, text, num, int, run } = require('./csvSql');
 
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-
-    if (inQuotes) {
-      if (char === '"') {
-        if (line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        current += char;
-      }
-    } else if (char === '"') {
-      inQuotes = true;
-    } else if (char === ',') {
-      cells.push(current.trim());
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  cells.push(current.trim());
-  return cells;
-}
-
-function escape(val) {
-  return `'${val.replace(/'/g, "''")}'`;
-}
-
-const raw = fs.readFileSync(csvPath, 'utf-8').trim();
-const [headerLine, ...lines] = raw.split('\n');
-const headers = parseCsvLine(headerLine);
-
-const rows = lines
-  .filter((l) => l.trim().length > 0)
-  .map((line) => {
-    const cells = parseCsvLine(line);
-    const row = Object.fromEntries(headers.map((h, i) => [h, cells[i]]));
-    return `  (${escape(row.dish_name)}, ${row.ingredient_id}, ${row.quantity_g})`;
-  });
-
-const sql = `insert into dish_ingredients (food_id, ingredient_id, quantity_g)
+run(() => {
+  const rows = readCsv(fs.readFileSync(csvPath, 'utf-8')).map(
+    (r) => `  (${text(r.dish_name)}, ${int(r.ingredient_id, r, 'ingredient_id')}, ${num(r.quantity_g, r, 'quantity_g')})`
+  );
+  return `insert into dish_ingredients (food_id, ingredient_id, quantity_g)
 select f.id, v.ingredient_id, v.quantity_g
 from (values
 ${rows.join(',\n')}
 ) as v(dish_name, ingredient_id, quantity_g)
 join foods f on f.name = v.dish_name and f.created_by is null;
 `;
-
-console.log(sql);
+});

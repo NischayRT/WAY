@@ -46,6 +46,21 @@ function key() {
   return buf;
 }
 
+/**
+ * Whether tokens can be stored right now. False only in production with a
+ * missing or malformed key; checked before sending anyone to Google, so a
+ * server setup problem never looks like a failed sign-in.
+ */
+export function encryptionReady() {
+  try {
+    key();
+    return true;
+  } catch (err) {
+    console.error('[tokenCrypto]', err.message);
+    return false;
+  }
+}
+
 export function isEncrypted(value) {
   return typeof value === 'string' && value.startsWith(PREFIX);
 }

@@ -55,44 +55,51 @@ export async function GET(request) {
   // Someone else signed in on this browser after the connect started.
   if (!startedBy || startedBy !== user.id) return failure('session_changed');
 
-  let writeMissing = false;
-  let extraMissing = [];
+  // Each step fails with its own code, so Settings can say what went wrong
+  // (it used to be one catch-all that showed only "Please try again").
+  let tokens;
   try {
-    const tokens = await exchangeCodeForTokens(code);
-
-    // prompt=consent should make Google return a refresh_token every
-    // time; guard anyway rather than store a row that can never refresh.
-    if (!tokens.refresh_token) {
-      return failure('no_refresh_token');
-    }
-
-    const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
-
-    const { error } = await supabase.from('google_health_connections').upsert({
-      user_id: user.id,
-      // encrypted at rest (lib/tokenCrypto.js)
-      access_token: encryptToken(tokens.access_token),
-      refresh_token: encryptToken(tokens.refresh_token),
-      expires_at: expiresAt,
-      // Google returns only what the user ticked on the consent screen, so
-      // this is the source of truth for whether we may write.
-      scopes: tokens.scope ?? null,
-      sync_enabled: true,
-    });
-
-    if (error) throw error;
-
-    // Granular consent: the user can untick the food / body-measurement boxes.
-    const granted = tokens.scope ?? '';
-    writeMissing = !(granted.includes(NUTRITION_WRITE_SCOPE) && granted.includes(METRICS_WRITE_SCOPE));
-    // An optional permission (e.g. sleep) that was asked for but not granted:
-    // either its box was left unticked, or the scope isn't added to the
-    // app's Data access list in Google Cloud, so Google never offered it.
-    extraMissing = requestedExtra.filter((k) => !granted.split(/\s+/).includes(OPTIONAL_SCOPES[k]));
-    if (extraMissing.length) console.warn('[google-health/callback] not granted:', extraMissing.join(','), '| granted:', granted);
+    tokens = await exchangeCodeForTokens(code);
   } catch (err) {
+    // Usually the redirect address or client secret in Vercel doesn't match
+    // Google Cloud, or the code was already used (double click / back button).
     return failure('exchange_failed', err?.message);
   }
+
+  // prompt=consent should make Google return a refresh_token every time;
+  // guard anyway rather than store a row that can never refresh.
+  if (!tokens.refresh_token) return failure('no_refresh_token');
+
+  let accessToken;
+  let refreshToken;
+  try {
+    // encrypted at rest (lib/tokenCrypto.js)
+    accessToken = encryptToken(tokens.access_token);
+    refreshToken = encryptToken(tokens.refresh_token);
+  } catch (err) {
+    return failure('server_setup', err?.message);
+  }
+
+  const { error } = await supabase.from('google_health_connections').upsert({
+    user_id: user.id,
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    expires_at: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
+    // Google returns only what the user ticked on the consent screen, so
+    // this is the source of truth for whether we may write.
+    scopes: tokens.scope ?? null,
+    sync_enabled: true,
+  });
+  if (error) return failure('save_failed', error.message);
+
+  // Granular consent: the user can untick the food / body-measurement boxes.
+  const granted = tokens.scope ?? '';
+  const writeMissing = !(granted.includes(NUTRITION_WRITE_SCOPE) && granted.includes(METRICS_WRITE_SCOPE));
+  // An optional permission (e.g. sleep) that was asked for but not granted:
+  // either its box was left unticked, or the scope isn't added to the
+  // app's Data access list in Google Cloud, so Google never offered it.
+  const extraMissing = requestedExtra.filter((k) => !granted.split(/\s+/).includes(OPTIONAL_SCOPES[k]));
+  if (extraMissing.length) console.warn('[google-health/callback] not granted:', extraMissing.join(','), '| granted:', granted);
 
   // Settings shows a success banner via this flag; other destinations
   // (e.g. /home after onboarding) just show the steps badge.

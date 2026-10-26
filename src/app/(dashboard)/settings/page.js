@@ -16,7 +16,11 @@ const GH_ERRORS = {
   session_changed: 'You signed in as someone else while connecting. Please connect again.',
   missing_code: 'Google did not complete the connection. Please try again.',
   no_refresh_token: 'Google did not return a refresh token. Disconnect and reconnect.',
-  token_exchange_failed: 'Google rejected the connection. Please try again.',
+  exchange_failed: 'Google turned down the sign-in. Please try once more from this page; if it keeps happening, the Google setup needs checking.',
+  token_exchange_failed: 'Google turned down the sign-in. Please try once more from this page.',
+  oauth_error: 'Google stopped the sign-in. Please try again.',
+  save_failed: 'Signed in with Google, but the connection could not be saved. Please try again.',
+  server_setup: 'Google Health isn’t fully set up on the server yet, so nothing was connected. This needs a fix on our side.',
 };
 
 export default async function SettingsPage({ searchParams }) {

@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { buildAuthUrl, OPTIONAL_SCOPES } from '@/lib/googleHealth';
 import { getAuthUser } from '@/lib/authServer';
+import { encryptionReady } from '@/lib/tokenCrypto';
 
 // Only these paths may be used as a post-connect destination. Anything
 // else (including an attacker-supplied URL) falls back to /settings, so
@@ -33,6 +34,16 @@ export async function GET(request) {
   const user = await getAuthUser(supabase);
 
   if (!user) return NextResponse.redirect(`${origin}/login`);
+
+  // Don't send people through Google's consent screen if the tokens it
+  // returns can't be stored (TOKEN_ENCRYPTION_KEY missing or malformed in
+  // production). Say so right away instead.
+  if (!encryptionReady()) return NextResponse.redirect(`${origin}/settings?google_health_error=server_setup`);
+  const missing = ['NEXT_PUBLIC_GOOGLE_HEALTH_CLIENT_ID', 'GOOGLE_HEALTH_CLIENT_SECRET', 'GOOGLE_HEALTH_REDIRECT_URI'].filter((k) => !process.env[k]);
+  if (missing.length) {
+    console.error('[google-health/connect] missing env:', missing.join(', '));
+    return NextResponse.redirect(`${origin}/settings?google_health_error=server_setup`);
+  }
 
   const requested = searchParams.get('returnTo');
   const returnTo = ALLOWED_RETURN_TO.includes(requested) ? requested : '/settings';

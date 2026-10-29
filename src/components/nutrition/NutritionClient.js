@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, ArrowRight, Plus, UtensilsCrossed } from 'lucide-react';
 import { PAGE, PageHeader, Card, Eyebrow, Segmented, Btn, Dot, fmt, useMounted, cx } from '@/components/way/ui';
+import TapTips from '@/components/way/TapTips';
 
 const RANGES = [7, 14, 30];
 const WD = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -24,13 +25,14 @@ const info = (date) => {
 /** Bars that pick a day when clicked; the selected one is lit, the rest dimmed. */
 function Bars({ bars, height, gap, rounded = 'rounded-[4px_4px_2px_2px]', children, showVal = false }) {
   return (
-    <div className="relative flex items-end" style={{ height, gap }}>
+    <TapTips className="flex items-end" style={{ height, gap }}>
       {children}
       {bars.map((b) => (
         <button
           key={b.key}
           type="button"
-          title={b.title}
+          data-tip={b.title}
+          aria-label={b.title}
           onClick={b.onClick}
           className="relative flex h-full min-w-0 flex-1 flex-col items-stretch justify-end transition-opacity duration-[250ms] hover:opacity-100"
           style={{ opacity: b.op }}
@@ -44,7 +46,7 @@ function Bars({ bars, height, gap, rounded = 'rounded-[4px_4px_2px_2px]', childr
           />
         </button>
       ))}
-    </div>
+    </TapTips>
   );
 }
 

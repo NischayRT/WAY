@@ -684,7 +684,7 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
         <div className="pointer-events-none absolute -left-16 -top-24 h-[260px] w-[260px] rounded-full bg-[radial-gradient(circle,rgba(52,211,153,.12),rgba(52,211,153,0)_70%)]" />
         {/* Name + level, with the actions beside it from 1024px */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-6">
-          <div className="relative flex min-w-0 items-center gap-3.5 md:gap-5">
+          <div className="way-island-gap relative flex min-w-0 items-center gap-3.5 md:gap-5">
             <div
               className="flex h-[68px] w-[68px] shrink-0 items-center justify-center rounded-full md:h-[84px] md:w-[84px]"
               style={{ background: `conic-gradient(#34d399 ${lv.pct * 3.6 * k}deg, #1a2130 0)`, transition: 'background 900ms' }}

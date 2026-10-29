@@ -106,18 +106,139 @@ export function MoreMenu({ placement = 'right', className = '' }) {
 }
 
 /**
+ * Phones (below 768px): your profile bubble, top right on every page. Tap it
+ * and it opens like an island into Settings, Account and Log out. It hides
+ * while you scroll down and comes back as soon as you scroll up (or reach
+ * the top).
+ */
+function MobileIsland({ initial, name }) {
+  const pathname = usePathname() || '';
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef(null);
+  const lastY = useRef(0);
+  const settingsOn = isActive(pathname, '/settings');
+
+  // Hide on the way down, show on the way up. Small jitters are ignored.
+  useEffect(() => {
+    let raf = 0;
+    lastY.current = window.scrollY;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const dy = y - lastY.current;
+        if (y < 24) setHidden(false);
+        else if (dy > 6) {
+          setHidden(true);
+          setOpen(false);
+        } else if (dy < -6) setHidden(false);
+        if (Math.abs(dy) > 6 || y < 24) lastY.current = y;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, []);
+
+  // A new page always starts with the bubble showing and closed.
+  useEffect(() => {
+    setOpen(false);
+    setHidden(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => ref.current && !ref.current.contains(e.target) && setOpen(false);
+    const onKey = (e) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const logout = async () => {
+    setBusy(true);
+    await createClient().auth.signOut();
+    invalidateJson();
+    router.push('/login');
+    router.refresh();
+  };
+
+  const item = 'flex items-center gap-3 rounded-[14px] px-3 py-2.5 text-[14px] text-way-ink2 transition-colors active:bg-way-hover';
+  return (
+    <div
+      ref={ref}
+      className={cx(
+        'fixed right-3 top-[max(12px,env(safe-area-inset-top))] z-[70] transition-[transform,opacity] duration-300 ease-[cubic-bezier(.2,.8,.2,1)] md:hidden',
+        hidden && !open ? 'pointer-events-none -translate-y-[160%] scale-75 opacity-0' : 'translate-y-0 scale-100 opacity-100'
+      )}
+    >
+      <div
+        className={cx(
+          'overflow-hidden border border-way-line2 bg-[#0f1420]/90 shadow-[0_12px_32px_rgba(0,0,0,.45)] backdrop-blur-md transition-[width,height,border-radius] duration-[400ms] ease-[cubic-bezier(.2,.9,.25,1.05)]',
+          open ? 'h-[188px] w-[232px] rounded-[26px]' : 'h-[42px] w-[42px] rounded-[21px]'
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-label={open ? 'Close menu' : 'Profile and settings'}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          className="flex h-[42px] w-full items-center gap-2.5 pl-[3px] pr-3 text-left"
+        >
+          <span
+            className={cx(
+              'flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-way-track text-sm font-semibold text-way-ink transition-shadow',
+              settingsOn && !open && 'shadow-[0_0_0_2px_#f1f5f9]'
+            )}
+          >
+            {initial}
+          </span>
+          <span className={cx('min-w-0 flex-1 truncate text-sm font-semibold transition-opacity duration-200', open ? 'opacity-100 delay-150' : 'opacity-0')}>
+            {name || 'Your account'}
+          </span>
+        </button>
+        <div role="menu" className={cx('flex flex-col gap-0.5 px-1.5 pb-1.5 pt-1 transition-opacity duration-200', open ? 'opacity-100 delay-150' : 'pointer-events-none opacity-0')}>
+          <Link href="/settings" role="menuitem" onClick={() => setOpen(false)} className={cx(item, settingsOn && 'bg-way-hover text-way-ink')}>
+            <Settings size={17} />
+            Settings
+          </Link>
+          <Link href="/settings?tab=account" role="menuitem" onClick={() => setOpen(false)} className={item}>
+            <UserRound size={17} />
+            Account
+          </Link>
+          <button type="button" role="menuitem" onClick={logout} disabled={busy} className={cx(item, 'text-rose-300 disabled:opacity-60')}>
+            <LogOut size={17} />
+            {busy ? 'Logging out…' : 'Log out'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Desktop: a 76px rail (logo, five destinations, Settings with a ⋯ menu and
  * the avatar at the bottom). Hovering slides out a label; the active item
  * gets a marker that glides between items. Phones: a five-slot bottom bar
  * with Log food raised in the middle and a sliding indicator.
  */
-export default function WayNav({ initial = 'W' }) {
+export default function WayNav({ initial = 'W', name = '' }) {
   const pathname = usePathname() || '';
   const settingsOn = isActive(pathname, '/settings');
   const activeIndex = NAV.findIndex((n) => isActive(pathname, n.href));
 
   return (
     <>
+      <MobileIsland initial={initial} name={name} />
       <aside className="fixed inset-y-0 left-0 z-50 hidden w-[76px] flex-col items-center gap-7 border-r border-way-line bg-way-rail py-6 md:flex">
         <Link href="/home" className="font-brand text-2xl leading-none tracking-[0.02em] text-way-ink transition-transform duration-300 hover:scale-110" aria-label="WAY home">
           WAY

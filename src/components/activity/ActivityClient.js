@@ -14,6 +14,7 @@ import WeightLogDialog from '@/components/way/WeightLogDialog';
 import { useJson } from '@/components/way/useJson';
 import HealthDataNotice from '@/components/way/HealthDataNotice';
 import { BodyAgeLocked } from '@/components/today/BodyAgeCard';
+import TapTips from '@/components/way/TapTips';
 
 const RANGES = [
   ['7D', 7],
@@ -150,7 +151,7 @@ function StatCard({ c, k, gapD, gapM, xLabels, span }) {
             ['lg:hidden', 72, gapM],
             ['hidden lg:flex', 140, gapD],
           ].map(([cls, h, gap]) => (
-            <div key={h} className={cx('relative flex items-end', cls)} style={{ height: h, gap }}>
+            <TapTips key={h} className={cx('flex items-end', cls)} style={{ height: h, gap }}>
               {c.goalPct != null ? (
                 <div className="pointer-events-none absolute inset-x-0 z-[1] border-t border-dashed border-way-dim" style={{ bottom: `${c.goalPct}%` }} />
               ) : null}
@@ -163,12 +164,13 @@ function StatCard({ c, k, gapD, gapM, xLabels, span }) {
               {c.bars.map((b, i) => (
                 <div
                   key={i}
-                  title={b.title}
-                  className="min-w-0 flex-1 rounded-[4px_4px_1px_1px] transition-[height,background,opacity] duration-[800ms] ease-[cubic-bezier(.2,.8,.2,1)] hover:opacity-75"
+                  data-tip={b.title}
+                  tabIndex={b.title ? 0 : undefined}
+                  className="min-w-0 flex-1 cursor-default rounded-[4px_4px_1px_1px] outline-none transition-[height,background,opacity] duration-[800ms] ease-[cubic-bezier(.2,.8,.2,1)] hover:opacity-75 focus-visible:opacity-75"
                   style={{ height: `${b.h * k}%`, background: b.color }}
                 />
               ))}
-            </div>
+            </TapTips>
           ))}
           <div className="hidden lg:flex" style={{ gap: gapD }}>
             {xLabels.map((x, i) => (

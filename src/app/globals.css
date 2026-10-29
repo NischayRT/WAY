@@ -311,3 +311,12 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .way-shine, .way-shine-loop, .way-glow, .way-step, .way-dash, .way-run, .way-float-up, .way-hop, .way-beat { animation: none; }
 }
+
+/* Phones: the profile island (WayNav MobileIsland) floats top right, so page
+   headers leave room for it. */
+@media (max-width: 767.98px) {
+  .way-app main > header,
+  .way-app .way-island-gap {
+    padding-right: 52px;
+  }
+}

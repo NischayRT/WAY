@@ -225,7 +225,6 @@ export default function TodayClient({
   const dateObj = new Date(y, m - 1, dd);
   const title = selectedDate === today ? 'Today' : dateObj.toLocaleDateString('en-IN', { weekday: 'long' });
   const dateLong = dateObj.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
-  const initial = (profile?.full_name || 'W').trim().charAt(0).toUpperCase();
 
   return (
     <main className={PAGE}>
@@ -261,13 +260,6 @@ export default function TodayClient({
               className="pointer-events-none absolute inset-0 h-full w-full min-w-0 appearance-none opacity-0"
             />
           </div>
-          <Link
-            href="/settings"
-            aria-label="Settings"
-            className="flex h-[38px] w-[38px] items-center justify-center rounded-full border border-way-line2 bg-way-track text-sm font-semibold md:hidden"
-          >
-            {initial}
-          </Link>
         </div>
       </header>
 

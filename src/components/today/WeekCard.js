@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { Card, Eyebrow, fmt, cx } from '@/components/way/ui';
+import TapTips from '@/components/way/TapTips';
 
 /** Last 7 days: calories as stacked protein/carbs/fat bars against the target line. */
 export default function WeekCard({ wk, k, selectedDate, onSelect }) {
@@ -25,7 +26,7 @@ export default function WeekCard({ wk, k, selectedDate, onSelect }) {
           <ChevronRight size={13} />
         </Link>
       </div>
-      <div className="relative flex h-[120px] items-end gap-2 lg:h-[150px] lg:gap-2.5">
+      <TapTips className="flex h-[120px] items-end gap-2 lg:h-[150px] lg:gap-2.5">
         <div className="pointer-events-none absolute inset-x-0 border-t border-dashed border-way-faint" style={{ bottom: `${wk.targetPct}%` }} />
         {wk.bars.map((b) => {
           const sel = b.date === selectedDate;
@@ -33,7 +34,8 @@ export default function WeekCard({ wk, k, selectedDate, onSelect }) {
             <button
               key={b.date}
               type="button"
-              title={b.title}
+              data-tip={b.title}
+              aria-label={b.title}
               onClick={() => onSelect(b.date)}
               className="flex h-full flex-1 flex-col justify-end transition-opacity duration-300"
               style={{ opacity: sel ? 1 : 0.4 }}
@@ -49,7 +51,7 @@ export default function WeekCard({ wk, k, selectedDate, onSelect }) {
             </button>
           );
         })}
-      </div>
+      </TapTips>
       <div className="flex gap-2 lg:gap-2.5">
         {wk.bars.map((b) => (
           <span

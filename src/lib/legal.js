@@ -11,7 +11,7 @@ export const LEGAL = {
   GOOGLE_SITE_VERIFICATION: 'Q2Z-HSqNb0z0PJYA05r3NFltquO351AmZ0pVVi22UmY',
   OPERATOR: 'Nischay (individual developer)',
   CONTACT_EMAIL: 'way.the.studio@gmail.com',
-  EFFECTIVE_DATE: '3 October 2026',
+  EFFECTIVE_DATE: '29 October 2026',
   GOVERNING_LAW: 'India',
   JURISDICTION: 'Hyderabad, Telangana',
 };

@@ -15,6 +15,14 @@ import {
   Footprints,
   Target,
   Sparkles,
+  Swords,
+  Crown,
+  Users,
+  Lock,
+  Flame as Streak,
+  Ruler,
+  Smartphone,
+  HeartPulse,
 } from 'lucide-react';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import { LEGAL } from '@/lib/legal';
@@ -32,12 +40,12 @@ import { getAuthUser } from '@/lib/authServer';
 export const metadata = {
   title: { absolute: 'WAY Studio — Indian food diet & physique tracker' },
   description:
-    'WAY Studio is a free web app for tracking calories and macros of Indian food, logging your weight, and viewing your progress in 3D. Optional Google Health sync.',
+    'WAY Studio is a free web app for tracking calories and macros of Indian food, logging your weight, seeing your progress in 3D, and running timed challenges with friends and family. Optional Google Health sync.',
   alternates: { canonical: '/' },
 };
 
 const FOODS = ['Dal tadka', 'Roti', 'Hyderabadi biryani', 'Masala dosa', 'Paneer tikka', 'Idli', 'Rajma chawal', 'Poha', 'Chole', 'Upma', 'Chai', 'Ragi sankati'];
-const MACROS = ['Calories', 'Protein', 'Carbs', 'Fat', 'Weight trend', 'Steps', 'Body fat', '3D goal body'];
+const MACROS = ['Calories', 'Protein', 'Carbs', 'Fat', 'Daily score', 'Recovery', 'Sleep', 'Steps', 'Challenges', 'Streaks', '3D goal body'];
 
 const STICKERS = [
   { Icon: Soup, cls: 'st1' },
@@ -95,6 +103,7 @@ export default async function HomePage() {
         </Link>
         <nav className={styles.navLinks} aria-label="Main">
           <a href="#features">Features</a>
+          <a href="#compete">Compete</a>
           <a href="#google-health">Google Health</a>
           <Link href="/privacy">Privacy</Link>
           <Link href="/login" className={styles.btnInk}>
@@ -129,9 +138,10 @@ export default async function HomePage() {
             <p className={`${styles.heroText} ${styles.in}`} style={{ '--d': '280ms' }}>
               {app} is a free web app that helps you track the calories and macros (protein, carbohydrates and fat)
               of the Indian food you actually eat, log your weight, and follow your progress toward a goal such as
-              losing weight, maintaining, or building muscle. You can optionally connect Google Health to bring in
-              your steps, distance, calories burned, floors, heart rate, blood oxygen, VO₂ max, glucose and (optionally) sleep, and to send your logged meals and weight to the Google
-              Health app.
+              losing weight, maintaining, or building muscle. Race friends and family in timed challenges, and only
+              ever compare the stats you agree to. You can optionally connect Google Health to bring in your steps,
+              distance, calories burned, floors, heart rate, blood oxygen, VO₂ max, glucose and (optionally) sleep,
+              and to send your logged meals and weight to the Google Health app.
             </p>
             <div className={`${styles.ctaRow} ${styles.in}`} style={{ '--d': '380ms' }}>
               <Link href="/login" className={styles.btnPop}>
@@ -164,8 +174,8 @@ export default async function HomePage() {
               </div>
               <h3>Track Indian food, your way</h3>
               <p>
-                Log meals from a food database built around Indian dishes, or build your own recipes. See calories,
-                protein, carbs and fat for every meal and for the whole day.
+                Log meals from a food database built around Indian dishes, or build your own recipes and edit them
+                later. See calories, protein, carbs and fat for every meal and for the whole day.
               </p>
               <div className={styles.plateViz} aria-hidden="true">
                 <div className={styles.donut}>
@@ -189,7 +199,7 @@ export default async function HomePage() {
               <h3>Weight and body progress</h3>
               <p>
                 Record your weight over time, set a target, and see your trend. Add body measurements to preview your
-                physique projection in 3D.
+                physique projection in 3D. In kg or lb, cm or feet and inches.
               </p>
               <svg className={styles.spark} viewBox="0 0 300 90" aria-hidden="true">
                 <path className={styles.sparkArea} d="M0,22 C40,18 55,40 90,36 S150,48 180,52 S240,66 300,70 L300,90 L0,90 Z" />
@@ -205,10 +215,10 @@ export default async function HomePage() {
               <div className={styles.cardIcon}>
                 <Footprints size={20} />
               </div>
-              <h3>Activity at a glance</h3>
+              <h3>Your day in one score</h3>
               <p>
-                Optionally connect Google Health to see your daily steps, distance and calories burned next to what you
-                eat.
+                Food and activity add up to a daily score. Connect Google Health to see steps, distance and calories
+                burned next to what you eat, plus recovery, strain and sleep.
               </p>
               <p className={styles.counter} aria-hidden="true">
                 <span className={styles.count} />
@@ -244,13 +254,14 @@ export default async function HomePage() {
         {/* ---------------------------------------------------------- how it works */}
         <section className={styles.section} aria-labelledby="how-title">
           <h2 id="how-title" className={`${styles.h2} ${styles.reveal}`}>
-            Three steps. <span className={styles.highlight}>Zero guesswork.</span>
+            Four steps. <span className={styles.highlight}>Zero guesswork.</span>
           </h2>
           <ol className={styles.steps}>
             {[
               ['Tell us about you', 'Height, weight, age, activity and goal. We work out your calories and macros.'],
               ['Log what you eat', 'Search Indian and everyday foods per 100 g, or repeat yesterday in one tap.'],
               ['Watch your body change', 'Your weight trend and your 3D goal body update as you go.'],
+              ['Race your people', 'Challenge friends or family on steps, distance or sleep, with a finish line.'],
             ].map(([t, d], i) => (
               <li key={t} className={`${styles.step} ${styles.reveal}`}>
                 <span className={styles.stepNum}>{i + 1}</span>
@@ -259,6 +270,82 @@ export default async function HomePage() {
               </li>
             ))}
           </ol>
+        </section>
+
+        {/* ---------------------------------------------------------- compete */}
+        <section id="compete" className={styles.section} aria-labelledby="compete-title">
+          <div className={styles.compete}>
+            <div className={styles.competeCopy}>
+              <p className={`${styles.pill} ${styles.reveal}`}>
+                <Swords size={14} /> New · Compete
+              </p>
+              <h2 id="compete-title" className={`${styles.h2} ${styles.reveal}`}>
+                Challenges with a <span className={styles.scribble}>finish line.</span>
+              </h2>
+              <p className={`${styles.competeText} ${styles.reveal}`}>
+                Pick up to four friends or family, one or more stats (steps, distance, active calories, floors or sleep)
+                and a last day, from one day to thirty. Everyone who joins sees a live leaderboard while it runs, and a
+                podium when it ends.
+              </p>
+              <ul className={`${styles.ticks} ${styles.reveal}`}>
+                <li>Several stats? Each gets its own podium; most stats won takes it.</li>
+                <li>Groups only form when everyone already knows each other.</li>
+                <li>One challenge at a time with each person, so nobody gets spammed.</li>
+                <li>Outside a challenge, you only ever see your own numbers.</li>
+              </ul>
+            </div>
+
+            <div className={`${styles.podiumCard} ${styles.reveal}`} aria-hidden="true">
+              <div className={styles.podiumHead}>
+                <span className={styles.liveChip}>
+                  <i /> 2d 4h left
+                </span>
+                <span className={styles.statChips}>
+                  <b style={{ background: '#cfe3ff' }}>Steps</b>
+                  <b style={{ background: '#c9f1dc' }}>Distance</b>
+                </span>
+              </div>
+              <div className={styles.podium}>
+                {[
+                  ['K', 'Kabir', '76,900', 2, '#cfe3ff'],
+                  ['M', 'Meera', '84,210', 1, '#ffe39a'],
+                  ['Y', 'You', '63,760', 3, '#ffd3dc'],
+                ].map(([i, name, v, place, bg]) => (
+                  <div key={name} className={styles.podiumCol}>
+                    {place === 1 ? <Crown size={22} className={styles.crown} /> : null}
+                    <span className={styles.avatar} style={{ background: bg }}>
+                      {i}
+                    </span>
+                    <span className={styles.podiumName}>{name}</span>
+                    <span className={styles.podiumVal}>{v}</span>
+                    <span className={styles.block} data-place={place}>
+                      {place}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className={styles.podiumFoot}>Only the people in this challenge · only its stats and days</p>
+            </div>
+          </div>
+
+          <div className={styles.mini}>
+            {[
+              [Users, 'Family sharing', 'Share chosen numbers with a parent, coach or doctor, for as long as you set. See when they look, and stop any time.', styles.cardLeaf],
+              [Lock, 'Private by design', 'No search or browsing: people need your exact username. Nothing is shared without your OK, item by item, and blocking ends it all.', styles.cardSky],
+              [Streak, 'Streaks, quests & badges', 'Keep a logging streak, clear weekly quests for XP, and earn badges like 10k Club and Well rested.', styles.cardTurmeric],
+              [Ruler, 'Your units', 'Height in cm or feet and inches, weight in kg or lb, measurements in cm or inches. Switch any time.', styles.cardPink],
+              [Smartphone, 'Made for your phone', 'Tap any chart for the exact numbers, and your profile and settings sit one tap away at the top of every page.', styles.cardLeaf],
+              [HeartPulse, 'Recovery, strain & sleep', 'With Google Health connected, see how recovered you are, how hard you pushed, and how you slept, side by side.', styles.cardSky],
+            ].map(([Icon, title, text, tone]) => (
+              <article key={title} className={`${styles.card} ${styles.miniCard} ${tone} ${styles.reveal}`}>
+                <div className={styles.cardIcon}>
+                  <Icon size={20} />
+                </div>
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </article>
+            ))}
+          </div>
         </section>
 
         {/* ---------------------------------------------------------- Google Health (verification content) */}
@@ -291,6 +378,12 @@ export default async function HomePage() {
                 <strong>Write your weight</strong> so the weight you log appears in the Google Health app.
               </li>
             </ul>
+            <p>
+              <strong>Sharing with people you choose.</strong> If you join a challenge or share with family, the daily
+              totals you pick (for example steps, distance or sleep, some of which come from Google Health) are shown
+              only to those people, only for the days involved. Nothing is shared unless you choose it, and you can stop
+              any time. Google Health data is never shared with anyone else.
+            </p>
             <p>
               You can disconnect at any time from Settings. We do not sell your data or use it for advertising.{' '}
               {app}&apos;s use and transfer to any other app of information received from Google APIs will adhere to

@@ -104,6 +104,7 @@ export default function PrivacyPage() {
             'To create and secure your account and sign you in.',
             'To calculate your daily calorie and macro targets and show your nutrition, weight trend, body progress and activity.',
             'To send your logged meals and weight to Google Health, and to show your Google Health activity, when you connect it and choose to use those features.',
+            'To show the people you choose (challenge members, or family you share with) the daily totals you agreed to share, only for the days involved.',
             'To fix problems, prevent abuse and keep the service reliable.',
             'To answer your questions and requests, and to meet legal obligations.',
           ]}
@@ -141,7 +142,8 @@ export default function PrivacyPage() {
             'Activity data (steps, distance, calories burned) is requested from Google when you open the app and is shown to you. It is used only to display your dashboard and activity pages.',
             'Nutrition and weight data is sent to Google only when you tap a sync button, or when automatic sync is on. Each sync sends the values you already logged in the app.',
             'We store the OAuth tokens Google gives us in our database, linked to your account, and use them only to perform the actions above on your behalf. We never store your Google password.',
-            'We do not sell Google user data and do not transfer or share it with third parties, except to our service providers as needed to operate the app (section 5), to comply with law, or with your consent.',
+            'If you join a challenge or share with family, the daily totals you choose (for example steps, distance, active calories, floors or sleep, which may come from Google Health) are shown to those people only, only for the days involved, and only while the challenge or share lasts. This happens only at your request, item by item, and you can stop it any time.',
+            'Apart from that, we do not sell Google user data and do not transfer or share it with third parties, except to our service providers as needed to operate the app (section 5), to comply with law, or with your consent.',
             'We do not use Google user data for advertising, including retargeting or interest-based advertising.',
             'We do not use Google user data to develop, improve or train generalized artificial intelligence or machine learning models.',
             'No person at WAY Studio reads your Google user data unless you ask us to, it is necessary for security or to investigate abuse, or the law requires it.',
@@ -178,6 +180,12 @@ export default function PrivacyPage() {
             'Our web hosting provider: to serve the website and apps.',
           ]}
         />
+        <p>
+          <strong className="text-slate-900 dark:text-white">People you choose.</strong> In Compete, other people see only your
+          username, first name and level until you connect with them. When you join a challenge, its members see your daily
+          totals for the challenge&apos;s stats and days. When you share with family, the person you share with sees the items
+          you picked until the end date you set or until you stop. People you block see nothing of yours.
+        </p>
         <p>
           We may also disclose information if required by law or to protect the rights, safety and security of users or the
           service. If {app} is ever transferred to another operator, we will make sure your information stays protected by an

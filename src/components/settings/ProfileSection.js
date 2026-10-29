@@ -8,6 +8,8 @@ import { getCurrentUserId } from '@/lib/currentUser';
 import { getDailyTargets, ACTIVITY_MULTIPLIERS } from '@/lib/bmrTdee';
 import { Card, Eyebrow, Toggle, NumField, Dot, fmt, cx } from '@/components/way/ui';
 import { invalidateJson } from '@/components/way/useJson';
+import { useUnits, UnitSwitch, HeightField, WeightField } from '@/components/way/units';
+import { fmtHeight, fmtWeight } from '@/lib/units';
 
 export const GOALS = [
   ['lose_weight', 'Lose weight'],
@@ -74,6 +76,7 @@ function Seg({ list, value, onChange, pills = false }) {
 export default function ProfileSection({ profile, onSaved }) {
   const supabase = createClient();
   const router = useRouter();
+  const { units } = useUnits();
   const [f, setF] = useState({
     name: profile.full_name ?? '',
     h: str(profile.height_cm),
@@ -143,8 +146,8 @@ export default function ProfileSection({ profile, onSaved }) {
     const h = Number(f.h);
     const w = Number(f.w);
     const age = Number(f.age);
-    if (!(h >= 100 && h <= 250)) return setError('Height must be between 100 and 250 cm.');
-    if (!(w >= 25 && w <= 300)) return setError('Weight must be between 25 and 300 kg.');
+    if (!(h >= 100 && h <= 250)) return setError(`Height must be between ${fmtHeight(100, units)} and ${fmtHeight(250, units)}.`);
+    if (!(w >= 25 && w <= 300)) return setError(`Weight must be between ${fmtWeight(25, units, 0)} and ${fmtWeight(300, units, 0)}.`);
     if (!(age >= 13 && age <= 100)) return setError('Age must be between 13 and 100.');
     const goalVal = (raw, label, min, max) => {
       if (raw === '' || raw == null) return { v: null };
@@ -193,11 +196,7 @@ export default function ProfileSection({ profile, onSaved }) {
     if (onSaved) setTimeout(onSaved, 650);
   };
 
-  const basics = [
-    ['h', 'Height', 'cm', 1],
-    ['w', 'Weight', 'kg', 0.1],
-    ['age', 'Age', 'yrs', 1],
-  ];
+
   const ovFields = [
     ['kcal', 'Calories', 'kcal', '#fbbf24', calc?.targetCalories],
     ['p', 'Protein', 'g', '#34d399', calc?.proteinG],
@@ -240,10 +239,28 @@ export default function ProfileSection({ profile, onSaved }) {
               className="h-11 rounded-xl border border-way-line2 bg-way-rail px-3 text-[15px] text-way-ink outline-none placeholder:text-way-faint focus:border-way-faint md:h-[46px] md:px-3.5"
             />
           </label>
-          <div className="grid grid-cols-3 gap-2 md:gap-3">
-            {basics.map(([key, label, unit, step]) => (
-              <NumField key={key} label={label} unit={unit} step={step} value={f[key]} onChange={set(key)} />
-            ))}
+          {/* Stored in cm and kg; shown and typed in your units. */}
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-[1.35fr_1fr_.7fr] md:gap-3">
+            <HeightField cm={f.h === '' ? '' : Number(f.h)} onChange={(v) => set('h')(v === '' ? '' : String(v))} />
+            <WeightField kg={f.w === '' ? '' : Number(f.w)} onChange={(v) => set('w')(v === '' ? '' : String(v))} />
+            <div className="col-span-2 md:col-span-1">
+              <NumField label="Age" unit="yrs" step={1} value={f.age} onChange={set('age')} />
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 rounded-xl bg-way-rail px-3 py-2.5 text-xs text-way-mute">
+            <span>Units everywhere in WAY</span>
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              {[
+                ['height', 'Height'],
+                ['weight', 'Weight'],
+                ['length', 'Body'],
+              ].map(([kind, label]) => (
+                <span key={kind} className="flex items-center gap-1.5 text-[11px] text-way-dim">
+                  {label}
+                  <UnitSwitch kind={kind} />
+                </span>
+              ))}
+            </span>
           </div>
           <div className="flex flex-col gap-1.5">
             <span className="text-xs text-way-mute">Sex</span>

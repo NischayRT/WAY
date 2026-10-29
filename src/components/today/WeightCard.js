@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { Scale, PersonStanding, ChevronDown, ChevronRight } from 'lucide-react';
 import { weightProgress } from '@/lib/goalState';
 import { buildBodyModel } from '@/lib/bodyPreview';
-import { Card, Eyebrow, Btn, polyPoints, f1 } from '@/components/way/ui';
+import { Card, Eyebrow, Btn, polyPoints } from '@/components/way/ui';
+import { useUnits } from '@/components/way/units';
+import { fmtWeight, weightUnit } from '@/lib/units';
 
 // three.js is downloaded the first time the body view opens.
 const WeightBodyCanvas = dynamic(() => import('@/components/body/WeightBodyCanvas'), {
@@ -24,6 +26,10 @@ const shortDate = (s) => new Date(`${s}T00:00:00`).toLocaleDateString('en-IN', {
  * body below). Log weight is the main action, at the top.
  */
 export default function WeightCard({ profile, weightLogs, selectedDate, today, currentWeight, onLog, k }) {
+  const { units } = useUnits();
+  // Weights in your unit (kg or lb); stored values stay in kg.
+  const w1 = (kg) => fmtWeight(kg, units, 1, false);
+  const wu = weightUnit(units);
   const [open, setOpen] = useState(false);
   const [everOpened, setEverOpened] = useState(false);
   const toggle = () => {
@@ -87,12 +93,12 @@ export default function WeightCard({ profile, weightLogs, selectedDate, today, c
 
       <div className="flex items-baseline justify-between">
         <Link href="/activity#weight" className="group flex items-baseline gap-[5px] lg:gap-1.5" title="Open weight history">
-          <span className="font-brand text-[40px] leading-none transition-colors group-hover:text-white lg:text-5xl">{now ? f1(now) : '—'}</span>
-          <span className="font-mono text-xs font-medium text-way-dim">kg</span>
+          <span className="font-brand text-[40px] leading-none transition-colors group-hover:text-white lg:text-5xl">{now ? w1(now) : '—'}</span>
+          <span className="font-mono text-xs font-medium text-way-dim">{wu}</span>
           <ChevronRight size={14} className="self-center text-way-faint transition-colors group-hover:text-way-ink2" />
         </Link>
         {targetKg != null ? (
-          <span className="font-mono text-xs font-semibold text-way-protein lg:text-[13px]">→ {targetKg} kg</span>
+          <span className="font-mono text-xs font-semibold text-way-protein lg:text-[13px]">→ {fmtWeight(targetKg, units)}</span>
         ) : (
           <Link href="/settings?tab=body&sub=goal" className="text-xs font-semibold text-way-protein">
             Set a goal →
@@ -110,7 +116,7 @@ export default function WeightCard({ profile, weightLogs, selectedDate, today, c
           </div>
           <div className="flex justify-between gap-2 font-mono text-[11px] font-medium text-way-dim">
             <span>
-              {f1(moved)} kg {losing ? 'lost' : 'gained'} · {f1(left)} to go
+              {fmtWeight(moved, units)} {losing ? 'lost' : 'gained'} · {w1(left)} to go
             </span>
             <span>
               {pct}%{by ? ` · by ${by}` : ''}
@@ -139,14 +145,14 @@ export default function WeightCard({ profile, weightLogs, selectedDate, today, c
               <div className="flex flex-col gap-0.5">
                 <span className="font-heading text-[10px] font-bold tracking-[0.12em] text-way-dim">NOW</span>
                 <span className="text-way-ink2">
-                  {f1(now)} kg · {model.bodyFatPct}% fat
+                  {fmtWeight(now, units)} · {model.bodyFatPct}% fat
                 </span>
               </div>
               {model.targetData ? (
                 <div className="flex flex-col gap-0.5 text-right">
                   <span className="font-heading text-[10px] font-bold tracking-[0.12em] text-way-protein">GOAL</span>
                   <span className="text-emerald-300">
-                    {model.targetKg} kg · {model.targetData.bodyFatPct}% fat
+                    {fmtWeight(model.targetKg, units)} · {model.targetData.bodyFatPct}% fat
                   </span>
                 </div>
               ) : null}
@@ -171,7 +177,7 @@ export default function WeightCard({ profile, weightLogs, selectedDate, today, c
                 <div className="flex justify-between text-[11px] text-way-dim">
                   <span>Last 30 days</span>
                   <span className="font-mono">
-                    {f1(series[0])} → {f1(series[series.length - 1])} kg
+                    {w1(series[0])} → {fmtWeight(series[series.length - 1], units)}
                   </span>
                 </div>
                 <svg viewBox="0 0 300 60" width="100%" height="60" preserveAspectRatio="none" className="block">

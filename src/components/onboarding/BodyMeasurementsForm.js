@@ -9,6 +9,8 @@ import { analyzeCurrentPhysique, estimateDefaultMeasurementsCm } from '@/lib/bod
 import { ui } from '@/lib/ui';
 import { Sparkles } from 'lucide-react';
 import { getCurrentUserId } from '@/lib/currentUser';
+import { useUnits, UnitSwitch } from '@/components/way/units';
+import { fmtLength } from '@/lib/units';
 
 const RealisticAvatar3D = dynamic(() => import('@/components/body/RealisticAvatar3D'), {
   ssr: false,
@@ -43,6 +45,7 @@ function SpinningPreview({ sex, heightCm, weightKg, chestCm, waistCm, hipCm, bic
   );
 }
 export default function BodyMeasurementsForm({ heightCm, weightKg, sex = 'male', onSaved, onSkip }) {
+  const { units } = useUnits();
   const supabase = createClient();
 
   // Sex-specific starting values (see estimateDefaultMeasurementsCm).
@@ -142,12 +145,16 @@ export default function BodyMeasurementsForm({ heightCm, weightKg, sex = 'male',
       </div>
 
       <div className={`${ui.card} space-y-5`}>
+        <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
+          Measured around the widest point
+          <UnitSwitch kind="length" plain />
+        </div>
         {sliders.map((s) => (
           <div key={s.key} className="space-y-1.5">
             <div className="flex justify-between text-xs font-semibold">
               <span className="text-slate-700 dark:text-slate-300">{s.label}</span>
               <span className="font-numeric font-bold text-emerald-600 dark:text-emerald-400">
-                {s.value}&quot; ({Math.round(s.cm)} cm)
+                {fmtLength(s.cm, units)}
               </span>
             </div>
             <input

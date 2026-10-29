@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabaseServer';
 import OnboardingClient from '@/components/onboarding/OnboardingClient';
 import { getAuthUser } from '@/lib/authServer';
+import { UnitsProvider } from '@/components/way/units';
 
 // Same reasoning as settings/page.js: never cache this page. It carries
 // a specific user's id down as a prop, and a stale render from a
@@ -32,7 +33,10 @@ export default async function OnboardingPage() {
           A few quick questions to set your daily calories and macros. Nothing is saved until you confirm your plan.
         </p>
       </div>
-      <OnboardingClient />
+      {/* No profile yet: units chosen here are kept in this browser and copied to the profile on the first app page. */}
+      <UnitsProvider>
+        <OnboardingClient />
+      </UnitsProvider>
     </main>
   );
 }

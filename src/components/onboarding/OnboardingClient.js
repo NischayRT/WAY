@@ -8,6 +8,8 @@ import { getCurrentUserId } from '@/lib/currentUser';
 import { todayLocalDate } from '@/lib/dateUtils';
 import { ui } from '@/lib/ui';
 import { buildPlan, bmiInfo, healthyWeightRange, PACES } from '@/lib/planner';
+import { useUnits, UnitSwitch, WeightInput, HeightInput } from '@/components/way/units';
+import { fmtHeight, fmtWeight, weightUnit } from '@/lib/units';
 import BodyMeasurementsForm from '@/components/onboarding/BodyMeasurementsForm';
 import GoogleHealthOnboardingStep from '@/components/onboarding/GoogleHealthOnboardingStep';
 
@@ -66,6 +68,7 @@ const fmtDate = (d) =>
 
 export default function OnboardingClient() {
   const router = useRouter();
+  const { units } = useUnits();
   const [step, setStep] = useState(0);
   const [maxStep, setMaxStep] = useState(0);
   const [form, setForm] = useState(EMPTY);
@@ -123,8 +126,8 @@ export default function OnboardingClient() {
         if (!(n(form.age) >= 16 && n(form.age) <= 100)) return 'Enter an age between 16 and 100.';
         return null;
       case 'body':
-        if (!(n(form.heightCm) >= 120 && n(form.heightCm) <= 230)) return 'Enter a height between 120 and 230 cm.';
-        if (!(n(form.weightKg) >= 30 && n(form.weightKg) <= 300)) return 'Enter a weight between 30 and 300 kg.';
+        if (!(n(form.heightCm) >= 120 && n(form.heightCm) <= 230)) return `Enter a height between ${fmtHeight(120, units)} and ${fmtHeight(230, units)}.`;
+        if (!(n(form.weightKg) >= 30 && n(form.weightKg) <= 300)) return `Enter a weight between ${fmtWeight(30, units, 0)} and ${fmtWeight(300, units, 0)}.`;
         return null;
       case 'lifestyle':
         return form.activityLevel ? null : 'Pick the option closest to a typical week.';
@@ -134,15 +137,15 @@ export default function OnboardingClient() {
           const t = n(form.targetWeightKg);
           const w = n(form.weightKg);
           if (!(t >= 30 && t <= 300)) return 'Enter your goal weight.';
-          if (goal.needsTarget === 'lower' && t >= w) return `For fat loss, your goal should be below your current ${w} kg.`;
-          if (goal.needsTarget === 'higher' && t <= w) return `To build muscle, your goal should be above your current ${w} kg.`;
+          if (goal.needsTarget === 'lower' && t >= w) return `For fat loss, your goal should be below your current ${fmtWeight(w, units)}.`;
+          if (goal.needsTarget === 'higher' && t <= w) return `To build muscle, your goal should be above your current ${fmtWeight(w, units)}.`;
         }
         return null;
       }
       default:
         return null;
     }
-  }, [step, form, goal]);
+  }, [step, form, goal, units]);
 
   const next = () => {
     if (stepError) {
@@ -279,15 +282,30 @@ export default function OnboardingClient() {
       {/* ---------------- 2. Body ---------------- */}
       {key === 'body' && (
         <Card title="Your body today" subtitle="Your current height and weight. Weigh yourself in the morning if you can.">
-          <div className="grid grid-cols-2 gap-3">
-            <label className={ui.fieldLabel}>
-              Height (cm)
-              <input className={ui.fieldInput} type="number" inputMode="decimal" value={form.heightCm} onChange={(e) => set('heightCm')(e.target.value)} placeholder="e.g. 170" />
-            </label>
-            <label className={ui.fieldLabel}>
-              Weight (kg)
-              <input className={ui.fieldInput} type="number" inputMode="decimal" step="0.1" value={form.weightKg} onChange={(e) => set('weightKg')(e.target.value)} placeholder="e.g. 72.5" />
-            </label>
+          {/* Typed in your units, kept in cm and kg. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className={ui.fieldLabel}>
+              <span className="flex items-center justify-between gap-2">
+                Height
+                <UnitSwitch kind="height" plain />
+              </span>
+              <HeightInput
+                cm={form.heightCm === '' ? '' : Number(form.heightCm)}
+                onChange={(v) => set('heightCm')(v === '' ? '' : String(v))}
+                className={ui.fieldInput}
+                suffixClassName="pt-1 text-xs font-semibold normal-case tracking-normal text-slate-400"
+              />
+            </div>
+            <div className={ui.fieldLabel}>
+              <span className="flex items-center justify-between gap-2">
+                Weight
+                <UnitSwitch kind="weight" plain />
+              </span>
+              <span className="flex items-center gap-1">
+                <WeightInput kg={form.weightKg === '' ? '' : Number(form.weightKg)} onChange={(v) => set('weightKg')(v === '' ? '' : String(v))} placeholderKg={72} className={ui.fieldInput} />
+                <span className="pt-1 text-xs font-semibold normal-case tracking-normal text-slate-400">{weightUnit(units)}</span>
+              </span>
+            </div>
           </div>
           {(() => {
             const b = bmiInfo(form.weightKg, form.heightCm);
@@ -297,7 +315,7 @@ export default function OnboardingClient() {
               <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
                 BMI <b className="font-numeric">{b.bmi}</b> · {b.label}. A healthy range for your height is{' '}
                 <b className="font-numeric">
-                  {r.min}-{r.max} kg
+                  {fmtWeight(r.min, units, 1, false)}-{fmtWeight(r.max, units)}
                 </b>
                 .<span className="block pt-1 text-[11px] text-slate-400">Using the Asian BMI cut-offs used in India (healthy 18.5-22.9). BMI doesn&apos;t see muscle, so treat it as a rough guide.</span>
               </div>
@@ -328,10 +346,21 @@ export default function OnboardingClient() {
 
           {goal?.needsTarget && (
             <div className="space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
-              <label className={ui.fieldLabel}>
-                Goal weight (kg)
-                <input className={ui.fieldInput} type="number" inputMode="decimal" step="0.1" value={form.targetWeightKg} onChange={(e) => set('targetWeightKg')(e.target.value)} placeholder={goal.needsTarget === 'lower' ? `below ${form.weightKg}` : `above ${form.weightKg}`} />
-              </label>
+              <div className={ui.fieldLabel}>
+                <span className="flex items-center justify-between gap-2">
+                  Goal weight
+                  <UnitSwitch kind="weight" plain />
+                </span>
+                <span className="flex items-center gap-1">
+                  <WeightInput
+                    kg={form.targetWeightKg === '' ? '' : Number(form.targetWeightKg)}
+                    onChange={(v) => set('targetWeightKg')(v === '' ? '' : String(v))}
+                    className={ui.fieldInput}
+                    placeholder={form.weightKg ? `${goal.needsTarget === 'lower' ? 'below' : 'above'} ${fmtWeight(form.weightKg, units, 1, false)}` : undefined}
+                  />
+                  <span className="pt-1 text-xs font-semibold normal-case tracking-normal text-slate-400">{weightUnit(units)}</span>
+                </span>
+              </div>
               {(() => {
                 const r = healthyWeightRange(form.heightCm);
                 const w = Number(form.weightKg);
@@ -343,7 +372,8 @@ export default function OnboardingClient() {
                   <div className="flex flex-wrap gap-1.5">
                     {[...new Set(sugg.filter((x) => x && x > 30).map((x) => Math.round(x * 10) / 10))].map((x) => (
                       <button key={x} type="button" onClick={() => set('targetWeightKg')(String(x))} className="rounded-full border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
-                        {x} kg{r && x === r.max ? ' (healthy max)' : ''}
+                        {fmtWeight(x, units)}
+                        {r && x === r.max ? ' (healthy max)' : ''}
                       </button>
                     ))}
                   </div>
@@ -366,7 +396,7 @@ export default function OnboardingClient() {
                         title={pc.label}
                         desc={
                           preview?.weeks
-                            ? `~${preview.paceKgWeek} kg/week · ${preview.weeks} weeks · ${pc.note}`
+                            ? `~${fmtWeight(preview.paceKgWeek, units, 2)}/week · ${preview.weeks} weeks · ${pc.note}`
                             : pc.note
                         }
                       />
@@ -473,6 +503,7 @@ function Choice({ selected, onClick, title, desc, Icon }) {
 }
 
 function PlanReview({ plan, form }) {
+  const { units } = useUnits();
   const macros = [
     { k: 'Protein', g: plan.proteinG, pct: plan.split.protein, c: 'bg-emerald-500', t: 'text-emerald-600 dark:text-emerald-400' },
     { k: 'Carbs', g: plan.carbsG, pct: plan.split.carbs, c: 'bg-blue-500', t: 'text-blue-600 dark:text-blue-400' },
@@ -482,11 +513,11 @@ function PlanReview({ plan, form }) {
   const why = [
     `Your body burns about ${fmt(plan.bmr)} kcal a day at rest. Being ${activity} brings that to about ${fmt(plan.tdee)} kcal (your maintenance).`,
     plan.direction === 'lose'
-      ? `Eating ${fmt(Math.abs(plan.deltaKcal))} kcal below maintenance loses about ${plan.paceKgWeek} kg a week.`
+      ? `Eating ${fmt(Math.abs(plan.deltaKcal))} kcal below maintenance loses about ${fmtWeight(plan.paceKgWeek, units, 2)} a week.`
       : plan.direction === 'gain'
-        ? `Eating ${fmt(plan.deltaKcal)} kcal above maintenance gains about ${plan.paceKgWeek} kg a week, enough to build muscle without much extra fat.`
+        ? `Eating ${fmt(plan.deltaKcal)} kcal above maintenance gains about ${fmtWeight(plan.paceKgWeek, units, 2)} a week, enough to build muscle without much extra fat.`
         : 'You eat at maintenance, so your weight stays steady.',
-    `Protein: ${plan.proteinPerKgRule} g per kg of ${plan.referenceWeightKg} kg${Number(form.weightKg) > plan.referenceWeightKg ? ' (a healthy reference weight for your height, since protein needs follow lean mass)' : ''}${['moderate', 'active', 'very_active'].includes(form.activityLevel) ? ', a little higher because you train most days' : ''}.`,
+    `Protein: ${plan.proteinPerKgRule} g per kg of ${plan.referenceWeightKg} kg${units.weight === 'lb' ? ` (${fmtWeight(plan.referenceWeightKg, units, 0)})` : ''}${Number(form.weightKg) > plan.referenceWeightKg ? ' (a healthy reference weight for your height, since protein needs follow lean mass)' : ''}${['moderate', 'active', 'very_active'].includes(form.activityLevel) ? ', a little higher because you train most days' : ''}.`,
     'Fat: about 28% of calories, for hormones and vitamins. Carbs: the rest, your main fuel (at least 130 g).',
   ];
 
@@ -497,7 +528,7 @@ function PlanReview({ plan, form }) {
         <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
           {plan.direction === 'maintain'
             ? 'Built to keep your weight steady.'
-            : `To reach ${form.targetWeightKg} kg${plan.targetDate ? ` around ${fmtDate(plan.targetDate)} (${plan.weeks} weeks)` : ''}.`}
+            : `To reach ${fmtWeight(form.targetWeightKg, units)}${plan.targetDate ? ` around ${fmtDate(plan.targetDate)} (${plan.weeks} weeks)` : ''}.`}
         </p>
       </div>
 

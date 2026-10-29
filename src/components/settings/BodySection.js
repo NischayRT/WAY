@@ -18,7 +18,9 @@ import { resolveTargetPhysique } from '@/lib/targetPhysiqueLogic';
 import { BODY_LIBRARY, selectBody } from '@/lib/bodyLibrary';
 import { weightProgress } from '@/lib/goalState';
 import { addDays } from '@/lib/dateUtils';
-import { Card, Eyebrow, Segmented, fmt, useLocalPref, cx } from '@/components/way/ui';
+import { Card, Eyebrow, Segmented, fmt, cx } from '@/components/way/ui';
+import { useUnits, UnitSwitch } from '@/components/way/units';
+import { fmtWeight, fmtHeight, weightUnit } from '@/lib/units';
 import { invalidateJson } from '@/components/way/useJson';
 
 // three.js loads only when this section opens.
@@ -63,8 +65,9 @@ export default function BodySection({ profile, currentWeightKg, startKg, today, 
   const male = sex === 'male';
   const heightCm = Number(profile.height_cm) || 175;
   const w = Number(currentWeightKg) || Number(profile.weight_kg) || 75;
-  const [units, setUnits] = useLocalPref('way.units', 'in');
-  const cmOnly = units === 'cm';
+  // Body measurements follow your length unit (cm | in), weight your weight unit.
+  const { units: u } = useUnits();
+  const cmOnly = u.length !== 'in';
 
   const est = useMemo(() => estimateDefaultMeasurementsCm({ heightCm, weightKg: w, sex }), [heightCm, w, sex]);
   const [m, setM] = useState(() => ({
@@ -178,7 +181,7 @@ export default function BodySection({ profile, currentWeightKg, startKg, today, 
   let body;
   if (Math.abs(dw) < 0.05) {
     title = 'Maintain';
-    body = `Hold ${target.toFixed(1)} kg at about ${fmt(tdee)} kcal a day.`;
+    body = `Hold ${fmtWeight(target, u)} at about ${fmt(tdee)} kcal a day.`;
   } else if (!feas.isFeasible) {
     title = feas.reasons?.[0]?.startsWith('Rate') || feas.reasons?.[0]?.startsWith('A surplus') ? 'Too fast' : 'Not safe as set';
     body = `${feas.reasons?.[0] || 'This goal is outside safe limits.'}${feas.recommendedWeeks ? ` Give it at least ${feas.recommendedWeeks} weeks.` : ''}`;
@@ -239,8 +242,8 @@ export default function BodySection({ profile, currentWeightKg, startKg, today, 
     { label: 'BMR', v: fmt(stats.bmr), color: '#f1f5f9' },
     { label: 'FFMI', v: stats.ffmi.toFixed(1), color: '#f1f5f9' },
   ];
-  const nowStr = `${w.toFixed(1)} kg · ${stats.bodyFatPct.toFixed(1)}% fat`;
-  const goalStr = `${target.toFixed(1)} kg · ${forecast.targetBfPct.toFixed(1)}% fat`;
+  const nowStr = `${fmtWeight(w, u)} · ${stats.bodyFatPct.toFixed(1)}% fat`;
+  const goalStr = `${fmtWeight(target, u)} · ${forecast.targetBfPct.toFixed(1)}% fat`;
   const side = mode === 'side';
 
   const viewerCard = (
@@ -324,18 +327,9 @@ export default function BodySection({ profile, currentWeightKg, startKg, today, 
         <Eyebrow>Measurements</Eyebrow>
         <div className="flex items-center gap-2">
           <span className="hidden font-mono text-xs font-medium text-way-dim sm:inline">
-            {w.toFixed(1)} kg · {Math.round(heightCm)} cm
+            {fmtWeight(w, u)} · {fmtHeight(heightCm, u)}
           </span>
-          <Segmented
-            size="sm"
-            className="rounded-[10px] bg-way-rail p-[3px]"
-            value={units}
-            onChange={setUnits}
-            options={[
-              { value: 'in', label: 'in' },
-              { value: 'cm', label: 'cm' },
-            ]}
-          />
+          <UnitSwitch kind="length" size="md" />
         </div>
       </div>
       <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-2 lg:gap-x-7 lg:gap-y-5">
@@ -394,7 +388,7 @@ export default function BodySection({ profile, currentWeightKg, startKg, today, 
       <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-2 lg:gap-x-7 lg:gap-y-5">
         <Slider
           label="Goal weight"
-          valStr={`${target.toFixed(1)} kg (${dw > 0 ? '−' : '+'}${Math.abs(dw).toFixed(1)})`}
+          valStr={`${fmtWeight(target, u)} (${dw > 0 ? '−' : '+'}${fmtWeight(Math.abs(dw), u, 1, false)})`}
           min={Math.max(35, Math.round(w - 25))}
           max={Math.round(w + 20)}
           step={0.5}
@@ -425,7 +419,7 @@ export default function BodySection({ profile, currentWeightKg, startKg, today, 
               {title}
             </span>
             <span className="font-mono text-xs font-semibold" style={{ color: feasible ? '#6ee7b7' : '#fda4af' }}>
-              {Math.abs(dw) < 0.05 ? '0 kg / wk' : `${dw > 0 ? '−' : '+'}${rate.toFixed(2)} kg / wk`}
+              {Math.abs(dw) < 0.05 ? `0 ${weightUnit(u)} / wk` : `${dw > 0 ? '−' : '+'}${fmtWeight(rate, u, 2)} / wk`}
             </span>
           </div>
           <span className="text-xs leading-normal text-way-ink2 [text-wrap:pretty] lg:text-[13px]">{body}</span>

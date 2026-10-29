@@ -7,7 +7,7 @@ import { addDays } from '@/lib/dateUtils';
 import { buildBodyModel } from '@/lib/bodyPreview';
 import { calculateBMR, calculateTDEE, ACTIVITY_MULTIPLIERS } from '@/lib/bmrTdee';
 import { TILE_DEFS, FLOORS_GOAL } from '@/lib/daily';
-import { PAGE, PageHeader, Card, Eyebrow, Segmented, Btn, fmt, f1, useMounted, polyPoints, cx } from '@/components/way/ui';
+import { PAGE, PageHeader, Card, Eyebrow, Segmented, Btn, fmt, useMounted, polyPoints, cx } from '@/components/way/ui';
 import { EditTilesDialog, useTileSelection, TILE_ICONS } from '@/components/way/tiles';
 import { LoadRingsCompact, LoadRingsWide, LoadTrend, hasLoad } from '@/components/way/LoadRings';
 import WeightLogDialog from '@/components/way/WeightLogDialog';
@@ -15,6 +15,8 @@ import { useJson } from '@/components/way/useJson';
 import HealthDataNotice from '@/components/way/HealthDataNotice';
 import { BodyAgeLocked } from '@/components/today/BodyAgeCard';
 import TapTips from '@/components/way/TapTips';
+import { useUnits, UnitSwitch } from '@/components/way/units';
+import { fmtWeight, fmtWeightFixed, fmtHeight, weightUnit } from '@/lib/units';
 
 const RANGES = [
   ['7D', 7],
@@ -196,6 +198,10 @@ export default function ActivityClient({ userId, profile, entries, goals, google
   const [weightOpen, setWeightOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [tiles, saveTiles] = useTileSelection(userId);
+  // Weights and heights in your units; everything is calculated in kg and cm.
+  const { units: U } = useUnits();
+  const wk = (kg, dec = 1) => fmtWeightFixed(kg, U, dec);
+  const wu = weightUnit(U);
   const k = useMounted() ? 1 : 0;
 
   const from = addDays(today, -(range - 1));
@@ -242,33 +248,34 @@ export default function ActivityClient({ userId, profile, entries, goals, google
     if (eta) eta.setDate(eta.getDate() + Math.round((Math.abs(toGo) / Math.abs(rate)) * 7));
     const sign = (v) => (v <= 0 ? '−' : '+');
     const progressPct = goalKg != null && startKg != null && startKg !== goalKg ? Math.round(((startKg - last.w) / (startKg - goalKg)) * 100) : null;
-    const pace = Math.abs(rate) > 1 ? 'Faster than 1 kg a week; ease off if energy dips.' : Math.abs(rate) >= 0.25 ? 'A sustainable pace.' : 'Pace has slowed; a plateau is normal.';
+    const pace = Math.abs(rate) > 1 ? `Faster than ${fmtWeight(1, U)} a week; ease off if energy dips.` : Math.abs(rate) >= 0.25 ? 'A sustainable pace.' : 'Pace has slowed; a plateau is normal.';
     return {
-      now: f1(last.w),
+      now: wk(last.w),
       line,
       area,
       avgLine,
       dotX: X(last.date) / 3,
       dotY: (Y(last.w) / 120) * 100,
-      hiStr: hi.toFixed(1),
-      midStr: ((hi + lo) / 2).toFixed(1),
-      loStr: lo.toFixed(1),
+      hiStr: wk(hi),
+      midStr: wk((hi + lo) / 2),
+      loStr: wk(lo),
       x0: dstr(from),
       x1: dstr(addDays(today, -Math.floor(range / 2))),
       stats: [
-        { label: 'Change', v: `${sign(change)}${Math.abs(change).toFixed(1)} kg`, color: Math.abs(change) < 0.05 ? '#f1f5f9' : (change < 0) === wantsLoss ? '#34d399' : '#fb7185' },
-        { label: 'Weekly rate', v: `${sign(rate)}${Math.abs(rate).toFixed(2)} kg`, color: '#f1f5f9' },
-        { label: 'To goal', v: toGo != null ? `${Math.abs(toGo).toFixed(1)} kg` : '—', color: '#f1f5f9' },
+        { label: 'Change', v: `${sign(change)}${wk(Math.abs(change))} ${wu}`, color: Math.abs(change) < 0.05 ? '#f1f5f9' : (change < 0) === wantsLoss ? '#34d399' : '#fb7185' },
+        { label: 'Weekly rate', v: `${sign(rate)}${wk(Math.abs(rate), 2)} ${wu}`, color: '#f1f5f9' },
+        { label: 'To goal', v: toGo != null ? `${wk(Math.abs(toGo))} ${wu}` : '—', color: '#f1f5f9' },
         { label: 'ETA at this pace', v: eta ? `${MON[eta.getMonth()]} ${eta.getFullYear()}` : '—', color: '#6ee7b7' },
       ],
       insight:
         progressPct != null
-          ? `${Math.max(0, Math.min(100, progressPct))}% of the way from ${f1(startKg)} kg. ${pace}`
+          ? `${Math.max(0, Math.min(100, progressPct))}% of the way from ${fmtWeight(startKg, U)}. ${pace}`
           : wIn.length > 1
-            ? `${change <= 0 ? 'Down' : 'Up'} ${Math.abs(change).toFixed(1)} kg in this range. ${pace}`
+            ? `${change <= 0 ? 'Down' : 'Up'} ${fmtWeight(Math.abs(change), U)} in this range. ${pace}`
             : 'One weigh-in in this range. Log a few more to see a trend.',
     };
-  }, [wIn, range, from, today, goalKg, startKg, wantsLoss]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wIn, range, from, today, goalKg, startKg, wantsLoss, U]);
 
   /* ---------- body composition ---------- */
   const comp = useMemo(() => {
@@ -282,7 +289,7 @@ export default function ActivityClient({ userId, profile, entries, goals, google
     const lean = w * (1 - fat / 100);
     const loKg = 18.5 * (h / 100) ** 2;
     const hiKg = 24.9 * (h / 100) ** 2;
-    const vs = w > hiKg ? `${(w - hiKg).toFixed(1)} kg over` : w < loKg ? `${(loKg - w).toFixed(1)} kg under` : 'Inside';
+    const vs = w > hiKg ? `${fmtWeight(w - hiKg, U)} over` : w < loKg ? `${fmtWeight(loKg - w, U)} under` : 'Inside';
     // Energy: Mifflin-St Jeor from the profile; with measurements, Katch-McArdle
     // from lean mass (more accurate for lean or heavy builds).
     const measured = !!profile?.waist_cm;
@@ -297,7 +304,7 @@ export default function ActivityClient({ userId, profile, entries, goals, google
       level: level.replace(/_/g, ' '),
       ffmi: model.stats?.ffmi ?? null,
       whtr: measured && model.stats?.waistToHeightRatio ? model.stats.waistToHeightRatio : null,
-      h: Math.round(h),
+      h: fmtHeight(h, U),
       age: profile?.age,
       bmi: bmi.toFixed(1),
       band,
@@ -305,11 +312,11 @@ export default function ActivityClient({ userId, profile, entries, goals, google
       marker: ((Math.min(35, Math.max(16, bmi)) - 16) / 19) * 100,
       fat,
       lean,
-      range: `${Math.round(loKg)}–${Math.round(hiKg)}`,
+      range: `${fmtWeight(loKg, U, 0, false)}–${fmtWeight(hiKg, U, 0)}`,
       vs,
       measured,
     };
-  }, [profile, latest]);
+  }, [profile, latest, U]);
 
   /* ---------- your stats (Google Health) ---------- */
   const extraKeys = tiles.filter((t) => EXTRA_KEYS.includes(t));
@@ -471,12 +478,12 @@ export default function ActivityClient({ userId, profile, entries, goals, google
     return {
       key: p.date,
       date: p.date === today ? 'Today' : p.date === addDays(today, -1) ? 'Yesterday' : `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dd.getDay()]}, ${dstr(p.date)}`,
-      w: f1(p.w),
-      d: prev ? `${d <= 0 ? '−' : '+'}${Math.abs(d).toFixed(1)}` : '—',
+      w: wk(p.w),
+      d: prev ? `${d <= 0 ? '−' : '+'}${wk(Math.abs(d))}` : '—',
       dColor: !prev || Math.abs(d) < 0.05 ? '#7c8aa0' : (d < 0) === wantsLoss ? '#34d399' : '#fb7185',
-      avg: f1(mean(win)),
+      avg: wk(mean(win)),
       prog: prog * k,
-      left: goalKg != null ? `${Math.abs(p.w - goalKg).toFixed(1)} kg` : '—',
+      left: goalKg != null ? `${wk(Math.abs(p.w - goalKg))} ${wu}` : '—',
     };
   });
   const shownRows = showAll ? rows : rows.slice(0, 8);
@@ -501,7 +508,7 @@ export default function ActivityClient({ userId, profile, entries, goals, google
       <div className="flex items-center justify-between">
         <Eyebrow>Body composition</Eyebrow>
         <span className="font-mono text-[11px] font-medium text-way-dim">
-          {comp ? `${comp.h} cm${comp.age ? ` · ${comp.age} y` : ''}` : ''}
+          {comp ? `${comp.h}${comp.age ? ` · ${comp.age} y` : ''}` : ''}
         </span>
       </div>
       {comp ? (
@@ -541,8 +548,8 @@ export default function ActivityClient({ userId, profile, entries, goals, google
           <div className="grid grid-cols-3 gap-2 lg:grid-cols-2 lg:gap-x-4 lg:gap-y-[18px] lg:border-t lg:border-way-line lg:pt-5">
             {[
               [`${comp.fat.toFixed(1)}%`, 'Body fat (est.)'],
-              [`${comp.lean.toFixed(1)} kg`, 'Lean mass'],
-              [`${comp.range} kg`, 'Healthy range'],
+              [fmtWeight(comp.lean, U), 'Lean mass'],
+              [comp.range, 'Healthy range'],
               [comp.vs, 'Vs healthy range'],
             ].map(([v, label], i) => (
               <div key={label} className={cx('flex flex-col gap-0.5 lg:gap-[3px]', i === 3 && 'hidden lg:flex')}>
@@ -675,9 +682,13 @@ export default function ActivityClient({ userId, profile, entries, goals, google
             <div className="flex flex-col gap-[3px] lg:gap-1.5">
               <Eyebrow>Weight</Eyebrow>
               <div className="flex items-baseline gap-[5px] lg:gap-2">
-                <span className="font-brand text-[38px] leading-none lg:text-[64px] lg:leading-[.9]">{W?.now ?? (latest ? f1(latest.w) : '—')}</span>
-                <span className="font-mono text-xs font-medium text-way-dim lg:text-[13px]">
-                  kg<span className="hidden lg:inline">{goalKg != null ? ` · goal ${goalKg} kg` : ''}</span>
+                <span className="font-brand text-[38px] leading-none lg:text-[64px] lg:leading-[.9]">{W?.now ?? (latest ? wk(latest.w) : '—')}</span>
+                <span className="flex items-center gap-2 font-mono text-xs font-medium text-way-dim lg:text-[13px]">
+                  <span>
+                    {wu}
+                    <span className="hidden lg:inline">{goalKg != null ? ` · goal ${fmtWeight(goalKg, U)}` : ''}</span>
+                  </span>
+                  <UnitSwitch kind="weight" />
                 </span>
               </div>
             </div>
@@ -838,7 +849,9 @@ export default function ActivityClient({ userId, profile, entries, goals, google
                   )}
                 >
                   <span className="text-[13px] text-way-ink2">{h.date}</span>
-                  <span className="hidden font-mono text-[13px] font-semibold lg:inline">{h.w} kg</span>
+                  <span className="hidden font-mono text-[13px] font-semibold lg:inline">
+                    {h.w} {wu}
+                  </span>
                   <span className="hidden font-mono text-xs font-semibold lg:inline" style={{ color: h.dColor }}>
                     {h.d}
                   </span>
@@ -850,7 +863,9 @@ export default function ActivityClient({ userId, profile, entries, goals, google
                     <span className="w-12 text-right font-mono text-[11px] font-medium text-way-dim">{h.left}</span>
                   </div>
                   <div className="flex items-baseline gap-3 lg:hidden">
-                    <span className="font-mono text-[13px] font-semibold">{h.w} kg</span>
+                    <span className="font-mono text-[13px] font-semibold">
+                      {h.w} {wu}
+                    </span>
                     <span className="w-[46px] text-right font-mono text-[11px] font-semibold" style={{ color: h.dColor }}>
                       {h.d}
                     </span>

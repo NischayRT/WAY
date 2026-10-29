@@ -29,6 +29,8 @@ import { ArenaTab } from './arena';
 import { ChallengeSheet } from './challenges';
 import { FriendsTab } from './friendsTab';
 import { buildChallenges } from '@/lib/challenges';
+import { useUnits } from '@/components/way/units';
+import { fmtWeight, weightUnit } from '@/lib/units';
 
 const TABS = [
   { key: 'arena', label: 'Arena' },
@@ -51,7 +53,7 @@ function dailyValue(byDay, field, from, to) {
 }
 
 /** Turns the raw rows into everything the tabs render. */
-export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
+export function buildModel({ d, userId, profile, today, cheerFlip, sent, units }) {
   const now = new Date();
   const person = (id) => {
     const base = d.people.get(id) || (id === userId ? { id, username: profile.username, full_name: profile.full_name } : { id });
@@ -99,6 +101,8 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
       }
       const stats = conn.fields.slice(0, 4).map((field) => {
         const v = dailyValue(u?.get(field), field, addDays(today, -6), today);
+        // Shared weight is shown in your weight unit (kg or lb).
+        if (field === 'weight_kg') return { field, v: fmtWeight(v, units, 1, false), unit: weightUnit(units) };
         return { field, v: fmtVal(v, FIELDS[field].dec), unit: FIELDS[field].agg === 'last' ? FIELDS[field].unit : `${FIELDS[field].unit}/day` };
       });
       let alert = null;
@@ -287,6 +291,7 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
 }
 
 function OpenDataDialog({ share, stats, today, onClose }) {
+  const { units } = useUnits();
   const days = Array.from({ length: 14 }, (_, i) => addDays(today, -i));
   const u = stats.get(share.conn.owner_id);
   return (
@@ -299,6 +304,7 @@ function OpenDataDialog({ share, stats, today, onClose }) {
               {share.conn.fields.map((f) => (
                 <th key={f} className="px-1 py-2 text-right font-medium" style={{ color: FIELDS[f].color }}>
                   {FIELDS[f].label}
+                  {f === 'weight_kg' ? ` (${weightUnit(units)})` : ''}
                 </th>
               ))}
             </tr>
@@ -311,7 +317,7 @@ function OpenDataDialog({ share, stats, today, onClose }) {
                   const v = u?.get(f)?.get(day);
                   return (
                     <td key={f} className={cx('px-1 py-2 text-right font-mono text-xs', v == null ? 'text-way-faint' : 'text-way-ink')}>
-                      {v == null ? '—' : fmtVal(v, FIELDS[f].dec)}
+                      {v == null ? '—' : f === 'weight_kg' ? fmtWeight(v, units, 1, false) : fmtVal(v, FIELDS[f].dec)}
                     </td>
                   );
                 })}
@@ -427,10 +433,11 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   const [counts, setCounts] = useState({});
 
   const ready = !d.loading && !d.error && d.people;
+  const { units } = useUnits();
   const m = useMemo(
-    () => (ready ? buildModel({ d, userId, profile, today, cheerFlip, sent }) : null),
+    () => (ready ? buildModel({ d, userId, profile, today, cheerFlip, sent, units }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ready, d.people, d.connections, d.challenges, d.members, d.board, d.results, d.stats, d.claims, d.views, d.nudges, d.cheers, d.foodDays, d.blocks, d.aliases, userId, profile, today, cheerFlip, sent]
+    [ready, d.people, d.connections, d.challenges, d.members, d.board, d.results, d.stats, d.claims, d.views, d.nudges, d.cheers, d.foodDays, d.blocks, d.aliases, userId, profile, today, cheerFlip, sent, units]
   );
 
   // Cheer totals for the events in the feed.

@@ -88,7 +88,7 @@ templates/                   # CSV templates for the generators
 ## 5. Database (`supabase/`)
 
 Run in this order on a new project (each file is safe to re-run unless noted):
-`schema.sql` → `add-weight-tracking.sql` → `add-custom-foods.sql` → `share-custom-foods.sql` → `add-food-log-update-policy.sql` → `expand-meal-categories.sql` → `add-recipe-system.sql` → `add-ingredient-logging.sql` → `security-hardening.sql` → `add-friends.sql` → `cheer-once-a-day.sql` → `security-fixes-2026-10.sql` → `security-followups-2026-10.sql` → `challenges-2026-10.sql` → `challenges-multi-2026-10.sql` → `compete-2026-10.sql`.
+`schema.sql` → `add-weight-tracking.sql` → `add-custom-foods.sql` → `share-custom-foods.sql` → `add-food-log-update-policy.sql` → `expand-meal-categories.sql` → `add-recipe-system.sql` → `add-ingredient-logging.sql` → `security-hardening.sql` → `add-friends.sql` → `cheer-once-a-day.sql` → `security-fixes-2026-10.sql` → `security-followups-2026-10.sql` → `challenges-2026-10.sql` → `challenges-multi-2026-10.sql` → `compete-2026-10.sql` → `units-2026-10.sql`.
 Seed data: `seed-dummy-foods.sql`, `seed-ingredients.sql` or `generated-ingredients.sql` (pick one; both insert ingredients), `seed-dish-recipes.sql`. `reset-foods.sql` is destructive.
 `google_health_connections` and `strava_connections` were created in the dashboard; `security-hardening.sql` adds their RLS.
 
@@ -102,5 +102,6 @@ Seed data: `seed-dummy-foods.sql`, `seed-ingredients.sql` or `generated-ingredie
 - Branch from `main`, open a PR, wait for the Vercel preview, then merge. New SQL goes in a new dated file and must be run **before** merging code that depends on it.
 - Not routed today (kept for reference; delete rather than revive without review): `components/home/HomeClient.js` and the widgets only it uses (`TileBoard`, `DailyLog`, `WeightBar`, `WeightBodyPreview`…), `components/body/BodyAgeCard.js` (has its own unscoped cache), `components/layout/BottomNav.js`, `components/forms/ProfileForm.js`, `components/weight/*`, `lib/insights.js`, `lib/userData.js`.
 - User-facing text: plain, short, no jargon.
+- Units: everything is stored and calculated in cm and kg. Show and take height, weight and body measurements through `lib/units.js` (`fmtWeight`, `fmtHeight`, `fmtLength`) and `components/way/units.js` (`useUnits`, `UnitSwitch`, `WeightInput`, `HeightInput`); never print "kg" or "cm" by hand. The choice lives in `profiles.units` (and this browser until that column exists).
 - Chart details: wrap the bars in `TapTips` and put the text in `data-tip` (never `title`, which phones don't show). Mouse hover and finger tap both work.
 - Phones: the profile island (Settings, Account, Log out) floats top right on every page; page headers (`main > header`) keep 52px clear for it.

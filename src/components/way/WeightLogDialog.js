@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabaseClient';
 import { getCurrentUserId } from '@/lib/currentUser';
 import { syncToGoogleHealth } from '@/lib/googleHealthSyncClient';
 import { Btn, Modal } from './ui';
+import { useUnits, UnitSwitch, WeightInput } from './units';
+import { fmtWeight, weightUnit } from '@/lib/units';
 
 const dayLabel = (date, today) =>
   date === today
@@ -25,14 +27,16 @@ export default function WeightLogDialog(props) {
 function WeightLogPanel({ onClose, date, today, currentWeight, onSaved }) {
   const supabase = createClient();
   const router = useRouter();
-  const [value, setValue] = useState(currentWeight ? String(Number(currentWeight).toFixed(1)) : '');
+  const { units } = useUnits();
+  // Kept in kg; WeightInput shows and takes your unit.
+  const [kgVal, setKgVal] = useState(currentWeight ? Math.round(Number(currentWeight) * 10) / 10 : '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   const save = async () => {
-    const kg = parseFloat(value);
+    const kg = kgVal === '' ? NaN : Math.round(Number(kgVal) * 100) / 100;
     if (!(kg > 20 && kg < 400)) {
-      setError('Enter a weight between 20 and 400 kg.');
+      setError(`Enter a weight between ${fmtWeight(20, units, 0)} and ${fmtWeight(400, units, 0)}.`);
       return;
     }
     setSaving(true);
@@ -87,22 +91,22 @@ function WeightLogPanel({ onClose, date, today, currentWeight, onSaved }) {
         </>
       }
     >
-      <label className="flex flex-col gap-2 text-xs text-way-mute">
-        Weight
-        <span className="flex h-14 items-center gap-2 rounded-[14px] border border-way-line3 bg-way-page px-4 focus-within:border-way-mute">
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.1"
+      <div className="flex flex-col gap-2 text-xs text-way-mute">
+        <span className="flex items-center justify-between">
+          Weight
+          <UnitSwitch kind="weight" size="md" />
+        </span>
+        <label className="flex h-14 items-center gap-2 rounded-[14px] border border-way-line3 bg-way-page px-4 focus-within:border-way-mute">
+          <WeightInput
+            kg={kgVal}
+            onChange={setKgVal}
             autoFocus
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && save()}
             className="way-num w-full bg-transparent font-mono text-2xl font-semibold text-way-ink outline-none"
           />
-          <span className="font-mono text-sm text-way-dim">kg</span>
-        </span>
-      </label>
+          <span className="font-mono text-sm text-way-dim">{weightUnit(units)}</span>
+        </label>
+      </div>
       {error ? <p className="mt-3 text-[13px] text-rose-300">{error}</p> : null}
     </Modal>
   );

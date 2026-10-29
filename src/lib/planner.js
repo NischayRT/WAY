@@ -165,9 +165,11 @@ export function buildPlan(p) {
 
   // Sanity notes about the goal weight itself.
   const range = healthyWeightRange(height);
+  // The caller can pass how to write a kg range in the person's unit (kg or lb).
+  const rangeStr = p.fmtRange ? p.fmtRange(range?.min, range?.max) : `${range?.min}-${range?.max} kg`;
   if (target && range) {
-    if (target < range.min) warnings.push(`Your goal is below the healthy range for your height (${range.min}-${range.max} kg).`);
-    if (direction === 'lose' && target > range.max) notes.push(`A first goal is a great start; the healthy range for your height is ${range.min}-${range.max} kg.`);
+    if (target < range.min) warnings.push(`Your goal is below the healthy range for your height (${rangeStr}).`);
+    if (direction === 'lose' && target > range.max) notes.push(`A first goal is a great start; the healthy range for your height is ${rangeStr}.`);
   }
   if (weeks && weeks > 52) notes.push('This is a long journey; consider a nearer first milestone. You can change your goal any time in Body Studio.');
 

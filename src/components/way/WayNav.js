@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { House, TrendingUp, Plus, Activity, Users, Settings, Ellipsis, LogOut, UserRound } from 'lucide-react';
+import { House, TrendingUp, Plus, Activity, Swords, Settings, Ellipsis, LogOut, UserRound } from 'lucide-react';
 import { createClient } from '@/lib/supabaseClient';
 import { cx } from './ui';
 import { invalidateJson } from './useJson';
@@ -13,7 +13,7 @@ const NAV = [
   { href: '/nutrition', label: 'Nutrition', Icon: TrendingUp },
   { href: '/log-food', label: 'Log food', Icon: Plus, log: true },
   { href: '/activity', label: 'Activity', Icon: Activity },
-  { href: '/friends', label: 'Friends', Icon: Users },
+  { href: '/compete', label: 'Compete', Icon: Swords },
 ];
 
 const isActive = (pathname, href) => pathname === href || pathname.startsWith(`${href}/`);

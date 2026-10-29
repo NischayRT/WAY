@@ -1,7 +1,10 @@
 'use client';
 
-import { Crown, UserPlus, Swords, Check, LayoutGrid, ChevronRight, Trophy, Plus, Hourglass } from 'lucide-react';
-import { FIELDS, COMPETE_KEYS, PERIODS, FRIEND_LIMIT, fmtVal, displayName } from '@/lib/friends';
+import { useState } from 'react';
+import { Crown, UserPlus, Swords, Check, LayoutGrid, ChevronRight, Trophy, Plus, Hourglass, UserRound } from 'lucide-react';
+import { FIELDS, COMPETE_KEYS, PERIODS, FRIEND_LIMIT, fmtVal, displayName, aggregate } from '@/lib/friends';
+import { addDays } from '@/lib/dateUtils';
+import { dayDiff } from '@/lib/challenges';
 import { Card, Eyebrow, Btn, Segmented, cx } from '@/components/way/ui';
 import { Avatar, FIELD_ICONS, ICONS } from './parts';
 import Leaderboard from './Leaderboard';
@@ -65,14 +68,13 @@ function HeadToHead({ m, ranked, missing, f, k }) {
 }
 
 /** Every stat at once. Tap a stat to open its board. */
-function AllBoards({ m, period, setMetric, k }) {
-  const keys = COMPETE_KEYS.filter((key) => m.competitors.some((c) => c.fields.includes(key)));
+function AllBoards({ m, keys, boardOf, setMetric, k, solo }) {
   return (
     <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:p-5">
       {keys.map((key, ki) => {
         const f = FIELDS[key];
         const Icon = FIELD_ICONS[key];
-        const { ranked } = m.board(key, period);
+        const { ranked } = boardOf(key);
         const max = ranked[0]?.v || 1;
         const myRank = ranked.findIndex((r) => r.id === m.me.id) + 1;
         return (
@@ -89,7 +91,9 @@ function AllBoards({ m, period, setMetric, k }) {
                 {f.label}
               </span>
               <span className="flex items-center gap-1 font-mono text-xs text-way-mute">
-                {myRank ? (
+                {solo ? (
+                  ranked.length ? 'you' : 'no data'
+                ) : myRank ? (
                   <>
                     <span className={myRank === 1 ? 'text-way-gold' : 'text-way-ink'}>#{myRank}</span> of {ranked.length}
                   </>
@@ -194,87 +198,124 @@ function ArenaWelcome({ m, onAdd, onOpenFriends }) {
   );
 }
 
-/** Friends, but nobody else has numbers yet: no fake "#1 of 1". */
-function WarmingUp({ m, period, k }) {
-  const key = 'steps';
-  const days = PERIOD_LABEL[period];
-  const people = [m.me.id, ...m.competitors.map((c) => c.id)];
+/** One stat, just you: the period's total (or average) and each day. */
+function SoloStat({ m, metric, period, k }) {
+  const f = FIELDS[metric];
+  const n = period === 'month' ? 30 : 7;
+  const days = Array.from({ length: n }, (_, i) => addDays(m.today, i - (n - 1)));
+  const byDay = m.mine?.get(metric);
+  const vals = days.map((d) => byDay?.get(d) ?? null);
+  const max = Math.max(1, ...vals.filter((v) => v != null));
+  const from = period === 'today' ? m.today : days[0];
+  const total = aggregate(byDay, metric, from, m.today);
+  const have = vals.filter((v) => v != null);
+  const best = have.length ? Math.max(...have) : null;
+  const avg = have.length ? have.reduce((a, b) => a + b, 0) / have.length : null;
+  const Icon = FIELD_ICONS[metric];
   return (
-    <Card className="flex flex-col overflow-hidden">
-      <div className="flex flex-col gap-1.5 px-5 pb-4 pt-6 lg:px-8 lg:pt-8">
-        <span className="font-heading text-[11px] font-bold tracking-[0.16em] text-sky-300">LEADERBOARD WARMING UP</span>
-        <span className="font-heading text-xl font-bold md:text-2xl">Rankings start when a friend’s numbers arrive</span>
-        <span className="text-[13px] text-way-mute [text-wrap:pretty]">
-          Each person’s numbers come in when they open WAY (at most every 30 minutes). Until then there’s no one to rank against, so nobody is #1 yet.
-        </span>
+    <div className="flex flex-col gap-6 px-4 pb-6 pt-5 lg:px-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <span className="flex items-center gap-2 text-[13px] font-semibold" style={{ color: f.color }}>
+            <Icon size={15} />
+            {f.label} · {PERIOD_LABEL[period]}
+            {f.agg === 'avg' ? ' (average a night)' : ''}
+          </span>
+          <span className="font-mono text-4xl font-semibold lg:text-5xl">
+            {fmtVal(total, f.dec)}
+            <span className="ml-2 text-sm font-medium text-way-dim">{f.unit}</span>
+          </span>
+        </div>
+        <div className="flex gap-6 font-mono text-xs">
+          <span className="flex flex-col gap-0.5">
+            <span className="text-way-dim">Best day</span>
+            <span className="font-semibold text-way-ink">{best == null ? '—' : fmtVal(best, f.dec)}</span>
+          </span>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-way-dim">Daily average</span>
+            <span className="font-semibold text-way-ink">{avg == null ? '—' : fmtVal(avg, f.dec)}</span>
+          </span>
+        </div>
       </div>
-      <div className="border-t border-way-line">
-        {people.map((id, i) => {
-          const isMe = id === m.me.id;
-          const v = m.board(key, period).ranked.find((r) => r.id === id)?.v ?? null;
+      <div className="flex h-36 items-end gap-[3px] lg:gap-1.5">
+        {vals.map((v, i) => {
+          const d = days[i];
+          const inside = d >= from;
           return (
-            <div key={id} className={cx('way-in-right flex items-center gap-3 px-5 py-3 lg:px-8', i && 'border-t border-way-line')} style={{ '--d': `${i * 90 * k}ms` }}>
-              <Avatar person={m.person(id)} isMe={isMe} size={34} />
-              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{isMe ? 'You' : displayName(m.person(id))}</span>
-              {v != null ? (
-                <span className="flex items-center gap-2 font-mono text-xs text-way-ink2">
-                  <Check size={13} className="text-way-protein" />
-                  {fmtVal(v)} steps · {days}
+            <div key={d} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5" title={`${d}: ${v == null ? 'no data' : `${fmtVal(v, f.dec)} ${f.unit}`}`}>
+              <div
+                className="w-full rounded-t-md transition-[height] duration-700 ease-out"
+                style={{ height: `${v == null ? 2 : Math.max(3, (v / max) * 100) * k}%`, background: v == null ? '#1f2937' : f.color, opacity: inside ? 1 : 0.35 }}
+              />
+              {n <= 7 ? (
+                <span className={cx('font-mono text-[10px]', d === m.today ? 'font-semibold text-way-ink' : 'text-way-dim')}>
+                  {d === m.today ? 'Today' : new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })}
                 </span>
-              ) : (
-                <span className="flex items-center gap-1.5 text-xs text-way-dim">
-                  <Hourglass size={12} />
-                  waiting for first sync
-                </span>
-              )}
+              ) : null}
             </div>
           );
         })}
       </div>
-    </Card>
+    </div>
   );
 }
 
 /**
- * The Arena: everything competitive in one place. The main card is the
- * always-on leaderboard (or what to do before there is one); the side
- * column is challenges, worded for the situation you're in.
+ * The Arena. People are compared only inside a challenge they all joined:
+ * with no live challenge it shows just your own numbers; during one, only
+ * that challenge's members, stats and days. The side column is challenges,
+ * worded for the situation you're in.
  */
 export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onClaim, onAdd, onOpenFriends, panel }) {
-  const hasFriends = m.competitors.length > 0;
-  const shared = COMPETE_KEYS.filter((key) => m.competitors.some((c) => c.fields.includes(key)));
-  const othersRanked = shared.some((key) => ['today', 'week', 'month'].some((p) => m.board(key, p).ranked.some((r) => r.id !== m.me.id)));
-  const ready = hasFriends && othersRanked;
-  const all = metric === 'all' || !shared.includes(metric);
+  const hasPeople = m.challengeable.length > 0;
+  const live = m.ch.live.filter((c) => c.status === 'joined');
+  const [scopeId, setScopeId] = useState(null);
+  const x = scopeId === 'solo' ? null : live.find((c) => c.id === scopeId) || live[0] || null;
+  const solo = !x;
+
+  const keys = solo ? COMPETE_KEYS : x.metrics;
+  const boardOf = (key) => {
+    if (!solo) return x.boards.find((bd) => bd.metric === key) || { ranked: [], missing: [] };
+    const from = addDays(m.today, -(PERIODS[period] - 1));
+    const v = aggregate(m.mine?.get(key), key, from, m.today);
+    return { ranked: v == null ? [] : [{ id: m.me.id, v, rank: 1 }], missing: v == null ? [m.me.id] : [] };
+  };
+  const all = metric === 'all' || !keys.includes(metric);
   const f = all ? null : FIELDS[metric];
-  const board = all ? null : m.board(metric, period);
+  const board = all ? null : boardOf(metric);
   const ranked = board?.ranked || [];
   const people = board ? ranked.length + board.missing.length : 0;
 
-  // Your rank (one stat) or standings (all stats)
+  // Where you stand: only inside a challenge (alone you'd always be #1).
   let rankCard = null;
-  if (ready && !all) {
+  if (!solo && !all) {
     const i = ranked.findIndex((r) => r.id === m.me.id);
     const mine = ranked[i];
     const ahead = i > 0 ? ranked[i - 1] : null;
-    const days = PERIODS[period];
+    const daysLeft = Math.max(1, dayDiff(m.today, x.c.ends_on) + 1);
     const my = !mine
       ? { rank: '—', headline: 'No numbers yet', sub: 'Your numbers appear once WAY syncs your day.', pass: 0 }
       : ahead
         ? {
-            rank: `#${i + 1}`,
+            rank: `#${mine.rank ?? i + 1}`,
             headline: `${fmtVal(ahead.v - mine.v, f.dec)} ${f.unit} to pass ${displayName(m.person(ahead.id))}`,
-            sub: f.agg === 'avg' ? `Beat ${fmtVal(ahead.v, 1)} ${f.unit} on average to move up.` : `About ${fmtVal((ahead.v - mine.v) / days, f.dec)} extra ${f.unit} a day gets you there.`,
+            sub:
+              f.agg === 'avg'
+                ? `Beat ${fmtVal(ahead.v, 1)} ${f.unit} on average to move up.`
+                : `About ${fmtVal((ahead.v - mine.v) / daysLeft, f.dec)} extra ${f.unit} a day for the ${daysLeft} day${daysLeft === 1 ? '' : 's'} left gets you there.`,
             pass: (mine.v / ahead.v) * 100,
           }
-        : { rank: '#1', headline: ranked.length > 1 ? 'You hold the crown' : 'Waiting for friends to sync', sub: ranked.length > 1 ? 'Defend it. People are close behind.' : 'Their numbers show up once they open WAY.', pass: 100 };
+        : {
+            rank: '#1',
+            headline: ranked.length > 1 ? 'You hold the crown' : 'Waiting for the others to sync',
+            sub: ranked.length > 1 ? 'Defend it until the last day.' : 'Their numbers show up once they open WAY.',
+            pass: 100,
+          };
     rankCard = (
       <Card className="relative flex items-center gap-3.5 overflow-hidden border-[rgba(250,204,21,.3)] p-4 lg:flex-col lg:items-stretch lg:gap-4 lg:p-6">
         <div className="hidden items-center justify-between lg:flex">
           <Eyebrow>Your rank</Eyebrow>
-          <span className="font-mono text-[11px] font-medium text-way-dim">
-            {f.label} · {PERIOD_LABEL[period]}
-          </span>
+          <span className="font-mono text-[11px] font-medium text-way-dim">{f.label} · this challenge</span>
         </div>
         <div className="flex items-baseline gap-2.5">
           <span className="font-brand text-5xl leading-none text-way-gold lg:text-[76px] lg:leading-[.85]">{my.rank}</span>
@@ -289,31 +330,33 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onClaim, 
         </div>
       </Card>
     );
-  } else if (ready) {
-    const standings = shared.map((key) => {
-      const r = m.board(key, period).ranked;
-      return { key, rank: r.findIndex((x) => x.id === m.me.id) + 1, of: r.length };
+  } else if (!solo) {
+    const standings = keys.map((key) => {
+      const r = boardOf(key).ranked;
+      return { key, rank: r.find((y) => y.id === m.me.id)?.rank ?? 0, of: r.length };
     });
-    const crowns = standings.filter((s) => s.rank === 1 && s.of > 1).length;
+    const led = standings.filter((st) => st.rank === 1 && st.of > 1).length;
     rankCard = (
       <Card className="flex flex-col gap-3 border-[rgba(250,204,21,.3)] p-4 lg:p-6">
         <div className="flex items-center justify-between">
           <Eyebrow>Your standings</Eyebrow>
-          <span className="font-mono text-[11px] font-medium text-way-dim">{PERIOD_LABEL[period]}</span>
+          <span className="font-mono text-[11px] font-medium text-way-dim">this challenge</span>
         </div>
         <div className="flex items-baseline gap-2">
-          <span className="font-brand text-5xl leading-none text-way-gold">{crowns}</span>
-          <span className="text-[13px] text-way-mute">crown{crowns === 1 ? '' : 's'} held</span>
+          <span className="font-brand text-5xl leading-none text-way-gold">{led}</span>
+          <span className="text-[13px] text-way-mute">
+            of {keys.length} stat{keys.length === 1 ? '' : 's'} led
+          </span>
         </div>
         <div className="flex flex-col gap-1.5">
-          {standings.map((s) => {
-            const Icon = FIELD_ICONS[s.key];
+          {standings.map((st) => {
+            const Icon = FIELD_ICONS[st.key];
             return (
-              <button key={s.key} type="button" onClick={() => setMetric(s.key)} className="flex items-center gap-2 rounded-lg px-1 py-1 text-left text-[13px] hover:bg-way-hover">
-                <Icon size={14} style={{ color: FIELDS[s.key].color }} />
-                <span className="flex-1 text-way-ink2">{FIELDS[s.key].label}</span>
-                <span className={cx('font-mono text-xs font-semibold', s.rank === 1 ? 'text-way-gold' : 'text-way-ink')}>{s.rank ? `#${s.rank}` : '—'}</span>
-                <span className="w-10 font-mono text-[11px] text-way-dim">of {s.of}</span>
+              <button key={st.key} type="button" onClick={() => setMetric(st.key)} className="flex items-center gap-2 rounded-lg px-1 py-1 text-left text-[13px] hover:bg-way-hover">
+                <Icon size={14} style={{ color: FIELDS[st.key].color }} />
+                <span className="flex-1 text-way-ink2">{FIELDS[st.key].label}</span>
+                <span className={cx('font-mono text-xs font-semibold', st.rank === 1 ? 'text-way-gold' : 'text-way-ink')}>{st.rank ? `#${st.rank}` : '—'}</span>
+                <span className="w-10 font-mono text-[11px] text-way-dim">of {st.of}</span>
               </button>
             );
           })}
@@ -322,9 +365,50 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onClaim, 
     );
   }
 
+  // Which comparison you're looking at: each live challenge, or just you.
+  const scopeBar = live.length ? (
+    <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:px-0">
+      {live.map((c) => {
+        const on = !solo && c.id === x.id;
+        const others = c.joined.filter((id) => id !== m.me.id);
+        return (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => setScopeId(c.id)}
+            aria-pressed={on}
+            className={cx(
+              'flex shrink-0 items-center gap-2 rounded-xl border py-1.5 pl-1.5 pr-3 text-xs font-semibold transition-colors',
+              on ? 'border-rose-400/60 bg-rose-400/12 text-rose-100' : 'border-way-line2 text-way-mute hover:text-way-ink2'
+            )}
+          >
+            <span className="flex -space-x-1.5">
+              {others.slice(0, 3).map((id) => (
+                <Avatar key={id} person={m.person(id)} size={20} ring="0 0 0 2px #0f1420" />
+              ))}
+            </span>
+            {others.length === 1 ? `vs ${displayName(m.person(others[0]))}` : `Group of ${c.joined.length}`}
+            <span className="font-mono text-[10px] font-medium text-way-dim">{c.left}</span>
+          </button>
+        );
+      })}
+      <button
+        type="button"
+        onClick={() => setScopeId('solo')}
+        aria-pressed={solo}
+        className={cx(
+          'shrink-0 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors',
+          solo ? 'border-way-ink bg-way-ink text-way-page' : 'border-way-line2 text-way-mute hover:text-way-ink2'
+        )}
+      >
+        Just you
+      </button>
+    </div>
+  ) : null;
+
   const chips = (
     <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:px-0">
-      {[['all', 'All', LayoutGrid, '#f1f5f9'], ...shared.map((key) => [key, FIELDS[key].label, FIELD_ICONS[key], FIELDS[key].color])].map(([key, label, Icon, color]) => {
+      {[['all', 'All', LayoutGrid, '#f1f5f9'], ...keys.map((key) => [key, FIELDS[key].label, FIELD_ICONS[key], FIELDS[key].color])].map(([key, label, Icon, color]) => {
         const on = key === 'all' ? all : key === metric;
         return (
           <button
@@ -342,7 +426,7 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onClaim, 
       })}
     </div>
   );
-  const periods = (
+  const periods = solo ? (
     <Segmented
       mono
       size="sm"
@@ -352,6 +436,10 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onClaim, 
       onChange={setPeriod}
       options={Object.keys(PERIODS).map((p) => ({ value: p, label: { today: 'Today', week: '7D', month: '30D' }[p] }))}
     />
+  ) : (
+    <span className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-way-line2 px-3 py-2 font-mono text-[11px] font-semibold text-way-ink2">
+      {x.span} · <span className="text-way-over">{x.left}</span>
+    </span>
   );
 
   const progress = (
@@ -430,47 +518,65 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onClaim, 
         </Card>
     </div>
   );
+  const soloNote = m.ch.upcoming.length
+    ? `Just your numbers for now. Your challenge starts ${m.ch.upcoming[0].c.starts_on === addDays(m.today, 1) ? 'tomorrow' : `on ${m.ch.upcoming[0].span.split(' – ')[0]}`}; then it compares you here.`
+    : live.length
+      ? 'Just your numbers. Pick a challenge above to compare.'
+      : 'Just your numbers. Friends and family are compared only inside a challenge you all joined.';
+
   return (
     <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 lg:items-start lg:gap-5">
-      {/* Main column: the leaderboard (or what comes before it), then history.
+      {/* Main column: the board (or what comes before it), then history.
           Below 1024px both columns dissolve into one flow. */}
       <div className="contents lg:col-span-8 lg:flex lg:flex-col lg:gap-5">
-      {!hasFriends ? (
-        <ArenaWelcome m={m} onAdd={onAdd} onOpenFriends={onOpenFriends} />
-      ) : !ready ? (
-        <WarmingUp m={m} period={period} k={k} />
-      ) : (
-        <>
-          <div className="flex flex-col gap-3.5 lg:hidden">
-            {chips}
-            {periods}
-          </div>
-          <Card className="relative flex flex-col overflow-hidden">
-            <div className="relative z-[1] hidden items-center justify-between gap-4 px-6 pt-[22px] lg:flex">
+        {!hasPeople ? (
+          <ArenaWelcome m={m} onAdd={onAdd} onOpenFriends={onOpenFriends} />
+        ) : (
+          <>
+            <div className="flex flex-col gap-3.5 lg:hidden">
+              {scopeBar}
               {chips}
               {periods}
             </div>
-            <div key={`${metric}-${period}`}>
-              {all ? (
-                <AllBoards m={m} period={period} setMetric={setMetric} k={k} />
-              ) : people <= 2 ? (
-                <HeadToHead m={m} ranked={ranked} missing={board.missing} f={f} k={k} />
-              ) : (
-                <Leaderboard m={m} ranked={ranked} missing={board.missing} f={f} k={k} />
-              )}
-            </div>
-            <div className="hidden border-t border-way-line px-6 pb-4 pt-3 text-[11px] text-way-dim lg:block">
-              Leaderboard · always on · only stats you both agreed on are compared · numbers update when each person opens WAY (at most every 30 min)
-              {f?.agg === 'avg' ? ' · sleep is an average per night' : ''}
-            </div>
-          </Card>
-        </>
-      )}
-
+            <Card className={cx('relative flex flex-col overflow-hidden', !solo && 'border-rose-400/25')}>
+              <div className="relative z-[1] hidden flex-col gap-4 px-6 pt-[22px] lg:flex">
+                {scopeBar}
+                <div className="flex items-center justify-between gap-4">
+                  {chips}
+                  {periods}
+                </div>
+              </div>
+              {solo ? (
+                <div className="mx-3 mt-3 flex items-center gap-2.5 rounded-xl bg-way-rail px-3.5 py-2.5 text-xs text-way-mute lg:mx-6 lg:mt-4">
+                  <UserRound size={14} className="shrink-0 text-way-dim" />
+                  <span className="[text-wrap:pretty]">{soloNote}</span>
+                </div>
+              ) : null}
+              <div key={`${solo ? 'solo' : x.id}-${metric}-${period}`}>
+                {all ? (
+                  <AllBoards m={m} keys={keys} boardOf={boardOf} setMetric={setMetric} k={k} solo={solo} />
+                ) : solo ? (
+                  <SoloStat m={m} metric={metric} period={period} k={k} />
+                ) : people <= 2 ? (
+                  <HeadToHead m={m} ranked={ranked} missing={board.missing} f={f} k={k} />
+                ) : (
+                  <Leaderboard m={m} ranked={ranked} missing={board.missing} f={f} k={k} />
+                )}
+              </div>
+              <div className="hidden border-t border-way-line px-6 pb-4 pt-3 text-[11px] text-way-dim lg:block">
+                {solo
+                  ? 'Only you · numbers update when WAY syncs your day (at most every 30 min)'
+                  : `Only the ${x.joined.length} people in this challenge · only its stats and days · numbers update when each person opens WAY`}
+                {f?.agg === 'avg' ? ' · sleep is an average per night' : ''}
+              </div>
+            </Card>
+          </>
+        )}
         {m.ch.hasHistory ? <ChallengeHistory m={m} onOpen={panel.onOpen} /> : progress}
       </div>
+
       {/* Side column. Below 1024px its cards join the page flow, with
-          challenges first: they're the most time-sensitive thing here. */}
+          challenges first when something needs you. */}
       <div className="contents lg:col-span-4 lg:flex lg:flex-col lg:gap-5">
         <div className={cx(m.ch.invites.length || m.ch.state === 'live' ? 'order-first' : '', 'lg:order-none')}>
           <ChallengePanel m={m} k={k} onAddFriend={onAdd} {...panel} />
@@ -478,7 +584,6 @@ export function ArenaTab({ m, metric, setMetric, period, setPeriod, k, onClaim, 
         {rankCard}
         {m.ch.hasHistory ? progress : null}
       </div>
-
     </div>
   );
 }

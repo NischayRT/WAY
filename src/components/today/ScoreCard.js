@@ -75,16 +75,20 @@ export default function ScoreCard({ d, k, connectHref, showScore = true, load = 
             {d.leftStr}
           </span>
         </div>
-        <div className="flex h-2.5 gap-[3px] lg:h-3.5 lg:gap-1">
+        {/* One column per meal: its bar segment with its label right under it.
+            Columns follow each meal's share of the day, but never get narrower
+            than their label, so labels can't drift under another meal's bar. */}
+        <div
+          className="grid gap-x-[3px] gap-y-2 lg:gap-x-1 lg:gap-y-2.5"
+          style={{ gridTemplateColumns: d.meals.map((m) => `minmax(max-content, ${Math.max(m.frac, 0.01)}fr)`).join(' ') }}
+        >
           {d.meals.map((m) => (
-            <div key={m.key} className="overflow-hidden rounded-[3px] bg-way-track lg:rounded" style={{ flex: m.frac * 100 }}>
+            <div key={`bar-${m.key}`} className="h-2.5 overflow-hidden rounded-[3px] bg-way-track lg:h-3.5 lg:rounded">
               <div className={cx('h-full', EASE)} style={{ width: `${m.fill * k}%`, background: m.barColor }} />
             </div>
           ))}
-        </div>
-        <div className="grid grid-cols-4 gap-1.5 lg:gap-3">
           {d.meals.map((m) => (
-            <div key={m.key} className="flex flex-col gap-px lg:gap-0.5">
+            <div key={m.key} className="flex min-w-0 flex-col gap-px pr-1.5 lg:gap-0.5">
               <span className="text-[11px] text-way-mute lg:text-xs">{m.label}</span>
               <span className="font-mono text-[11px] font-semibold lg:text-xs" style={{ color: m.valColor }}>
                 {fmt(m.totals.calories)}

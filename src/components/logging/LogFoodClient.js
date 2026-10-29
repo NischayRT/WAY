@@ -659,8 +659,46 @@ export default function LogFoodClient({ userId, today, minDate, initialDate, ini
       >
         <ChevronLeft size={15} />
       </button>
-      <span className={cx('text-center font-mono text-xs font-semibold md:text-[13px]', long ? 'min-w-[150px]' : 'min-w-[76px]', backdated ? 'text-way-kcal' : 'text-way-ink')}>
-        {long ? day.long : day.short}
+      {/* Tap the date for a calendar; the arrows still step a day at a time.
+          The input sits under the button (invisible, no layout width), and
+          its sibling is found from the click, so both copies of this
+          picker (phone and desktop) work. */}
+      <span className="relative flex">
+        <button
+          type="button"
+          title="Pick a date"
+          aria-label={`Pick a date. Showing ${day.long}`}
+          onClick={(e) => {
+            const input = e.currentTarget.nextElementSibling;
+            if (!input) return;
+            try {
+              if (input.showPicker) input.showPicker();
+              else input.click();
+            } catch {
+              input.focus();
+            }
+          }}
+          className={cx(
+            'relative z-[1] rounded-[10px] px-1.5 py-1.5 text-center font-mono text-xs font-semibold underline decoration-dotted decoration-1 underline-offset-4 transition-colors hover:bg-way-hover md:text-[13px]',
+            long ? 'min-w-[150px]' : 'min-w-[76px]',
+            backdated ? 'text-way-kcal decoration-way-kcal/50' : 'text-way-ink decoration-way-faint'
+          )}
+        >
+          {long ? day.long : day.short}
+        </button>
+        <input
+          type="date"
+          aria-hidden="true"
+          tabIndex={-1}
+          min={minDate}
+          max={today}
+          value={date}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v && v >= minDate && v <= today) setDate(v);
+          }}
+          className="pointer-events-none absolute inset-0 h-full w-full min-w-0 appearance-none opacity-0"
+        />
       </span>
       <button
         type="button"

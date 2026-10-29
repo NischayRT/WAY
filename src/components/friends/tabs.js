@@ -326,7 +326,7 @@ export function InboxTab({ m, onReview, onDecline, onCancel, onRevise }) {
 
 const RULES = [
   [SearchX, 'No search or browsing. People need your exact username, and see only that until you accept.'],
-  [ListChecks, 'Nothing is shared without your OK, item by item. Competing compares only what you both agree on.'],
+  [ListChecks, 'Nothing is shared without your OK, item by item. Rankings happen only inside a challenge you joined, among the people in it.'],
   [Database, 'Only daily totals are read (the last 31 days), and only the agreed items. A challenge shows its one stat, for its days, to the people who joined. Stop sharing and access ends at once.'],
   [TimerReset, 'Set an end date, remove items, stop any time, or block someone.'],
   [ShieldCheck, 'These rules are enforced by the database, not just this screen.'],

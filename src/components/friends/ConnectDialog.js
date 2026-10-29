@@ -194,7 +194,7 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
     const lastAllowed = addDays(tomorrow, MAX_CHALLENGE_DAYS - 1);
     const until = s.days === 'date' ? s.until : addDays(tomorrow, s.days - 1);
     const days = until && until >= tomorrow && until <= lastAllowed ? dayDiff(tomorrow, until) + 1 : null;
-    const people = s.people.filter((id) => friends.some((p) => p.id === id));
+    const people = s.people.filter((id) => friends.some((p) => p.id === id && !p.busy));
     const metrics = COMPETE_KEYS.filter((k) => s.metrics.includes(k));
     const statWords = metrics.map((k) => FIELDS[k].label.toLowerCase());
     const statList = statWords.length > 1 ? `${statWords.slice(0, -1).join(', ')} and ${statWords[statWords.length - 1]}` : statWords[0] || 'the stats';
@@ -210,7 +210,7 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
     body = (
       <>
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-way-ink2">Who</span>
+          <span className="text-xs font-semibold text-way-ink2">Who (friends or family)</span>
           <span className="font-mono text-[11px] text-way-dim">
             {people.length}/{Math.min(MAX_CHALLENGE_PEOPLE, friends.length || MAX_CHALLENGE_PEOPLE)}
           </span>
@@ -224,19 +224,23 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
                   key={p.id}
                   type="button"
                   aria-pressed={on}
+                  disabled={!!p.busy}
+                  title={p.busy ? 'Already in a challenge with you. One at a time per person.' : undefined}
                   onClick={() => toggle(p.id)}
-                  className="flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-xs font-semibold transition-colors"
+                  className="flex items-center gap-2 rounded-full border py-1 pl-1 pr-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45"
                   style={on ? { background: 'rgba(251,113,133,.14)', color: '#fecdd3', borderColor: 'rgba(251,113,133,.6)' } : { color: '#94a3b8', borderColor: '#253044' }}
                 >
                   <Avatar person={p} size={24} />
                   {displayName(p)}
+                  {p.kind === 'family' ? <span className="rounded bg-emerald-400/12 px-1 text-[9px] font-bold uppercase tracking-wide text-emerald-300">family</span> : null}
+                  {p.busy ? <span className="text-[10px] font-medium text-way-dim">in a challenge</span> : null}
                   {on ? <Check size={12} /> : null}
                 </button>
               );
             })}
           </div>
         ) : (
-          <span className="rounded-xl bg-way-rail px-3 py-2.5 text-xs text-way-mute">You can challenge people you compete with. Add a friend first.</span>
+          <span className="rounded-xl bg-way-rail px-3 py-2.5 text-xs text-way-mute">You can challenge friends and family. Add a friend first.</span>
         )}
         {onSwitch && (md.counts?.friends ?? 0) < FRIEND_LIMIT ? (
           <button type="button" onClick={() => onSwitch({ type: 'add', mode: 'compete', counts: md.counts })} className="flex items-center gap-1.5 self-start text-xs font-semibold text-way-protein">
@@ -266,6 +270,14 @@ export default function ConnectDialog({ md, meId, supabase, onClose, onDone, onS
             );
           })}
         </div>
+        {people.length > 1 ? (
+          <span className="rounded-xl border border-amber-400/25 bg-amber-400/[.06] px-3 py-2 text-[11px] text-amber-200 [text-wrap:pretty]">
+            Group challenge: everyone you pick has to be friends or family with each other too, so nobody races a stranger.
+          </span>
+        ) : null}
+        {friends.some((p) => p.busy) ? (
+          <span className="text-[11px] text-way-dim">Greyed out: already in a challenge with you. One at a time per person, until it ends or is cancelled.</span>
+        ) : null}
         <span className="text-xs font-semibold text-way-ink2">How long</span>
         <Segmented
           stretch

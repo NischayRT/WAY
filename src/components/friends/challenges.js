@@ -251,7 +251,7 @@ export function presetsFor(today) {
  */
 export function ChallengePanel({ m, k, onOpen, onNew, onPreset, onAddFriend, onReview, onDecline, onRematch }) {
   const ch = m.ch;
-  const noFriends = !m.competitors.length;
+  const noFriends = !m.challengeable.length;
   const pendingFriends = m.outgoing.filter((x) => x.kind === 'conn' && x.item.kind === 'compete');
   const latest = ch.finished[0];
 
@@ -293,7 +293,7 @@ export function ChallengePanel({ m, k, onOpen, onNew, onPreset, onAddFriend, onR
             <span className="text-[13px] text-way-mute [text-wrap:pretty]">
               {pendingFriends.length
                 ? `Unlocks when ${listNames(m, pendingFriends.map((x) => x.to.id), 2)} accepts your friend invite.`
-                : 'A challenge is a race with a finish line: pick friends, stats and a last day. You need a friend first.'}
+                : 'A challenge is a race with a finish line: pick friends or family, stats and a last day. Add a friend first, or share with family.'}
             </span>
           </div>
           <Btn variant="primary" onClick={onAddFriend}>
@@ -458,9 +458,9 @@ export function ChallengeSheet({ m, x, k, sent, onClose, onNudge, onLeave, onCan
               <RotateCcw size={14} />
               Rematch
             </Btn>
-          ) : x.isCreator && x.phase === 'upcoming' ? (
+          ) : x.isCreator ? (
             <Btn variant="dangerOutline" onClick={() => onCancel(x)} className="mr-auto">
-              Call it off
+              Cancel challenge
             </Btn>
           ) : x.status === 'joined' ? (
             <Btn variant="outline" onClick={() => onLeave(x)} className="mr-auto">

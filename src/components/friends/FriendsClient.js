@@ -12,7 +12,6 @@ import {
   seasonInfo,
   FRIEND_LIMIT,
   FAMILY_LIMIT,
-  buildBoard,
   buildFeed,
   QUESTS,
   questProgress,
@@ -231,16 +230,32 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
   const waitDays = changed ? RENAME_DAYS - daysBetween(changed, today) : 0;
   const canRename = waitDays <= 0;
 
-  const stepsBoard = buildBoard({ meId: userId, competitors, stats: d.stats, metric: 'steps', period: 'week', today });
-  const seasonRank = stepsBoard.ranked.findIndex((r) => r.id === userId) + 1;
-  const othersRankedSteps = stepsBoard.ranked.some((r) => r.id !== userId);
+  // Your own steps this week (people are compared only inside challenges).
+  const stepsWeek = aggregate(mine?.get('steps'), 'steps', addDays(today, -6), today);
+
+  // Everyone you could challenge: friends, and family (an active share either way).
+  const challengeable = [];
+  const seenC = new Set();
+  const addC = (id, kind) => {
+    if (seenC.has(id) || blockedIds.has(id)) return;
+    seenC.add(id);
+    challengeable.push({ id, person: person(id), kind });
+  };
+  for (const c of competitors) addC(c.id, 'friend');
+  for (const sh of sharesIn) addC(sh.owner.id, 'family');
+  for (const sh of sharesOut) addC(sh.viewer.id, 'family');
+  // Who you're already in a challenge with (waiting or running): one at a time.
+  const busyWith = new Map();
+  for (const x of ch.all) {
+    if (x.phase === 'ended' || !['joined', 'invited'].includes(x.status)) continue;
+    for (const id of [...x.joined, ...x.invited]) if (id !== userId && !busyWith.has(id)) busyWith.set(id, x);
+  }
 
   return {
     me,
     today,
     person,
     levelOfPerson: (id) => levelOf(person(id).xp || 0).level,
-    board: (metric, period) => buildBoard({ meId: userId, competitors, stats: d.stats, metric, period, today }),
     competitors,
     season,
     quests,
@@ -264,7 +279,10 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent }) {
     canRename,
     renameHint: canRename ? 'You can change it once every 30 days.' : `You can change it again in ${waitDays} day${waitDays === 1 ? '' : 's'}.`,
     foodStreak,
-    seasonRank: seasonRank > 0 && othersRankedSteps ? `#${seasonRank} of ${stepsBoard.ranked.length}` : othersRankedSteps ? '—' : 'Waiting on friends',
+    stepsWeek,
+    mine,
+    challengeable,
+    busyWith,
   };
 }
 
@@ -462,10 +480,10 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   if (d.setup || d.error) {
     return (
       <main className={PAGE}>
-        <h1 className="font-heading text-[28px] font-bold md:text-[34px]">Friends</h1>
+        <h1 className="font-heading text-[28px] font-bold md:text-[34px]">Compete</h1>
         <Card className="flex max-w-[620px] flex-col gap-3 p-6">
           <Database size={22} className="text-way-kcal" />
-          <span className="text-base font-semibold">{d.setup ? 'Friends needs a one-time database update' : 'Friends could not load'}</span>
+          <span className="text-base font-semibold">{d.setup ? 'Compete needs a one-time database update' : 'Compete could not load'}</span>
           <span className="text-[13px] text-way-mute [text-wrap:pretty]">
             {d.setup ? (
               <>
@@ -545,16 +563,25 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
   const onDecline = (x) => (x.kind === 'challenge' ? declineChallenge(x.ch) : rpc('respond_connection', { p_id: x.item.id, p_accept: false }, 'Declined'));
   const onCancel = (x) =>
     x.kind === 'challenge' ? rpc('cancel_challenge', { p_id: x.item.id }, 'Challenge called off') : rpc('end_connection', { p_id: x.item.id }, 'Invite cancelled');
-  const friendsToChallenge = () => m.competitors.map((c) => m.person(c.id));
   const newChallenge = (preset = {}) =>
-    setMd({ type: 'challenge', friends: friendsToChallenge(), today, counts: { friends: m.friendCount, family: m.familyCount }, ...preset });
-  const friendIds = () => new Set(m.competitors.map((c) => c.id));
+    setMd({
+      type: 'challenge',
+      friends: m.challengeable.map((c) => ({ ...c.person, kind: c.kind, busy: m.busyWith.get(c.id) || null })),
+      today,
+      counts: { friends: m.friendCount, family: m.familyCount },
+      ...preset,
+    });
   const onRematch = (x) => {
     setSheet(null);
-    const ids = friendIds();
-    newChallenge({ people: x.joined.filter((id) => id !== userId && ids.has(id)).slice(0, 4), metrics: x.metrics, days: [1, 3, 7, 14, 30].includes(x.len) ? x.len : 7 });
+    const ok = new Set(m.challengeable.map((c) => c.id));
+    newChallenge({ people: x.joined.filter((id) => id !== userId && ok.has(id) && !m.busyWith.has(id)).slice(0, 4), metrics: x.metrics, days: [1, 3, 7, 14, 30].includes(x.len) ? x.len : 7 });
   };
-  const onPreset = (p) => newChallenge({ people: m.competitors.slice(0, 4).map((c) => c.id), metrics: p.metrics, days: p.days });
+  // Starters pick the stats and length; you pick the people (a group only
+  // works if everyone is friends or family with each other).
+  const onPreset = (p) => {
+    const free = m.challengeable.filter((c) => !m.busyWith.has(c.id));
+    newChallenge({ people: free.length === 1 ? [free[0].id] : [], metrics: p.metrics, days: p.days });
+  };
   const onChallengeFriend = (person) => newChallenge({ people: [person.id] });
   const onLeave = (x) =>
     setCf({
@@ -569,11 +596,14 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
     });
   const onCallOff = (x) =>
     setCf({
-      title: 'Call off this challenge?',
-      text: 'It hasn’t started yet. Everyone invited stops seeing it.',
+      title: 'Cancel this challenge?',
+      text:
+        x.phase === 'upcoming'
+          ? 'It hasn’t started yet. Everyone invited stops seeing it.'
+          : 'It ends now for everyone and no results are kept. You can challenge them again straight away.',
       cta: 'Call it off',
       run: async () => {
-        await rpc('cancel_challenge', { p_id: x.id }, 'Challenge called off');
+        await rpc('cancel_challenge', { p_id: x.id }, 'Challenge cancelled');
         setCf(null);
         setSheet(null);
       },
@@ -643,7 +673,7 @@ export default function FriendsClient({ userId, today, profile, initialTab = 'ar
       : m.ch.running.length
         ? { Icon: Swords, label: 'Challenges', v: m.ch.live.length ? `${m.ch.live.length} live now` : 'Starting soon', c: '#fb7185' }
         : { Icon: Swords, label: 'Challenges', v: m.competitors.length ? 'None yet' : 'Need a friend', c: '#fb7185' },
-    { Icon: Trophy, label: 'Steps this week', v: m.competitors.length ? m.seasonRank : 'Just you', c: '#facc15' },
+    { Icon: Trophy, label: 'Your steps · 7 days', v: m.stepsWeek == null ? 'No data yet' : fmtVal(m.stepsWeek), c: '#facc15' },
     { Icon: Users, label: 'Friends · Family', v: `${m.competitors.length}/${FRIEND_LIMIT} · ${m.sharesIn.length + m.sharesOut.length ? m.familyCount : 0}/${FAMILY_LIMIT}`, c: '#60a5fa' },
   ];
 

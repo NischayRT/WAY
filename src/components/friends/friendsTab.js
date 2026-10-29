@@ -106,6 +106,7 @@ export function FriendsTab({ m, k, copied, onCopy, onAdd, onCheerPerson, onChall
         {friends.map((f, i) => {
           const comp = m.competitors.find((c) => c.id === f.id);
           const live = m.ch.running.filter((x) => x.joined.includes(f.id)).length;
+          const busy = m.busyWith.get(f.id);
           return (
             <Card key={f.id} className="way-rise flex flex-col gap-3.5 p-4 lg:p-5" style={{ '--d': `${i * 70}ms` }}>
               <div className="flex items-start gap-3">
@@ -151,14 +152,24 @@ export function FriendsTab({ m, k, copied, onCopy, onAdd, onCheerPerson, onChall
                   <PartyPopper size={13} />
                   {f.cheered ? 'Cheered' : 'Cheer'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onChallenge(f.person)}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-way-over px-3 py-2 text-xs font-semibold text-[#1a0508]"
-                >
-                  <Swords size={13} />
-                  Challenge
-                </button>
+                {busy ? (
+                  <span
+                    title="One challenge at a time with each person. You can challenge them again when this one ends, or after it’s cancelled."
+                    className="flex flex-1 flex-col items-center justify-center rounded-xl border border-rose-400/30 bg-rose-400/[.06] px-2 py-1 text-center text-[11px] font-semibold leading-tight text-rose-200"
+                  >
+                    In a challenge
+                    <span className="font-mono text-[10px] font-medium text-way-dim">{busy.phase === 'upcoming' ? 'starts soon' : `until ${busy.span.split(' – ')[1]}`}</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onChallenge(f.person)}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-way-over px-3 py-2 text-xs font-semibold text-[#1a0508]"
+                  >
+                    <Swords size={13} />
+                    Challenge
+                  </button>
+                )}
               </div>
             </Card>
           );

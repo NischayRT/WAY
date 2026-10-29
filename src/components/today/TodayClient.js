@@ -167,7 +167,7 @@ export default function TodayClient({
         left >= 0
           ? `${fmt(left)} kcal${connected && stepsLeft ? ` and ${fmt(stepsLeft)} steps` : ''} to go.${
               biggest ? ` ${biggest.label} is your biggest open slot` : ''
-            }${pLeft ? `${biggest ? '; aim' : ' Aim'} for ${pLeft} g more protein.` : biggest ? '.' : ''}`
+            }${pLeft ? `${biggest ? ', and aim' : ' Aim'} for ${pLeft} g more protein.` : biggest ? '.' : ''}`
           : `Over by ${fmt(-left)} kcal. A walk after dinner evens it out.`;
     } else if (totals.calories === 0) {
       sentence = 'Nothing was logged on this day.';

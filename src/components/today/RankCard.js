@@ -4,15 +4,17 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Trophy, ChevronRight, Crown, X } from 'lucide-react';
 import { createClient } from '@/lib/supabaseClient';
-import { addDays } from '@/lib/dateUtils';
-import { FIELDS, COMPETE_KEYS, buildBoard, indexStats, fmtVal, displayName } from '@/lib/friends';
+import { fmtVal, displayName } from '@/lib/friends';
+import { buildChallenges, indexBoard } from '@/lib/challenges';
 import { cx } from '@/components/way/ui';
 import { Avatar } from '@/components/friends/parts';
 
+// Slides in, counts down for 9 seconds (hover pauses) and tucks away; tap it
+// to open the Arena.
 /**
- * A short-lived banner with your place on this week's Friends leaderboard.
- * Slides in, counts down for 9 seconds (hover pauses) and tucks away; tap it
- * to open the Arena. Renders nothing unless you compete with someone.
+ * Home banner: where you stand in a live challenge. People are compared only
+ * inside challenges they joined, so with no live challenge there's nothing
+ * to show and the banner stays hidden.
  */
 export default function RankCard({ userId, today, className = '' }) {
   const supabase = useMemo(() => createClient(), []);
@@ -22,20 +24,18 @@ export default function RankCard({ userId, today, className = '' }) {
   useEffect(() => {
     let live = true;
     (async () => {
-      const { data: conns, error } = await supabase.from('connections').select('owner_id, other_id, fields').eq('kind', 'compete').eq('status', 'active');
-      if (error || !conns?.length) return;
+      const [challenges, members] = await Promise.all([
+        supabase.from('challenges').select('*').gte('ends_on', today).lte('starts_on', today).eq('status', 'open'),
+        supabase.from('challenge_members').select('challenge_id, user_id, status, invited_at, responded_at, result_seen'),
+      ]);
+      if (challenges.error || !challenges.data?.length) return;
       // Bring your own numbers up to date (throttled server-side), then read.
       await fetch('/api/friends/sync', { method: 'POST' }).catch(() => {});
-      const [people, stats] = await Promise.all([
-        supabase.rpc('friend_people'),
-        supabase.rpc('friend_stats', { p_from: addDays(today, -13), p_to: today }),
-      ]);
-      if (!live || people.error || stats.error) return;
-      setData({
-        competitors: conns.map((c) => ({ id: c.owner_id === userId ? c.other_id : c.owner_id, fields: c.fields })),
-        people: new Map((people.data || []).map((p) => [p.id, p])),
-        stats: indexStats(stats.data || []),
-      });
+      const [people, board] = await Promise.all([supabase.rpc('friend_people'), supabase.rpc('challenge_board')]);
+      if (!live || people.error || board.error) return;
+      const ch = buildChallenges({ challenges: challenges.data, members: members.data || [], board: indexBoard(board.data || []), meId: userId, today });
+      const x = ch.live.find((c) => c.status === 'joined' && c.ranked.length > 1) || ch.live.find((c) => c.status === 'joined');
+      if (x) setData({ x, people: new Map((people.data || []).map((p) => [p.id, p])) });
     })().catch(() => {});
     return () => {
       live = false;
@@ -43,25 +43,26 @@ export default function RankCard({ userId, today, className = '' }) {
   }, [supabase, userId, today]);
 
   if (!data) return null;
-  const metric = COMPETE_KEYS.find((key) => data.competitors.some((c) => c.fields.includes(key)));
-  if (!metric) return null;
-  const f = FIELDS[metric];
-  const { ranked } = buildBoard({ meId: userId, competitors: data.competitors, stats: data.stats, metric, period: 'week', today });
-  const total = Math.max(ranked.length, 1 + data.competitors.filter((c) => c.fields.includes(metric)).length);
+  const { x } = data;
+  const person = (id) => data.people.get(id) || { id };
+  const ranked = x.ranked;
   const i = ranked.findIndex((r) => r.id === userId);
   const mine = ranked[i];
   const ahead = i > 0 ? ranked[i - 1] : null;
   const behind = i >= 0 ? ranked[i + 1] : null;
-  const person = (id) => data.people.get(id) || { id };
+  const total = ranked.length + x.missing.length;
   const first = i === 0 && ranked.length > 1;
+  const f = x.f;
+  const what = x.multi ? `${x.metrics.length}-stat` : f.label.toLowerCase();
+  const gap = (a, b) => (x.multi ? `${a.v - b.v} stat${a.v - b.v === 1 ? '' : 's'}` : `${fmtVal(a.v - b.v, f.dec)} ${f.unit}`);
 
   const line = !mine
     ? 'Your numbers show up once WAY syncs your day.'
     : ahead
-      ? `${fmtVal(ahead.v - mine.v, f.dec)} ${f.unit} behind ${displayName(person(ahead.id))}`
+      ? `${gap(ahead, mine)} behind ${displayName(person(ahead.id))} · ${x.left}`
       : behind
-        ? `${fmtVal(mine.v - behind.v, f.dec)} ${f.unit} ahead of ${displayName(person(behind.id))}`
-        : 'Waiting for your friends to sync.';
+        ? `${gap(mine, behind)} ahead of ${displayName(person(behind.id))} · ${x.left}`
+        : `Waiting for the others to sync · ${x.left}`;
 
   return (
     <div
@@ -70,14 +71,14 @@ export default function RankCard({ userId, today, className = '' }) {
     >
       <div className="min-h-0 overflow-hidden">
         <div className="way-drop group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-[rgba(250,204,21,.3)] bg-[linear-gradient(90deg,rgba(250,204,21,.10),rgba(15,20,32,1)_55%)] py-2.5 pl-3 pr-2 lg:gap-4 lg:py-3 lg:pl-4">
-          <Link href="/friends?tab=arena" className="flex min-w-0 flex-1 items-center gap-3 lg:gap-4">
+          <Link href="/compete?tab=arena" className="flex min-w-0 flex-1 items-center gap-3 lg:gap-4">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-400/15">
               {first ? <Crown size={18} className="text-way-gold" /> : <Trophy size={17} className="text-way-gold" />}
             </span>
             <span className="font-brand text-[28px] leading-none text-way-gold">{mine ? `#${i + 1}` : '—'}</span>
             <span className="flex min-w-0 flex-col">
               <span className="truncate text-[13px] font-semibold">
-                of {total} in {f.label.toLowerCase()} this week
+                of {total} in your {what} challenge
               </span>
               <span className="truncate text-xs text-way-mute">{line}</span>
             </span>

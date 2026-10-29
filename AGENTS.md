@@ -36,7 +36,7 @@ src/
 │   │                        #   Family, Inbox, Privacy. Leaderboard.js is the shared podium board
 │   ├── activity/, nutrition/, streak/, weight/, settings/, onboarding/, landing/, legal/
 │   ├── body/                # 3D viewers and studio
-│   ├── way/                 # Design system (ui.js, WayNav, useJson cache, tiles)
+│   ├── way/                 # Design system (ui.js, WayNav + phone profile island, TapTips, useJson cache, tiles)
 │   └── home/                # Older home widgets; several are no longer routed (see section 7)
 └── lib/
     ├── authServer.js        # getAuthUser(): signed proxy headers or getClaims(); signIdentity()
@@ -102,3 +102,5 @@ Seed data: `seed-dummy-foods.sql`, `seed-ingredients.sql` or `generated-ingredie
 - Branch from `main`, open a PR, wait for the Vercel preview, then merge. New SQL goes in a new dated file and must be run **before** merging code that depends on it.
 - Not routed today (kept for reference; delete rather than revive without review): `components/home/HomeClient.js` and the widgets only it uses (`TileBoard`, `DailyLog`, `WeightBar`, `WeightBodyPreview`…), `components/body/BodyAgeCard.js` (has its own unscoped cache), `components/layout/BottomNav.js`, `components/forms/ProfileForm.js`, `components/weight/*`, `lib/insights.js`, `lib/userData.js`.
 - User-facing text: plain, short, no jargon.
+- Chart details: wrap the bars in `TapTips` and put the text in `data-tip` (never `title`, which phones don't show). Mouse hover and finger tap both work.
+- Phones: the profile island (Settings, Account, Log out) floats top right on every page; page headers (`main > header`) keep 52px clear for it.

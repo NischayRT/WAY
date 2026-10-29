@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Flame, Crown, Sparkles, ChevronRight } from 'lucide-react';
 import { streakTier } from '@/lib/streak';
 import { Card, Eyebrow, cx } from '@/components/way/ui';
+import TapTips from '@/components/way/TapTips';
 
 /**
  * Login streak (days you opened WAY); opens the streak page. The look grows with the streak: a grey ember, a small
@@ -97,16 +98,16 @@ export default function StreakCard({ streak, k, className = '' }) {
 
       {/* Last 7 days */}
       <div className="relative hidden flex-col items-end gap-2 sm:flex">
-        <div className="flex gap-1">
+        <TapTips className="flex gap-1">
           {(streak?.last7 || []).map((d) => (
             <span
               key={d.date}
               className="h-5 w-2 rounded-full transition-colors"
               style={{ background: d.on ? t.color : '#1a2130', boxShadow: d.on && lvl >= 3 ? `0 0 8px ${t.color}88` : 'none' }}
-              title={d.date}
+              data-tip={`${new Date(`${d.date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })}\n${d.on ? 'Opened WAY' : 'Missed'}`}
             />
           ))}
-        </div>
+        </TapTips>
         <span className="font-mono text-[10px] text-way-dim">last 7 days</span>
       </div>
       <ChevronRight size={16} className="relative shrink-0 text-way-faint transition-colors group-hover:text-way-ink2" />

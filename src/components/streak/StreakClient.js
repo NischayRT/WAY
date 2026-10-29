@@ -6,6 +6,7 @@ import { ArrowLeft, Flame, Crown, Sparkles, Lock, Check, Utensils, CalendarDays 
 import { STREAK_TIERS, streakTier } from '@/lib/streak';
 import { addDays } from '@/lib/dateUtils';
 import { PAGE, Card, Eyebrow, Btn, cx } from '@/components/way/ui';
+import TapTips from '@/components/way/TapTips';
 
 // Deterministic "random" so server and client render the same particles.
 // Rounded, because Math.sin can differ in the last digits between server and browser.
@@ -262,7 +263,7 @@ export default function StreakClient({ login, food, today, name }) {
               {recent.size} of 42 days
             </span>
           </div>
-          <div className="mx-auto grid w-full max-w-[340px] grid-cols-7 gap-1.5">
+          <TapTips className="mx-auto grid w-full max-w-[340px] grid-cols-7 gap-1.5">
             {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
               <span key={i} className="text-center font-heading text-[10px] font-bold text-way-dim">
                 {d}
@@ -274,7 +275,7 @@ export default function StreakClient({ login, food, today, name }) {
               return (
                 <span
                   key={d}
-                  title={d}
+                  data-tip={future ? undefined : `${new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })}\n${on ? 'Opened WAY' : 'Missed'}`}
                   className={cx('way-pop aspect-square rounded-md', d === today && 'ring-2 ring-way-ink/60')}
                   style={{
                     '--d': `${1100 + i * 18}ms`,
@@ -286,7 +287,7 @@ export default function StreakClient({ login, food, today, name }) {
                 />
               );
             })}
-          </div>
+          </TapTips>
         </Card>
 
         {/* Food streak + why */}

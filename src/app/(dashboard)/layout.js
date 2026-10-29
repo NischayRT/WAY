@@ -8,6 +8,7 @@ import { getAuthUser } from '@/lib/authServer';
 // older component that still uses `dark:` variants in step with it.
 export default async function DashboardLayout({ children }) {
   let initial = 'W';
+  let name = '';
   try {
     const supabase = await createServerSupabaseClient();
     const user = await getAuthUser(supabase);
@@ -17,6 +18,7 @@ export default async function DashboardLayout({ children }) {
         supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
       ]);
       initial = (profile?.full_name || user.email || 'W').trim().charAt(0).toUpperCase() || 'W';
+      name = (profile?.full_name || '').trim();
     }
   } catch {
     // Signed out or Supabase unreachable: the page itself handles the redirect.
@@ -25,7 +27,7 @@ export default async function DashboardLayout({ children }) {
   return (
     <div className="way-app dark min-h-screen overflow-x-clip bg-way-page text-way-ink [color-scheme:dark] md:pl-[76px]">
       {children}
-      <WayNav initial={initial} />
+      <WayNav initial={initial} name={name} />
     </div>
   );
 }

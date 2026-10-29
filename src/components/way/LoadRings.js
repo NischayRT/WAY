@@ -1,6 +1,7 @@
 'use client';
 
 import { cx } from '@/components/way/ui';
+import TapTips from './TapTips';
 
 /**
  * Recovery · Strain · Sleep rings (lib/dailyLoad.js via
@@ -162,13 +163,13 @@ export function LoadTrend({ series = [], className = '' }) {
               <span className="text-way-mute">{r.label}</span>
               <span className="font-mono font-semibold text-way-ink2">avg {r.fmt(r.key === 'strain' ? avg : Math.round(avg))}</span>
             </div>
-            <div className="flex h-14 items-end gap-[2px]">
+            <TapTips className="flex h-14 items-end gap-[2px]">
               {series.map((d) => {
                 const v = d[r.key];
                 return (
                   <div
                     key={d.date}
-                    title={`${d.date}: ${v == null ? 'no data' : r.fmt(v)}`}
+                    data-tip={`${new Date(`${d.date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })}\n${r.label}: ${v == null ? 'no data' : r.fmt(v)}`}
                     className="flex-1 rounded-t-[2px]"
                     style={{
                       height: v == null ? 3 : `${Math.max(6, Math.min(100, (v / r.max) * 100))}%`,
@@ -178,7 +179,7 @@ export function LoadTrend({ series = [], className = '' }) {
                   />
                 );
               })}
-            </div>
+            </TapTips>
           </div>
         );
       })}

@@ -528,7 +528,7 @@ function PlanReview({ plan, form }) {
         <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
           {plan.direction === 'maintain'
             ? 'Built to keep your weight steady.'
-            : `To reach ${form.targetWeightKg} kg${plan.targetDate ? ` around ${fmtDate(plan.targetDate)} (${plan.weeks} weeks)` : ''}.`}
+            : `To reach ${fmtWeight(form.targetWeightKg, units)}${plan.targetDate ? ` around ${fmtDate(plan.targetDate)} (${plan.weeks} weeks)` : ''}.`}
         </p>
       </div>
 

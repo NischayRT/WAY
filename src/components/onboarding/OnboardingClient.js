@@ -9,7 +9,7 @@ import { todayLocalDate } from '@/lib/dateUtils';
 import { ui } from '@/lib/ui';
 import { buildPlan, bmiInfo, healthyWeightRange, PACES } from '@/lib/planner';
 import { useUnits, UnitSwitch, WeightInput, HeightInput } from '@/components/way/units';
-import { fmtHeight, fmtWeight, weightUnit } from '@/lib/units';
+import { fmtHeight, fmtWeight, weightUnit, kgToDisplay, displayToKg } from '@/lib/units';
 import BodyMeasurementsForm from '@/components/onboarding/BodyMeasurementsForm';
 import GoogleHealthOnboardingStep from '@/components/onboarding/GoogleHealthOnboardingStep';
 
@@ -111,11 +111,12 @@ export default function OnboardingClient() {
         heightCm: Number(form.heightCm),
         weightKg: Number(form.weightKg),
         targetWeightKg: goal?.needsTarget ? Number(form.targetWeightKg) || null : null,
+        fmtRange: (lo, hi) => `${fmtWeight(lo, units, 1, false)}-${fmtWeight(hi, units)}`,
       });
     } catch {
       return null;
     }
-  }, [form, goal]);
+  }, [form, goal, units]);
 
   /* ---------------- per-step validation ---------------- */
   const stepError = useMemo(() => {
@@ -364,15 +365,18 @@ export default function OnboardingClient() {
               {(() => {
                 const r = healthyWeightRange(form.heightCm);
                 const w = Number(form.weightKg);
+                // Round steps in your unit: 3 and 5 kg, or 5 and 10 lb.
+                const lb = units.weight === 'lb';
+                const toKg = (n) => (lb ? Math.round(displayToKg(Math.round(kgToDisplay(w, units)) + n, units) * 100) / 100 : w + n);
                 const sugg =
                   goal.needsTarget === 'lower'
-                    ? [w - 3, w - 5, r && r.max < w ? r.max : null]
-                    : [w + 2, w + 4];
+                    ? [toKg(lb ? -5 : -3), toKg(lb ? -10 : -5), r && r.max < w ? r.max : null]
+                    : [toKg(lb ? 5 : 2), toKg(lb ? 10 : 4)];
                 return (
                   <div className="flex flex-wrap gap-1.5">
-                    {[...new Set(sugg.filter((x) => x && x > 30).map((x) => Math.round(x * 10) / 10))].map((x) => (
+                    {[...new Set(sugg.filter((x) => x && x > 30).map((x) => (lb ? x : Math.round(x * 10) / 10)))].map((x) => (
                       <button key={x} type="button" onClick={() => set('targetWeightKg')(String(x))} className="rounded-full border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
-                        {fmtWeight(x, units)}
+                        {fmtWeight(x, units, lb && x !== r?.max ? 0 : 1)}
                         {r && x === r.max ? ' (healthy max)' : ''}
                       </button>
                     ))}

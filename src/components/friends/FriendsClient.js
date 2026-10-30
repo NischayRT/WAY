@@ -6,6 +6,7 @@ import { RefreshCw, UserPlus, Flame, Swords, Trophy, AtSign, Database, Sparkles,
 import { addDays, todayLocalDate } from '@/lib/dateUtils';
 import {
   FIELDS,
+  COMPETE_KEYS,
   fmtVal,
   displayName,
   levelOf,
@@ -193,12 +194,29 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent, units }
   for (const c of competitors) addRel(c.id, 'Compete');
   for (const s of sharesIn) addRel(s.owner.id, 'Shares with you');
   for (const s of sharesOut) addRel(s.viewer.id, 'You share');
+  // Friends' numbers come only from challenges that are live right now, and
+  // only that challenge's stats and days (challenge_board does the scoping).
+  const seen = new Map(); // userId -> Map(field -> Map(day -> value))
+  for (const x of ch.running) {
+    if (x.phase !== 'live') continue;
+    for (const [metric, byUser] of d.board.get(x.c.id) || []) {
+      for (const [uid, byDay] of byUser) {
+        if (uid === userId || blockedIds.has(uid)) continue;
+        if (!seen.has(uid)) seen.set(uid, new Map());
+        const u = seen.get(uid);
+        if (!u.has(metric)) u.set(metric, new Map());
+        for (const [day, v] of byDay) u.get(metric).set(day, v);
+      }
+    }
+  }
   const friends = [...relOf].map(([id, rels]) => {
     const p = person(id);
     const comp = competitors.find((c) => c.id === id);
-    const u = d.stats.get(id);
-    const stepsToday = u?.get('steps')?.get(today);
-    const stepsWeek = dailyValue(u?.get('steps'), 'steps', addDays(today, -6), today);
+    const u = seen.get(id);
+    const shownField = u ? ['steps', ...COMPETE_KEYS].find((f) => u.get(f)?.size) : null;
+    const todayV = shownField ? u.get(shownField).get(today) : null;
+    const weekV = shownField ? dailyValue(u.get(shownField), shownField, addDays(today, -6), today) : null;
+    const unitOf = (f) => (f === 'steps' ? 'steps' : FIELDS[f].unit);
     // Already cheered today (here or in the feed): the button shows it and
     // tapping undoes that same cheer.
     const cheerKey = cheeredToday.get(id) || `${id}:cheer:${today}`;
@@ -212,13 +230,25 @@ export function buildModel({ d, userId, profile, today, cheerFlip, sent, units }
       cheerKey,
       cheered: cheeredToday.has(id),
       cheeredYou: cheersIn.filter((c) => c.from_id === id).length,
-      line: stepsToday != null ? `${fmtVal(stepsToday)} steps today` : stepsWeek != null ? `${fmtVal(stepsWeek)} steps/day this week` : 'No numbers yet',
+      line:
+        todayV != null
+          ? `${fmtVal(todayV, FIELDS[shownField].dec)} ${unitOf(shownField)} today`
+          : weekV != null
+            ? `${fmtVal(weekV, FIELDS[shownField].dec)} ${unitOf(shownField)}/day this week`
+            : comp
+              ? 'Numbers show only inside a challenge'
+              : 'Family',
     };
   }).sort((a, b) => Number(b.canCheer) - Number(a.canCheer) || displayName(a.person).localeCompare(displayName(b.person)));
 
   const foodStreak = logStreak(d.foodDays, today);
   const badges = badgesFor({ mine, foodStreak, challengeWins: ch.record.wins, today });
-  const feed = buildFeed({ competitors, stats: d.stats, today });
+  // Big days of friends you're in a live challenge with (cheers need a friend).
+  const feed = buildFeed({
+    competitors: competitors.filter((c) => seen.has(c.id)).map((c) => ({ id: c.id, fields: [...seen.get(c.id).keys()] })),
+    stats: seen,
+    today,
+  });
 
   const connectedIds = new Set([
     ...d.connections.filter((c) => c.status === 'active').map(other),

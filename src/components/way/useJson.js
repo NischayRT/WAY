@@ -10,6 +10,7 @@ const cache = new Map(); // url -> { data, error, status, t }
 const MAX_ENTRIES = 80;
 const FRESH_MS = 30 * 1000; // younger than this: don't even refetch
 const inflight = new Map(); // url -> Promise, so two widgets share one request
+let generation = 0; // bumped on account change; answers from before are dropped
 
 function remember(url, entry) {
   cache.delete(url);
@@ -19,16 +20,20 @@ function remember(url, entry) {
 
 function load(url) {
   if (inflight.has(url)) return inflight.get(url);
+  const gen = generation;
   const p = fetch(url)
     .then(async (res) => {
       const data = await res.json().catch(() => null);
-      const entry = { data, error: res.ok ? null : data?.error || `Request failed (${res.status})`, status: res.status, t: Date.now() };
-      // Only successful answers are reused; errors are always retried.
-      if (res.ok) remember(url, entry);
+      const entry = { data, error: res.ok ? null : data?.error || `Request failed (${res.status})`, status: res.status, t: Date.now(), gen };
+      // Only successful answers are reused; errors are always retried. An
+      // answer that started before an account change is never cached.
+      if (res.ok && gen === generation) remember(url, entry);
       return entry;
     })
-    .catch((e) => ({ data: null, error: e.message || 'Network error', status: null, t: Date.now() }))
-    .finally(() => inflight.delete(url));
+    .catch((e) => ({ data: null, error: e.message || 'Network error', status: null, t: Date.now(), gen }))
+    .finally(() => {
+      if (inflight.get(url) === p) inflight.delete(url);
+    });
   inflight.set(url, p);
   return p;
 }
@@ -52,6 +57,7 @@ function watchAccount() {
       if (owner !== cacheOwner) {
         cache.clear();
         inflight.clear();
+        generation += 1;
         cacheOwner = owner;
       }
     });
@@ -83,7 +89,8 @@ export function useJson(url) {
       if (!nonce && Date.now() - hit.t < FRESH_MS) return undefined;
     }
     load(url).then((entry) => {
-      if (live) setState({ url, ...entry });
+      // Ignore answers for the previous account.
+      if (live && entry.gen === generation) setState({ url, ...entry });
     });
     return () => {
       live = false;

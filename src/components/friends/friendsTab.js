@@ -210,8 +210,8 @@ export function FriendsTab({ m, k, copied, onCopy, onAdd, onCheerPerson, onChall
       {friends.length ? (
         <Card className="flex flex-col pb-2 pt-[18px] lg:col-span-12 lg:pt-[22px]">
           <div className="flex items-center justify-between px-4 pb-3 lg:px-6">
-            <Eyebrow>Friend activity</Eyebrow>
-            <span className="font-mono text-[11px] font-medium text-way-dim">last 7 days · one cheer a day each</span>
+            <Eyebrow>Challenge activity</Eyebrow>
+            <span className="font-mono text-[11px] font-medium text-way-dim">live challenges · one cheer a day each</span>
           </div>
           {m.feed.length ? (
             m.feed.map((e) => {
@@ -250,7 +250,7 @@ export function FriendsTab({ m, k, copied, onCopy, onAdd, onCheerPerson, onChall
             })
           ) : (
             <p className="border-t border-way-line px-6 py-6 text-center text-[13px] text-way-dim">
-              Nothing yet this week. Big days show up here once friends sync: 10k steps, long walks, high climbs.
+              Friends’ big days show up here while you’re in a challenge together: 10k steps, long walks, high climbs. Outside challenges, your numbers stay private.
             </p>
           )}
         </Card>

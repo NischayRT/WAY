@@ -12,7 +12,6 @@ import WeekDateStrip from '@/components/home/WeekDateStrip';
 import NutritionalOrbitPanel from '@/components/home/NutritionalOrbitPanel';
 import MealTargetsCard from '@/components/home/MealTargetsCard';
 import WeekMacroChart from '@/components/home/WeekMacroChart';
-import RepeatMealBanner from '@/components/home/RepeatMealBanner';
 import DailyLog from '@/components/home/DailyLog';
 import QuickWeightLogModal from '@/components/home/QuickWeightLogModal';
 import { RemainingGoalWidget } from '@/components/home/GoogleHealthWidgets';
@@ -252,7 +251,6 @@ export default function HomeClient({
                   targetCalories={currentTargets.targetCalories}
                 />
               </div>
-              <RepeatMealBanner selectedDate={selectedDate} />
             </div>
           </div>
 

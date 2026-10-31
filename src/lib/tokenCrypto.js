@@ -13,17 +13,17 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
  * Format: enc:v1:<iv>:<tag>:<ciphertext>  (AES-256-GCM, base64url parts)
  *
  * Rollout-safe: values without the prefix are treated as legacy plaintext
- * and re-encrypted the next time they are written. In production a missing
- * key is an error: tokens are never stored unencrypted there. Elsewhere
- * (local dev, preview deployments without the key) they are stored as before
- * with a warning, so development never breaks.
+ * and re-encrypted the next time they are written. On any deployed build
+ * (Vercel production AND preview, which can share the production database)
+ * a missing key is an error: tokens are never stored unencrypted there. Only
+ * local development stores them as before, with a warning.
  */
 
 const PREFIX = 'enc:v1:';
 
-// Vercel production (or any production build outside Vercel).
+// Any Vercel deployment (production or preview), or a production build elsewhere.
 function isProduction() {
-  return process.env.VERCEL_ENV ? process.env.VERCEL_ENV === 'production' : process.env.NODE_ENV === 'production';
+  return Boolean(process.env.VERCEL_ENV) || process.env.NODE_ENV === 'production';
 }
 let warned = false;
 
@@ -31,7 +31,7 @@ function key() {
   const raw = process.env.TOKEN_ENCRYPTION_KEY;
   if (!raw) {
     if (isProduction()) {
-      throw new Error('TOKEN_ENCRYPTION_KEY is not set; refusing to store OAuth tokens unencrypted in production.');
+      throw new Error('TOKEN_ENCRYPTION_KEY is not set; refusing to store OAuth tokens unencrypted on a deployed build.');
     }
     if (!warned) {
       console.warn('[tokenCrypto] TOKEN_ENCRYPTION_KEY is not set; OAuth tokens are stored unencrypted.');

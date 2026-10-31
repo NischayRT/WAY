@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 
 // Per-user request limits for routes that call Google (each call spends the
 // app's shared Google Cloud quota). Counted in the database
-// (public.hit_rate_limit in supabase/security-followups-2026-10.sql), so the
-// limit holds across every serverless instance.
+// (public.hit_rate_limit), so the limit holds across every serverless instance.
+// The database owns the policy: since supabase/security-run2-2026-10.sql it
+// ignores the limit and window sent here, so a caller can't loosen or reset
+// them. Keep these numbers in step with that file (they're still sent, so
+// older databases keep working, and the 429 Retry-After uses them).
 //
 // Limits are generous for real use: the home page asks for ~4 Google-backed
 // endpoints per load.

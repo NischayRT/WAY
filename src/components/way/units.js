@@ -46,6 +46,21 @@ export function UnitsProvider({ initial, userId, children }) {
     }
   }, [fromServer, userId]);
 
+  // The copy in this browser belongs to whoever is signed in: forget it on
+  // sign-out so the next account on this browser doesn't inherit it.
+  useEffect(() => {
+    supabase.current ??= createClient();
+    const { data } = supabase.current.auth.onAuthStateChange((event) => {
+      if (event !== 'SIGNED_OUT') return;
+      try {
+        localStorage.removeItem(LOCAL_KEY);
+      } catch {
+        // storage blocked: nothing to forget
+      }
+    });
+    return () => data?.subscription?.unsubscribe();
+  }, []);
+
   const setUnit = useCallback(
     (kind, value) => {
       setUnits((u) => {

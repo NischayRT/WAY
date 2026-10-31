@@ -92,8 +92,9 @@ export default function TermsPage() {
 
       <Section title="9. Ending your use">
         <p>
-          You can stop using {app} or delete your account in Settings at any time. We may suspend or end access if you break
-          these Terms or put the service or other users at risk.
+          You can stop using {app} at any time. To delete your account, email <ContactLine /> from the address you sign in with; the
+          Privacy Policy explains what we erase and when. We may suspend or end access if you break these Terms or put
+          the service or other users at risk.
         </p>
       </Section>
 

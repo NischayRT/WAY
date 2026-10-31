@@ -9,7 +9,7 @@ import { Modal, Btn, Segmented, cx } from '@/components/way/ui';
 import { Avatar } from './parts';
 
 const MODES = [
-  { key: 'compete', title: 'Compete', desc: 'Rank each other. You both agree what counts.', Icon: Swords, c: '#fb7185' },
+  { key: 'compete', title: 'Compete', desc: 'Race in challenges. You both agree what counts; numbers show only while one is on.', Icon: Swords, c: '#fb7185' },
   { key: 'offer', title: 'Share mine', desc: 'They see what you pick, for as long as you choose.', Icon: Share2, c: '#34d399' },
   { key: 'request', title: 'Ask to see', desc: 'They decide what, if anything, to share.', Icon: Eye, c: '#60a5fa' },
 ];
